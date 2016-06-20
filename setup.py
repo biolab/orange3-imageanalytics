@@ -20,6 +20,10 @@ KEYWORDS = [
 
 PACKAGES = find_packages()
 
+PACKAGE_DATA = {
+    "orangecontrib.imageanalytics.widgets": ["icons/*.svg"],
+}
+
 INSTALL_REQUIRES = [
     "Orange3 >= 3.3.5",
     "setuptools",
@@ -40,6 +44,7 @@ if __name__ == "__main__":
         description=DESCRIPTION,
         license=LICENSE,
         packages=PACKAGES,
+        package_data=PACKAGE_DATA,
         keywords=KEYWORDS,
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,

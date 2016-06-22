@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 
 from setuptools import setup, find_packages
+import io
+
+with io.open("README.rst", "r", encoding="utf-8") as f:
+    README = f.read()
 
 NAME = "Orange3-ImageAnalytics"
 VERSION = "0.0.1"
 DESCRIPTION = "Orange3 add-on for dealing with image related tasks"
+LONG_DESCRIPTION = README
 LICENSE = "GPL3+"
 CLASSIFIERS = [
     "Development Status :: 1 - Planning",
@@ -27,11 +32,14 @@ PACKAGE_DATA = {
 INSTALL_REQUIRES = [
     "Orange3 >= 3.3.5",
     "setuptools",
+    "numpy",
 ]
 
 ENTRY_POINTS = {
     "orange.widgets":
-        ("Image Analytics = orangecontrib.imageanalytics.widgets",)
+        ("Image Analytics = orangecontrib.imageanalytics.widgets",),
+    "orange3.addon":
+        ("Orange3-Imageanalytics = orangecontrib.imageanalytics",)
 }
 
 NAMESPACE_PACKAGES = ["orangecontrib"]
@@ -42,6 +50,7 @@ if __name__ == "__main__":
         name=NAME,
         version=VERSION,
         description=DESCRIPTION,
+        long_description=LONG_DESCRIPTION,
         license=LICENSE,
         packages=PACKAGES,
         package_data=PACKAGE_DATA,

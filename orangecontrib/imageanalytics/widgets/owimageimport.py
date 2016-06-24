@@ -302,7 +302,10 @@ class OWImportImages(widget.OWWidget):
         elif self.__state == OWImportImages.Done:
             nvalid = sum(imeta.isvalid for imeta in self._imageMeta)
             ncategories = len(self._imageCategories)
-            text = "{} images / {} categories".format(nvalid, ncategories)
+            if ncategories < 2:
+                text = "{} images".format(nvalid)
+            else:
+                text = "{} images / {} categories".format(nvalid, ncategories)
         elif self.__state == OWImportImages.Cancelled:
             text = "Cancelled"
         elif self.__state == OWImportImages.Error:
@@ -558,9 +561,12 @@ class OWImportImages(widget.OWWidget):
         """
         if self._imageMeta:
             categories = self._imageCategories
-            cat_var = Orange.data.DiscreteVariable(
-                "category", values=list(sorted(categories.values()))
-            )
+            if len(categories) > 1:
+                cat_var = Orange.data.DiscreteVariable(
+                    "category", values=list(sorted(categories.values()))
+                )
+            else:
+                cat_var = None
             # Image name (file basename without the extension)
             imagename_var = Orange.data.StringVariable("image name")
             # Full fs path
@@ -574,7 +580,7 @@ class OWImportImages(widget.OWWidget):
             height_var = Orange.data.ContinuousVariable(
                 "height", number_of_decimals=0)
             domain = Orange.data.Domain(
-                [], [cat_var],
+                [], [cat_var] if cat_var is not None else [],
                 [imagename_var, image_var, size_var, width_var, height_var]
             )
             cat_data = []
@@ -582,10 +588,14 @@ class OWImportImages(widget.OWWidget):
 
             for imgmeta in self._imageMeta:
                 if imgmeta.isvalid:
-                    category = categories.get(os.path.dirname(imgmeta.path))
+                    if cat_var is not None:
+                        category = categories.get(os.path.dirname(imgmeta.path))
+                        cat_data.append([cat_var.to_val(category)])
+                    else:
+                        cat_data.append([])
                     basename = os.path.basename(imgmeta.path)
                     imgname, _ = os.path.splitext(basename)
-                    cat_data.append([cat_var.to_val(category)])
+
                     meta_data.append(
                         [imgname, imgmeta.path, imgmeta.size,
                          imgmeta.width, imgmeta.height]

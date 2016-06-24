@@ -111,8 +111,8 @@ class OWImportImages(widget.OWWidget):
         NoState, Processing, Done, Cancelled, Error = range(5)
     NoState, Processing, Done, Cancelled, Error = State
 
-    # Modality = Qt.ApplicationModal
-    Modality = Qt.WindowModal
+    Modality = Qt.ApplicationModal
+    # Modality = Qt.WindowModal
 
     MaxRecentItems = 20
 

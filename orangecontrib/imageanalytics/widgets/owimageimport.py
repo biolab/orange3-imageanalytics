@@ -561,13 +561,19 @@ class OWImportImages(widget.OWWidget):
             cat_var = Orange.data.DiscreteVariable(
                 "category", values=list(sorted(categories.values()))
             )
+            # Image name (file basename without the extension)
+            imagename_var = Orange.data.StringVariable("image name")
+            # Full fs path
             image_var = Orange.data.StringVariable("image")
             image_var.attributes["type"] = "image"
+            # file size
             size_var = Orange.data.ContinuousVariable("size")
+            # image width/height
             width_var = Orange.data.ContinuousVariable("width")
             height_var = Orange.data.ContinuousVariable("height")
             domain = Orange.data.Domain(
-                [], [cat_var], [image_var, size_var, width_var, height_var]
+                [], [cat_var],
+                [imagename_var, image_var, size_var, width_var, height_var]
             )
             cat_data = []
             meta_data = []
@@ -575,9 +581,11 @@ class OWImportImages(widget.OWWidget):
             for imgmeta in self._imageMeta:
                 if imgmeta.isvalid:
                     category = categories.get(os.path.dirname(imgmeta.path))
+                    basename = os.path.basename(imgmeta.path)
+                    imgname, _ = os.path.splitext(basename)
                     cat_data.append([cat_var.to_val(category)])
                     meta_data.append(
-                        [imgmeta.path, imgmeta.size,
+                        [imgname, imgmeta.path, imgmeta.size,
                          imgmeta.width, imgmeta.height]
                     )
 

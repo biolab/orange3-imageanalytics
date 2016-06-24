@@ -636,10 +636,11 @@ class ImageScan:
     def run(self):
         imgmeta = []
         filescanner = scan(self.startdir)
-        patterns = ["*.{}".format(fmt) for fmt in self.formats]
+        patterns = ["*.{}".format(fmt.lower()) for fmt in self.formats]
 
         def fnmatch_any(fname, patterns):
-            return any(fnmatch.fnmatch(fname, pattern) for pattern in patterns)
+            return any(fnmatch.fnmatch(fname.lower(), pattern)
+                       for pattern in patterns)
 
         batch = []
 

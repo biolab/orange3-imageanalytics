@@ -449,49 +449,55 @@ class OWImportImages(widget.OWWidget):
             assert self.__pendingTask is not None
             log.info("Starting a new task while one is in progress. "
                      "Cancel the existing task (dir:'{}')"
-                     .format(self.__pendingTask.topdir))
+                     .format(self.__pendingTask.startdir))
             self.cancel()
 
-        topdir = self.currentPath
+        startdir = self.currentPath
 
         self.__setRuntimeState(OWImportImages.Processing)
 
         report_progress = methodinvoke(
             self, "__onReportProgress", (object,))
 
-        taskstate = namespace(cancelled=False,
-                              report_progress=report_progress)
+        task = ImageScan(startdir, report_progress=report_progress)
 
-        self.__pendingTask = task = namespace(
-            topdir=topdir,
-            taskstate=taskstate,
+        # collect the task state in one convenient place
+        self.__pendingTask = taskstate = namespace(
+            task=task,
+            startdir=startdir,
             future=None,
             watcher=None,
             cancelled=False,
             cancel=None,
-            report_progress=report_progress
         )
 
         def cancel():
-            task.cancelled = True
-            task.taskstate.cancelled = True
-            task.future.cancel()
-            task.watcher.finished.disconnect(self.__onRunFinished)
+            # Cancel the task and disconnect
+            if taskstate.future.cancel():
+                pass
+            else:
+                taskstate.task.cancelled = True
+                taskstate.cancelled = True
+                try:
+                    taskstate.future.result(timeout=3)
+                except UserInterruptError:
+                    pass
+                except TimeoutError:
+                    log.info("The task did not stop in in a timely manner")
+            taskstate.watcher.finished.disconnect(self.__onRunFinished)
 
-        task.cancel = cancel
+        taskstate.cancel = cancel
 
-        def run_image_scan_task_interupt(*args, **kwargs):
+        def run_image_scan_task_interupt():
             try:
-                return run_image_scan_task(*args, **kwargs)
-            except UserInteruptError:
+                return task.run()
+            except UserInterruptError:
                 # Suppress interrupt errors, so they are not logged
                 return
 
-        task.future = self.__executor.submit(
-            run_image_scan_task_interupt, topdir, taskstate=taskstate
-        )
-        task.watcher = FutureWatcher(task.future)
-        task.watcher.finished.connect(self.__onRunFinished)
+        taskstate.future = self.__executor.submit(run_image_scan_task_interupt)
+        taskstate.watcher = FutureWatcher(taskstate.future)
+        taskstate.watcher.finished.connect(self.__onRunFinished)
 
     @Slot()
     def __onRunFinished(self):
@@ -519,7 +525,7 @@ class OWImportImages(widget.OWWidget):
         for imeta in image_meta:
             # derive categories from the path relative to the starting dir
             dirname = os.path.dirname(imeta.path)
-            relpath = os.path.relpath(dirname, task.topdir)
+            relpath = os.path.relpath(dirname, task.startdir)
             categories[dirname] = relpath
 
         self._imageMeta = image_meta
@@ -530,7 +536,7 @@ class OWImportImages(widget.OWWidget):
 
     def cancel(self):
         """
-        Cancel current pending task.
+        Cancel current pending task (if any).
         """
         if self.__state == OWImportImages.Processing:
             assert self.__pendingTask is not None
@@ -591,7 +597,7 @@ class OWImportImages(widget.OWWidget):
         self.__executor.shutdown(wait=True)
 
 
-class UserInteruptError(BaseException):
+class UserInterruptError(BaseException):
     """
     A BaseException subclass used for cooperative task/thread cancellation
     """
@@ -600,22 +606,47 @@ class UserInteruptError(BaseException):
 DefaultFormats = ("jpeg", "jpg", "png")
 
 
-def run_image_scan_task(topdir, formats=DefaultFormats, *, taskstate=None):
-    imgmeta = []
-    scanner = scan_images(topdir, formats=formats)
-    for batch in batches(scanner, 10):
-        imgmeta.extend(batch)
+class ImageScan:
+    def __init__(self, startdir, formats=DefaultFormats, report_progress=None):
+        self.startdir = startdir
+        self.formats = formats
+        self.report_progress = report_progress
+        self.cancelled = False
 
-        if taskstate is not None:
-            if taskstate.cancelled:
-                raise UserInteruptError()
-            if taskstate.report_progress is not None:
-                taskstate.report_progress(
+    def run(self):
+        imgmeta = []
+        filescanner = scan(self.startdir)
+        patterns = ["*.{}".format(fmt) for fmt in self.formats]
+
+        def fnmatch_any(fname, patterns):
+            return any(fnmatch.fnmatch(fname, pattern) for pattern in patterns)
+
+        batch = []
+
+        for path in filescanner:
+            if fnmatch_any(path, patterns):
+                imeta = image_meta_data(path)
+                imgmeta.append(imeta)
+                batch.append(imgmeta)
+
+            if self.cancelled:
+                return
+                # raise UserInterruptError
+
+            if len(batch) == 10 and self.report_progress is not None:
+                self.report_progress(
                     namespace(count=len(imgmeta),
                               lastpath=imgmeta[-1].path,
-                              batch=batch)
-                )
-    return imgmeta
+                              batch=batch))
+                batch = []
+
+        if batch and self.report_progress is not None:
+            self.report_progress(
+                    namespace(count=len(imgmeta),
+                              lastpath=imgmeta[-1].path,
+                              batch=batch))
+
+        return imgmeta
 
 
 def batches(iter, batch_size=10):

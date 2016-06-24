@@ -33,6 +33,7 @@ INSTALL_REQUIRES = [
     "Orange3 >= 3.3.5",
     "setuptools",
     "numpy",
+    "pillow"
 ]
 
 ENTRY_POINTS = {

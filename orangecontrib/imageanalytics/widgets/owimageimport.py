@@ -566,11 +566,13 @@ class OWImportImages(widget.OWWidget):
             # Full fs path
             image_var = Orange.data.StringVariable("image")
             image_var.attributes["type"] = "image"
-            # file size
-            size_var = Orange.data.ContinuousVariable("size")
-            # image width/height
-            width_var = Orange.data.ContinuousVariable("width")
-            height_var = Orange.data.ContinuousVariable("height")
+            # file size/width/height
+            size_var = Orange.data.ContinuousVariable(
+                "size", number_of_decimals=0)
+            width_var = Orange.data.ContinuousVariable(
+                "width", number_of_decimals=0)
+            height_var = Orange.data.ContinuousVariable(
+                "height", number_of_decimals=0)
             domain = Orange.data.Domain(
                 [], [cat_var],
                 [imagename_var, image_var, size_var, width_var, height_var]

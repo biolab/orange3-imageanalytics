@@ -1,3 +1,16 @@
+"""
+ImageNet Embedding
+------------------
+Embeds images listed in input data table using the output of the
+image embedding server.
+"""
+
+# todo how to handle dirty flag on commit (checkbox auto commit)
+# todo check when dead server
+# todo recheck the server (should there be another button, where?)
+# todo handle images from the network (not in local files)
+# todo add image attribute (like in view images)
+
 import numpy as np
 
 from Orange.widgets import widget, gui
@@ -13,7 +26,7 @@ class OWImageNetEmbedding(widget.OWWidget):
     name = "ImageNet Embedding"
     description = "Image profiling through deep network from ImageNet."
     icon = "icons/ImageNetEmbedding.svg"
-    priority = 2000
+    priority = 150
 
     inputs = [("Data", Table, "set_data")]
     outputs = [("Embeddings", Table, widget.Default)]
@@ -26,7 +39,7 @@ class OWImageNetEmbedding(widget.OWWidget):
         super().__init__()
 
         self.data = None
-        self.file_att = None  # attribute with image filenames
+        self.file_att = None  # attribute with image file names
         self.origin = None  # origin of image files
 
         box = gui.widgetBox(self.controlArea, "Info")
@@ -53,7 +66,7 @@ class OWImageNetEmbedding(widget.OWWidget):
         )
         self.commit_box.setEnabled(False)
 
-        self.profiler = ImageProfiler(token=self.token, clear_history=True)
+        self.profiler = ImageProfiler(token=self.token)
         if self.token:
             self.profiler.set_token(self.token)
         self.set_info()
@@ -61,8 +74,10 @@ class OWImageNetEmbedding(widget.OWWidget):
     def set_info(self):
         if self.profiler.token:
             if self.profiler.server:
-                self.info_b.setText("Server ok. Image credit:"
-                                    " {}".format(self.profiler.coins))
+                self.info_b.setText(
+                    "Connected to server. Credit for {} "
+                    "image{}.".format(self.profiler.coins,
+                                      "s" if self.profiler.coins > 1 else ""))
                 if self.profiler.coins > 0:
                     self.commit_box.setEnabled(True)
                     self.warning(0, "")
@@ -77,7 +92,7 @@ class OWImageNetEmbedding(widget.OWWidget):
 
     def set_data(self, data):
         if data is None:
-            self.send("Data", None)
+            self.send("Embeddings", None)
             self.info_a.setText("No data on input.")
             return
 
@@ -95,11 +110,14 @@ class OWImageNetEmbedding(widget.OWWidget):
             return
         self.file_att = atts[0]  # todo handle a set of image attributes
         self.origin = self.file_att.attributes.get("origin", "")
-        if self.auto_commit and self.profiler.coins >= 0:
+        if self.auto_commit:
             self.commit()
 
     def token_name_changed(self):
         self.profiler.set_token(self.token)
+        if self.profiler.token:  # token is valid
+            if self.auto_commit:
+                self.commit()
         self.set_info()
 
     def commit(self):
@@ -108,7 +126,7 @@ class OWImageNetEmbedding(widget.OWWidget):
             return
         with self.progressBar(len(self.data)) as progress:
             if not self.profiler.server:
-                self.info_b.setText("Embedding server not available.")
+                self.info_b.setText("Connection with server not established.")
                 self.send("Embeddings", None)
                 return
             xp = []
@@ -117,6 +135,7 @@ class OWImageNetEmbedding(widget.OWWidget):
                 ps = self.profiler(filename)
                 xp.append(ps)
                 progress.advance()
+        self.profiler.dump_history()
 
         xp = np.array(xp)
         x = np.hstack((self.data.X, xp))
@@ -136,9 +155,9 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     ow = OWImageNetEmbedding()
-    origin = "/Users/blaz/Desktop/image-small"
-    data = Table(origin + "/data-small.tab")
-    data.domain["img"].attributes.update({"origin": origin})
+    origin = "/Users/blaz/Desktop/images/dicty"
+    data = Table(origin + "/small.tab")
+    data.domain["image"].attributes.update({"origin": origin})
     ow.set_data(data)
     ow.show()
     app.exec()

@@ -97,6 +97,7 @@ class OWImportImages(widget.OWWidget):
     name = "Import Images"
     description = "Import images from a directory(s)"
     icon = "icons/ImportImages.svg"
+    priority = 110
 
     outputs = [("Data", Orange.data.Table)]
 

@@ -41,6 +41,10 @@ class ImageProfiler:
             self.token = ""
 
     def get_server_address(self):
+        from socket import gethostname
+        if "Air1" in gethostname():
+            return "http://127.0.0.1:8080/"
+
         url = "https://raw.githubusercontent.com/biolab/" \
               "orange3-imageanalytics/master/SERVERS.txt"
         try:
@@ -77,7 +81,7 @@ class ImageProfiler:
         return res.json().get("valid")
 
     def __call__(self, image_file_name):
-        im = Image.open(image_file_name)
+        im = Image.open(image_file_name).convert('RGB')
         im.thumbnail(self.THUMBNAIL_SIZE, Image.ANTIALIAS)
         out = io.BytesIO()
         im.save(out, format="JPEG")
@@ -104,18 +108,9 @@ class ImageProfiler:
         self.dump_history()
 
 if __name__ == "__main__":
-    with ImageProfiler(token="483ea629-0a85-4390-a494-58cfd8324a82",
+    with ImageProfiler(token="3ce7672c-a2ed-4f91-a954-fd34abae5046",
                        clear_history=True) \
             as image_profiler:
         print("Server:", image_profiler.server)
         result = image_profiler("example-image.jpg")
         print(result)
-
-    # with ImageProfiler(server="http://193.2.72.53:8080/") \
-    #         as image_profiler:
-    #     print("Server:", image_profiler.server)
-
-    # with ImageProfiler(server="http://193.2.72.53:8080/") \
-    #         as image_profiler:
-    #     result = image_profiler("example-image.jpg")
-    #     print(result)

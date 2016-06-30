@@ -5,13 +5,13 @@ Embeds images listed in input data table using the output of the
 image embedding server.
 """
 
-# todo how to handle dirty flag on commit (checkbox auto commit)
 # todo check when dead server
 # todo recheck the server (should there be another button, where?)
 # todo handle images from the network (not in local files)
 # todo add image attribute (like in view images)
 
 import numpy as np
+import os.path
 
 from Orange.widgets import widget, gui
 from Orange.widgets.settings import Setting
@@ -110,14 +110,12 @@ class OWImageNetEmbedding(widget.OWWidget):
             return
         self.file_att = atts[0]  # todo handle a set of image attributes
         self.origin = self.file_att.attributes.get("origin", "")
-        if self.auto_commit:
-            self.commit()
+        self.commit()
 
     def token_name_changed(self):
         self.profiler.set_token(self.token)
         if self.profiler.token:  # token is valid
-            if self.auto_commit:
-                self.commit()
+            self.commit()
         self.set_info()
 
     def commit(self):
@@ -131,7 +129,11 @@ class OWImageNetEmbedding(widget.OWWidget):
                 return
             xp = []
             for d in self.data:
-                filename = self.origin + "/" + str(d[self.file_att])
+                name = str(d[self.file_att])
+                if os.path.exists(name):
+                    filename = name
+                else:
+                    filename = self.origin + "/" + str(d[self.file_att])
                 ps = self.profiler(filename)
                 xp.append(ps)
                 progress.advance()

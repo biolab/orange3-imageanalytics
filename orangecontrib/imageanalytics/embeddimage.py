@@ -17,7 +17,7 @@ class ImageProfiler:
     THUMBNAIL_SIZE = (299, 299)
     PICKLE_FILE = Orange.misc.environ.cache_dir() + "/image_embeddings.pkl"
 
-    def __init__(self, server=None, token=None, clear_history=False):
+    def __init__(self, server=None, token=None, clear_history=True):
         if os.path.exists(self.PICKLE_FILE) and not clear_history:
             self.history = pickle.load(open(self.PICKLE_FILE, "rb"))
         else:
@@ -41,9 +41,9 @@ class ImageProfiler:
             self.token = ""
 
     def get_server_address(self):
-        from socket import gethostname
-        if "Air1" in gethostname():
-            return "http://127.0.0.1:8080/"
+        # from socket import gethostname
+        # if "Air1" in gethostname():
+        #     return "http://127.0.0.1:8080/"
 
         url = "https://raw.githubusercontent.com/biolab/" \
               "orange3-imageanalytics/master/SERVERS.txt"

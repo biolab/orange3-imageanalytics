@@ -8,7 +8,10 @@ with io.open("README.rst", "r", encoding="utf-8") as f:
 
 NAME = "Orange3-ImageAnalytics"
 VERSION = "0.0.1"
-DESCRIPTION = "Orange3 add-on for dealing with image related tasks"
+AUTHOR = 'Bioinformatics Laboratory, FRI UL'
+AUTHOR_EMAIL = 'contact@orange.biolab.si'
+URL = 'http://orange.biolab.si/download'
+DESCRIPTION = "Orange3 add-on for image data mining."
 LONG_DESCRIPTION = README
 LICENSE = "GPL3+"
 CLASSIFIERS = [
@@ -50,6 +53,9 @@ if __name__ == "__main__":
     setup(
         name=NAME,
         version=VERSION,
+        author=AUTHOR,
+        author_email=AUTHOR_EMAIL,
+        url=URL,
         description=DESCRIPTION,
         long_description=LONG_DESCRIPTION,
         license=LICENSE,

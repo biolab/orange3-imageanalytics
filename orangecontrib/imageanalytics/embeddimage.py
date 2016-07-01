@@ -9,7 +9,17 @@ import base64
 import hashlib
 import Orange.misc.environ
 import requests
+import re
 from requests.exceptions import ConnectionError
+from io import BytesIO
+
+url_re = re.compile(
+    r'^(?:http|ftp)s?://'  # http:// or https://
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+    r'localhost|'  # localhost...
+    r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+    r'(?::\d+)?'  # optional port
+    r'(?:/?|[/?]\S+)$', re.IGNORECASE)
 
 
 class ImageProfiler:
@@ -81,10 +91,14 @@ class ImageProfiler:
         return res.json().get("valid")
 
     def __call__(self, image_file_name):
-        im = Image.open(image_file_name).convert('RGB')
-        im.thumbnail(self.THUMBNAIL_SIZE, Image.ANTIALIAS)
+        if url_re.match(image_file_name):
+            response = requests.get(image_file_name)
+            img = Image.open(BytesIO(response.content))
+        else:
+            img = Image.open(image_file_name).convert('RGB')
+        img.thumbnail(self.THUMBNAIL_SIZE, Image.ANTIALIAS)
         out = io.BytesIO()
-        im.save(out, format="JPEG")
+        img.save(out, format="JPEG")
         base64_bytes = base64.b64encode(out.getbuffer())
 
         h = self.compute_hash(base64_bytes)

@@ -7,7 +7,7 @@ with io.open("README.rst", "r", encoding="utf-8") as f:
     README = f.read()
 
 NAME = "Orange3-ImageAnalytics"
-VERSION = "0.0.1"
+VERSION = "0.0.3"
 AUTHOR = 'Bioinformatics Laboratory, FRI UL'
 AUTHOR_EMAIL = 'contact@orange.biolab.si'
 URL = 'http://orange.biolab.si/download'

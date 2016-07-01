@@ -7,16 +7,16 @@ image embedding server.
 
 # todo check when dead server
 # todo recheck the server (should there be another button, where?)
-# todo handle images from the network (not in local files)
 # todo add image attribute (like in view images)
 
 import numpy as np
 import os.path
+import sys
 
 from Orange.widgets import widget, gui
 from Orange.widgets.settings import Setting
 from Orange.data import Table, Domain, ContinuousVariable
-from orangecontrib.imageanalytics.embeddimage import ImageProfiler
+from orangecontrib.imageanalytics.embeddimage import ImageProfiler, url_re
 from PyQt4 import QtGui
 from PyQt4.QtGui import QDesktopServices
 from PyQt4.QtCore import Qt, QUrl
@@ -29,7 +29,8 @@ class OWImageNetEmbedding(widget.OWWidget):
     priority = 150
 
     inputs = [("Data", Table, "set_data")]
-    outputs = [("Embeddings", Table, widget.Default)]
+    outputs = [("Embeddings", Table, widget.Default),
+               ("Missing Images", Table)]
     auto_commit = Setting(True)
     token = Setting("")
 
@@ -93,6 +94,7 @@ class OWImageNetEmbedding(widget.OWWidget):
     def set_data(self, data):
         if data is None:
             self.send("Embeddings", None)
+            self.send("Missing Images", None)
             self.info_a.setText("No data on input.")
             return
 
@@ -109,7 +111,8 @@ class OWImageNetEmbedding(widget.OWWidget):
             self.data = None
             return
         self.file_att = atts[0]  # todo handle a set of image attributes
-        self.origin = self.file_att.attributes.get("origin", "")
+        self.origin = self.file_att.attributes.get("origin", None) or \
+            self.data.attributes.get("origin", None)
         self.commit()
 
     def token_name_changed(self):
@@ -126,41 +129,67 @@ class OWImageNetEmbedding(widget.OWWidget):
             if not self.profiler.server:
                 self.info_b.setText("Connection with server not established.")
                 self.send("Embeddings", None)
+                self.send("Missing Images", None)
                 return
+            sel = np.ones(len(self.data), dtype=bool)
             xp = []
-            for d in self.data:
+            for i, d in enumerate(self.data):
                 name = str(d[self.file_att])
-                if os.path.exists(name):
+                if os.path.exists(name) or url_re.match(name):
                     filename = name
-                else:
+                elif self.origin:
                     filename = self.origin + "/" + str(d[self.file_att])
-                ps = self.profiler(filename)
-                xp.append(ps)
+                else:
+                    filename = None  # loading of the image failed
+                    sel[i] = False  # this item will be skipped
+                if filename:
+                    try:
+                        ps = self.profiler(filename)
+                        xp.append(ps)
+                    except:
+                        sel[i] = False
                 progress.advance()
         self.profiler.dump_history()
 
+        if not np.any(sel):
+            self.send("Embeddings", None)
+            self.send("Missing Images", self.data)
+            return
+
+        data = Table(self.data[sel])
+
         xp = np.array(xp)
-        x = np.hstack((self.data.X, xp))
+        x = np.hstack((data.X, xp))
         atts = [ContinuousVariable("n%d" % i) for i in
                 range(xp.shape[1])]
         domain = Domain(list(self.data.domain.attributes) + atts,
                         self.data.domain.class_vars,
                         self.data.domain.metas)
-        embeddings = Table(domain, x, self.data.Y, self.data.metas)
+        embeddings = Table(domain, x, data.Y, data.metas)
         self.send("Embeddings", embeddings)
+        if np.any(np.logical_not(sel)):
+            missing_data = Table(self.data[np.logical_not(sel)])
+            self.send("Missing Images", missing_data)
+        else:
+            self.send("Missing Images", None)
         self.set_info()
 
 
-if __name__ == "__main__":
+def main(argv=sys.argv):
     import sys
     from PyQt4.QtGui import QApplication
 
     app = QApplication(sys.argv)
     ow = OWImageNetEmbedding()
-    origin = "/Users/blaz/Desktop/images/dicty"
-    data = Table(origin + "/small.tab")
-    data.domain["image"].attributes.update({"origin": origin})
+    if len(argv) > 1:
+        data = Table(argv[1])
+        data.attributes["origin"] = os.path.split(argv[1])[0]
+    else:
+        data = Table('zoo-with-images')
     ow.set_data(data)
     ow.show()
     app.exec()
     ow.saveSettings()
+
+if __name__ == "__main__":
+    main()

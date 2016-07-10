@@ -117,7 +117,7 @@ class OWImageNetEmbedding(widget.OWWidget):
 
     def token_name_changed(self):
         self.profiler.set_token(self.token)
-        if self.profiler.token:  # token is valid
+        if self.profiler.token and self.data:  # token is valid
             self.commit()
         self.set_info()
 

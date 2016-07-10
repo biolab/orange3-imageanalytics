@@ -10,16 +10,20 @@ import hashlib
 import Orange.misc.environ
 import requests
 import re
+import logging
 from requests.exceptions import ConnectionError
 from io import BytesIO
 
 url_re = re.compile(
     r'^(?:http|ftp)s?://'  # http:// or https://
-    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
+    r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)'
+     '+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
     r'localhost|'  # localhost...
     r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
     r'(?::\d+)?'  # optional port
     r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+
+log = logging.getLogger(__name__)
 
 
 class ImageProfiler:
@@ -27,7 +31,7 @@ class ImageProfiler:
     THUMBNAIL_SIZE = (299, 299)
     PICKLE_FILE = Orange.misc.environ.cache_dir() + "/image_embeddings.pkl"
 
-    def __init__(self, server=None, token=None, clear_history=True):
+    def __init__(self, server=None, token=None, clear_history=False):
         if os.path.exists(self.PICKLE_FILE) and not clear_history:
             self.history = pickle.load(open(self.PICKLE_FILE, "rb"))
         else:
@@ -60,6 +64,7 @@ class ImageProfiler:
         try:
             res = requests.get(url)
         except ConnectionError:
+            log.error("Could not access server list page at\n%s." % url)
             return None
         server = res.text.strip().split("\n")[0]
         if self.check_server_alive(server):
@@ -74,6 +79,7 @@ class ImageProfiler:
             alive = status == 200
             return alive
         except ConnectionError:
+            log.error("Page %s is not responding." % (server + "/info"))
             return False
 
     @staticmethod

@@ -93,6 +93,10 @@ def RecentPath_asqstandarditem(pathitem):
     return item
 
 
+class State(enum.IntEnum):
+    NoState, Processing, Done, Cancelled, Error = range(5)
+
+
 class OWImportImages(widget.OWWidget):
     name = "Import Images"
     description = "Import images from a directory(s)"
@@ -108,10 +112,6 @@ class OWImportImages(widget.OWWidget):
     want_main_area = False
     resizing_enabled = False
 
-    class State(enum.IntEnum):
-        NoState, Processing, Done, Cancelled, Error = range(5)
-    NoState, Processing, Done, Cancelled, Error = State
-
     Modality = Qt.ApplicationModal
     # Modality = Qt.WindowModal
 
@@ -120,7 +120,7 @@ class OWImportImages(widget.OWWidget):
     def __init__(self):
         super().__init__()
         #: widget's runtime state
-        self.__state = OWImportImages.NoState
+        self.__state = State.NoState
         self._imageMeta = []
         self._imageCategories = {}
 
@@ -296,27 +296,27 @@ class OWImportImages(widget.OWWidget):
         self.start()
 
     def __updateInfo(self):
-        if self.__state == OWImportImages.NoState:
+        if self.__state == State.NoState:
             text = "No image set selected"
-        elif self.__state == OWImportImages.Processing:
+        elif self.__state == State.Processing:
             text = "Processing"
-        elif self.__state == OWImportImages.Done:
+        elif self.__state == State.Done:
             nvalid = sum(imeta.isvalid for imeta in self._imageMeta)
             ncategories = len(self._imageCategories)
             if ncategories < 2:
                 text = "{} images".format(nvalid)
             else:
                 text = "{} images / {} categories".format(nvalid, ncategories)
-        elif self.__state == OWImportImages.Cancelled:
+        elif self.__state == State.Cancelled:
             text = "Cancelled"
-        elif self.__state == OWImportImages.Error:
+        elif self.__state == State.Error:
             text = "Error state"
         else:
             assert False
 
         self.info_area.setText(text)
 
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             self.infostack.setCurrentIndex(1)
         else:
             self.infostack.setCurrentIndex(0)
@@ -359,7 +359,7 @@ class OWImportImages(widget.OWWidget):
             self.currentPath = None
         self.__actions.reload.setEnabled(self.currentPath is not None)
 
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             self.cancel()
 
         return True
@@ -397,30 +397,30 @@ class OWImportImages(widget.OWWidget):
         return 0
 
     def __setRuntimeState(self, state):
-        assert state in OWImportImages.State
-        self.setBlocking(state == OWImportImages.Processing)
+        assert state in State
+        self.setBlocking(state == State.Processing)
         message = ""
-        if state == OWImportImages.Processing:
-            assert self.__state in [OWImportImages.Done,
-                                    OWImportImages.NoState,
-                                    OWImportImages.Error,
-                                    OWImportImages.Cancelled]
+        if state == State.Processing:
+            assert self.__state in [State.Done,
+                                    State.NoState,
+                                    State.Error,
+                                    State.Cancelled]
             message = "Processing"
-        elif state == OWImportImages.Done:
-            assert self.__state == OWImportImages.Processing
-        elif state == OWImportImages.Cancelled:
-            assert self.__state == OWImportImages.Processing
+        elif state == State.Done:
+            assert self.__state == State.Processing
+        elif state == State.Cancelled:
+            assert self.__state == State.Processing
             message = "Cancelled"
-        elif state == OWImportImages.Error:
+        elif state == State.Error:
             message = "Error during processing"
-        elif state == OWImportImages.NoState:
+        elif state == State.NoState:
             message = ""
         else:
             assert False
 
         self.__state = state
 
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             self.infostack.setCurrentIndex(1)
         else:
             self.infostack.setCurrentIndex(0)
@@ -432,7 +432,7 @@ class OWImportImages(widget.OWWidget):
         """
         Restart the image scan task
         """
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             self.cancel()
 
         self._imageMeta = []
@@ -443,13 +443,13 @@ class OWImportImages(widget.OWWidget):
         """
         Start/execute the image indexing operation
         """
-        self.error(0)
+        self.error()
 
         self.__invalidated = False
         if self.currentPath is None:
             return
 
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             assert self.__pendingTask is not None
             log.info("Starting a new task while one is in progress. "
                      "Cancel the existing task (dir:'{}')"
@@ -458,7 +458,7 @@ class OWImportImages(widget.OWWidget):
 
         startdir = self.currentPath
 
-        self.__setRuntimeState(OWImportImages.Processing)
+        self.__setRuntimeState(State.Processing)
 
         report_progress = methodinvoke(
             self, "__onReportProgress", (object,))
@@ -506,7 +506,7 @@ class OWImportImages(widget.OWWidget):
     @Slot()
     def __onRunFinished(self):
         assert QThread.currentThread() is self.thread()
-        assert self.__state == OWImportImages.Processing
+        assert self.__state == State.Processing
         assert self.__pendingTask is not None
         assert self.sender() is self.__pendingTask.watcher
         assert self.__pendingTask.future.done()
@@ -517,12 +517,12 @@ class OWImportImages(widget.OWWidget):
             image_meta = task.future.result()
         except Exception as err:
             sys.excepthook(*sys.exc_info())
-            state = OWImportImages.Error
+            state = State.Error
             image_meta = []
-            self.error(0, traceback.format_exc())
+            self.error(traceback.format_exc())
         else:
-            state = OWImportImages.Done
-            self.error(0)
+            state = State.Done
+            self.error()
 
         categories = {}
 
@@ -542,18 +542,18 @@ class OWImportImages(widget.OWWidget):
         """
         Cancel current pending task (if any).
         """
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             assert self.__pendingTask is not None
             self.__pendingTask.cancel()
             self.__pendingTask = None
-            self.__setRuntimeState(OWImportImages.Cancelled)
+            self.__setRuntimeState(State.Cancelled)
 
     @Slot(object)
     def __onReportProgress(self, arg):
         # report on scan progress from a worker thread
         # arg must be a namespace(count: int, lastpath: str)
         assert QThread.currentThread() is self.thread()
-        if self.__state == OWImportImages.Processing:
+        if self.__state == State.Processing:
             self.pathlabel.setText(prettyfypath(arg.lastpath))
 
     def commit(self):

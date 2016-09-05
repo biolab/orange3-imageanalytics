@@ -14,7 +14,7 @@ import os.path
 import sys
 
 from Orange.widgets import widget, gui
-from Orange.widgets.settings import Setting, ContextSetting
+from Orange.widgets.settings import Setting
 from Orange.data import Table, Domain, ContinuousVariable
 from Orange.widgets.utils.itemmodels import VariableListModel
 
@@ -35,7 +35,7 @@ class OWImageNetEmbedding(widget.OWWidget):
                ("Missing Images", Table)]
     auto_commit = Setting(True)
     token = Setting("")
-    img_attr = ContextSetting(0)
+    img_attr = Setting(0)
 
     want_main_area = False
 
@@ -107,20 +107,18 @@ class OWImageNetEmbedding(widget.OWWidget):
             return
 
         self.info_a.setText("Data with %d instances." % len(data))
-        self.data = data
-        # todo check for image attributes
-
         self.atts = [a for a in data.domain.metas if
                 a.attributes.get("type") == "image"]
-        self.img_cb.setModel(VariableListModel(self.atts))
-
         if not self.atts:
             self.warning(text="Input data has no image attributes.")
             self.info_a.setText("Data (%d instances) without image "
                                 "attributes." % len(data))
             self.data = None
             return
+        self.img_cb.setModel(VariableListModel(self.atts))
+        self.img_cb.setCurrentIndex(self.img_attr)
 
+        self.data = data
         self.img_attr_changed()
 
     def token_name_changed(self):

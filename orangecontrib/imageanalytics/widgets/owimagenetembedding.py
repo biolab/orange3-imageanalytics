@@ -115,6 +115,8 @@ class OWImageNetEmbedding(widget.OWWidget):
                                 "attributes." % len(data))
             self.data = None
             return
+        if not self.img_attr < len(self.atts):
+            self.img_attr = 0
         self.img_cb.setModel(VariableListModel(self.atts))
         self.img_cb.setCurrentIndex(self.img_attr)
 

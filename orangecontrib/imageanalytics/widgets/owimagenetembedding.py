@@ -16,6 +16,8 @@ import sys
 from Orange.widgets import widget, gui
 from Orange.widgets.settings import Setting
 from Orange.data import Table, Domain, ContinuousVariable
+from Orange.widgets.utils.itemmodels import VariableListModel
+
 from orangecontrib.imageanalytics.embeddimage import ImageProfiler, url_re
 from PyQt4 import QtGui
 from PyQt4.QtGui import QDesktopServices
@@ -33,6 +35,7 @@ class OWImageNetEmbedding(widget.OWWidget):
                ("Missing Images", Table)]
     auto_commit = Setting(True)
     token = Setting("")
+    img_attr = Setting(0)
 
     want_main_area = False
 
@@ -46,6 +49,11 @@ class OWImageNetEmbedding(widget.OWWidget):
         box = gui.widgetBox(self.controlArea, "Info")
         self.info_a = gui.widgetLabel(box, "No data on input.")
         self.info_b = gui.widgetLabel(box, "")
+
+        box = gui.widgetBox(self.controlArea, "Settings")
+        self.img_cb = gui.comboBox(box, self, "img_attr",
+                                   label="Image attribute:", orientation=Qt.Horizontal,
+                                   callback=self.img_attr_changed)
 
         box = gui.widgetBox(self.controlArea, "Server Token")
         gui.lineEdit(box, self, "token", "Token: ",
@@ -99,27 +107,34 @@ class OWImageNetEmbedding(widget.OWWidget):
             return
 
         self.info_a.setText("Data with %d instances." % len(data))
-        self.data = data
-        # todo check for image attributes
-
-        atts = [a for a in data.domain.metas if
+        self.atts = [a for a in data.domain.metas if
                 a.attributes.get("type") == "image"]
-        if not atts:
+        if not self.atts:
             self.warning(text="Input data has no image attributes.")
             self.info_a.setText("Data (%d instances) without image "
                                 "attributes." % len(data))
             self.data = None
             return
-        self.file_att = atts[0]  # todo handle a set of image attributes
-        self.origin = self.file_att.attributes.get("origin", None) or \
-            self.data.attributes.get("origin", None)
-        self.commit()
+        if not self.img_attr < len(self.atts):
+            self.img_attr = 0
+        self.img_cb.setModel(VariableListModel(self.atts))
+        self.img_cb.setCurrentIndex(self.img_attr)
+
+        self.data = data
+        self.img_attr_changed()
 
     def token_name_changed(self):
         self.profiler.set_token(self.token)
         if self.profiler.token and self.data:  # token is valid
             self.commit()
         self.set_info()
+
+    def img_attr_changed(self):
+        self.file_att = self.atts[self.img_attr]
+        self.origin = self.file_att.attributes.get("origin", None) or \
+                      self.data.attributes.get("origin", None)
+        if self.auto_commit:
+            self.commit()
 
     def commit(self):
         if len(self.data) > self.profiler.coins:

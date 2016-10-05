@@ -58,7 +58,7 @@ class OWImageNetEmbedding(widget.OWWidget):
         box = gui.widgetBox(self.controlArea, "Server Token")
         gui.lineEdit(box, self, "token", "Token: ",
                      controlWidth=250, orientation=Qt.Horizontal,
-                     enterPlaceholder=True, callback=self.token_name_changed)
+                     callback=self.token_name_changed)
 
         gui.button(
             box, self, "Get Token",

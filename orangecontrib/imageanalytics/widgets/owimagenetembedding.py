@@ -137,6 +137,10 @@ class OWImageNetEmbedding(widget.OWWidget):
             self.commit()
 
     def commit(self):
+        if not self.data:
+            self.send("Embeddings", None)
+            self.send("Missing Images", None)
+            return
         if len(self.data) > self.profiler.coins:
             self.warning(0, "Not enough credit to process images.")
             return

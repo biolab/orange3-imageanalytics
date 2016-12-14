@@ -377,9 +377,13 @@ class OWImportImages(widget.OWWidget):
         """
         existing = None
         for pathitem in self.recent_paths:
-            if os.path.samefile(pathitem.abspath, path):
-                existing = pathitem
-                break
+            try:
+                if os.path.samefile(pathitem.abspath, path):
+                    existing = pathitem
+                    break
+            except FileNotFoundError:
+                # file not found if the `pathitem.abspath` no longer exists
+                pass
 
         model = self.recent_cb.model()
 

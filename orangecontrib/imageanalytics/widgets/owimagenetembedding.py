@@ -1,216 +1,153 @@
-"""
-ImageNet Embedding
-------------------
-Embeds images listed in input data table using the output of the
-image embedding server.
-"""
-
-# todo check when dead server
-# todo recheck the server (should there be another button, where?)
-# todo add image attribute (like in view images)
-
-import numpy as np
-import os.path
-import sys
-
-from Orange.widgets import widget, gui
+from AnyQt.QtCore import Qt
+from AnyQt.QtWidgets import QLayout
+from Orange.data import Table
+from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
-from Orange.data import Table, Domain, ContinuousVariable
 from Orange.widgets.utils.itemmodels import VariableListModel
+from Orange.widgets.widget import OWWidget, Default
+from requests.exceptions import ConnectionError
 
-from orangecontrib.imageanalytics.embeddimage import ImageProfiler, url_re
-from PyQt4 import QtGui
-from PyQt4.QtGui import QDesktopServices
-from PyQt4.QtCore import Qt, QUrl
+from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 
 
-class OWImageNetEmbedding(widget.OWWidget):
+class _Input:
+    IMAGES = "Images"
+
+
+class _Output:
+    EMBEDDINGS = "Embeddings"
+    MISSING_IMAGES = "Missing Images"
+
+
+class OWImageNetEmbedding(OWWidget):
     name = "ImageNet Embedding"
-    description = "Image profiling through deep network from ImageNet."
+    description = "Image embedding through deep neural network from ImageNet."
     icon = "icons/ImageNetEmbedding.svg"
     priority = 150
 
-    inputs = [("Data", Table, "set_data")]
-    outputs = [("Embeddings", Table, widget.Default),
-               ("Missing Images", Table)]
-    auto_commit = Setting(True)
-    token = Setting("")
-    img_attr = Setting(0)
-
     want_main_area = False
+    _auto_apply = Setting(default=True)
+
+    inputs = [(_Input.IMAGES, Table, "set_data")]
+    outputs = [
+        (_Output.EMBEDDINGS, Table, Default),
+        (_Output.MISSING_IMAGES, Table)
+    ]
+
+    cb_image_attr_current_id = Setting(default=0)
+    _NO_DATA_INFO_TEXT = "No data on input."
 
     def __init__(self):
         super().__init__()
+        self._image_attributes = None
+        self._input_data_table = None
 
-        self.data = None
-        self.file_att = None  # attribute with image file names
-        self.origin = None  # origin of image files
+        self._setup_layout()
 
-        box = gui.widgetBox(self.controlArea, "Info")
-        self.info_a = gui.widgetLabel(box, "No data on input.")
-        self.info_b = gui.widgetLabel(box, "")
+        self._image_embedder = ImageEmbedder(server_url='127.0.0.1')
+        connection_info = self._image_embedder.is_connected_to_server()
+        self._set_server_info(connection_info)
 
-        box = gui.widgetBox(self.controlArea, "Settings")
-        self.img_cb = gui.comboBox(box, self, "img_attr",
-                                   label="Image attribute:", orientation=Qt.Horizontal,
-                                   callback=self.img_attr_changed)
-
-        box = gui.widgetBox(self.controlArea, "Server Token")
-        gui.lineEdit(box, self, "token", "Token: ",
-                     controlWidth=250, orientation=Qt.Horizontal,
-                     callback=self.token_name_changed)
-
-        gui.button(
-            box, self, "Get Token",
-            callback=self.open_server_token_page,
-            autoDefault=False
-        )
-
+    def _setup_layout(self):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
-        self.layout().setSizeConstraint(QtGui.QLayout.SetFixedSize)
+        self.layout().setSizeConstraint(QLayout.SetFixedSize)
 
-        self.commit_box = gui.auto_commit(
-            self.controlArea, self, "auto_commit", label="Commit",
-            checkbox_label="Commit on change"
+        widget_box = widgetBox(self.controlArea, "Info")
+        self.input_data_info = widgetLabel(widget_box, self._NO_DATA_INFO_TEXT)
+
+        widget_box = widgetBox(self.controlArea, "Settings")
+        self.cb_image_attr = comboBox(
+            widget=widget_box,
+            master=self,
+            value="cb_image_attr_current_id",
+            label="Image attribute:",
+            orientation=Qt.Horizontal,
+            callback=self._cb_image_attr_changed
         )
-        self.commit_box.setEnabled(False)
 
-        self.profiler = ImageProfiler(token=self.token)
-        if self.token:
-            self.profiler.set_token(self.token)
-        self.set_info()
-
-    def set_info(self):
-        if self.profiler.token:
-            if self.profiler.server:
-                self.info_b.setText(
-                    "Connected to server. Credit for {} "
-                    "image{}.".format(self.profiler.coins,
-                                      "s" if self.profiler.coins > 1 else ""))
-                if self.profiler.coins > 0:
-                    self.commit_box.setEnabled(True)
-                    self.warning(0, "")
-            else:
-                self.info_b.setText("Connection with server not established.")
-        else:
-            self.info_b.setText("Please enter valid server token.")
-
-    def open_server_token_page(self):
-        url = QUrl(self.profiler.server + "get_token")
-        QDesktopServices.openUrl(url)
+        auto_commit(
+            widget=self.controlArea,
+            master=self,
+            value="_auto_apply",
+            label="Apply",
+            checkbox_label="Auto Apply",
+            commit=self.commit
+        )
 
     def set_data(self, data):
         if data is None:
-            self.send("Embeddings", None)
-            self.send("Missing Images", None)
-            self.info_a.setText("No data on input.")
+            self.send(_Output.EMBEDDINGS, None)
+            self.send(_Output.MISSING_IMAGES, None)
+            self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
             return
 
-        self.info_a.setText("Data with %d instances." % len(data))
-        self.atts = [a for a in data.domain.metas if
-                a.attributes.get("type") == "image"]
-        if not self.atts:
-            self.warning(text="Input data has no image attributes.")
-            self.info_a.setText("Data (%d instances) without image "
-                                "attributes." % len(data))
-            self.data = None
+        self._image_attributes = self._filter_image_attributes(data)
+        if not self._image_attributes:
+            input_data_info_text = (
+                "Data with {:d} instances, but without image attributes."
+                .format(len(data)))
+            input_data_info_text.format(input_data_info_text)
+            self.input_data_info.setText(input_data_info_text)
+            self._input_data_table = None
             return
-        if not self.img_attr < len(self.atts):
-            self.img_attr = 0
-        self.img_cb.setModel(VariableListModel(self.atts))
-        self.img_cb.setCurrentIndex(self.img_attr)
 
-        self.data = data
-        self.img_attr_changed()
+        if not self.cb_image_attr_current_id < len(self._image_attributes):
+            self.cb_image_attr_current_id = 0
 
-    def token_name_changed(self):
-        self.profiler.set_token(self.token)
-        if self.profiler.token and self.data:  # token is valid
-            self.commit()
-        self.set_info()
+        self.cb_image_attr.setModel(VariableListModel(self._image_attributes))
+        self.cb_image_attr.setCurrentIndex(self.cb_image_attr_current_id)
 
-    def img_attr_changed(self):
-        self.file_att = self.atts[self.img_attr]
-        self.origin = self.file_att.attributes.get("origin", None) or \
-                      self.data.attributes.get("origin", None)
-        if self.auto_commit:
+        self._input_data_table = data
+        input_data_info_text = "Data with {:d} instances.".format(len(data))
+        self.input_data_info.setText(input_data_info_text)
+
+        self._cb_image_attr_changed()
+
+    @staticmethod
+    def _filter_image_attributes(data):
+        metas = data.domain.metas
+        return [m for m in metas if m.attributes.get("type") == "image"]
+
+    def _cb_image_attr_changed(self):
+        if self._auto_apply:
             self.commit()
 
     def commit(self):
-        if not self.data:
-            self.send("Embeddings", None)
-            self.send("Missing Images", None)
-            return
-        if len(self.data) > self.profiler.coins:
-            self.warning(0, "Not enough credit to process images.")
-            return
-        with self.progressBar(len(self.data)) as progress:
-            if not self.profiler.server:
-                self.info_b.setText("Connection with server not established.")
-                self.send("Embeddings", None)
-                self.send("Missing Images", None)
+        file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
+        file_paths = self._input_data_table[:, file_paths_attr].metas.flatten()
+
+        with self.progressBar(len(file_paths)) as progress:
+            try:
+                embeddings = self._image_embedder(
+                    file_paths,
+                    image_processed_callback=lambda: progress.advance()
+                )
+            except ConnectionError:
+                self.send(_Output.EMBEDDINGS, None)
+                self.send(_Output.MISSING_IMAGES, None)
+                self._set_server_info(connected=False)
                 return
-            sel = np.ones(len(self.data), dtype=bool)
-            xp = []
-            for i, d in enumerate(self.data):
-                name = str(d[self.file_att])
-                if os.path.exists(name) or url_re.match(name):
-                    filename = name
-                elif self.origin:
-                    filename = self.origin + "/" + str(d[self.file_att])
-                else:
-                    filename = None  # loading of the image failed
-                    sel[i] = False  # this item will be skipped
-                if filename:
-                    try:
-                        ps = self.profiler(filename)
-                        xp.append(ps)
-                    except:
-                        sel[i] = False
-                progress.advance()
-        self.profiler.dump_history()
 
-        if not np.any(sel):
-            self.send("Embeddings", None)
-            self.send("Missing Images", self.data)
-            return
+        print(embeddings)
+        # todo: construct Orange table and send output signals
 
-        data = Table(self.data[sel])
-
-        xp = np.array(xp)
-        x = np.hstack((data.X, xp))
-        atts = [ContinuousVariable("n%d" % i) for i in
-                range(xp.shape[1])]
-        domain = Domain(list(self.data.domain.attributes) + atts,
-                        self.data.domain.class_vars,
-                        self.data.domain.metas)
-        embeddings = Table(domain, x, data.Y, data.metas)
-        embeddings.ids = self.data.ids[sel]
-        self.send("Embeddings", embeddings)
-        if np.any(np.logical_not(sel)):
-            missing_data = Table(self.data[np.logical_not(sel)])
-            missing_data.ids = self.data.ids[np.logical_not(sel)]
-            self.send("Missing Images", missing_data)
+    def _set_server_info(self, connected):
+        self.clear_messages()
+        if connected:
+            self.information("Connected to server.")
         else:
-            self.send("Missing Images", None)
-        self.set_info()
+            self.warning("Not connected to server.")
+
+    def onDeleteWidget(self):
+        super().onDeleteWidget()
+        self._image_embedder.__exit__(None, None, None)
 
 
-def main(argv=sys.argv):
+if __name__ == '__main__':
     import sys
-    from PyQt4.QtGui import QApplication
-
+    from AnyQt.QtWidgets import QApplication
     app = QApplication(sys.argv)
-    ow = OWImageNetEmbedding()
-    if len(argv) > 1:
-        data = Table(argv[1])
-        data.attributes["origin"] = os.path.split(argv[1])[0]
-    else:
-        data = Table('zoo-with-images')
-    ow.set_data(data)
-    ow.show()
+    widget = OWImageNetEmbedding()
+    widget.show()
     app.exec()
-    ow.saveSettings()
-
-if __name__ == "__main__":
-    main()
+    widget.saveSettings()

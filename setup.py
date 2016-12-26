@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-from setuptools import setup, find_packages
 import io
+import os
+
+from setuptools import setup, find_packages
 
 with io.open("README.rst", "r", encoding="utf-8") as f:
     README = f.read()
@@ -24,6 +26,7 @@ CLASSIFIERS = [
 
 KEYWORDS = [
     "orange3 add-on",
+    "orange3-imageanalytics"
 ]
 
 PACKAGES = find_packages()
@@ -32,13 +35,10 @@ PACKAGE_DATA = {
     "orangecontrib.imageanalytics.widgets": ["icons/*.svg"],
 }
 
-INSTALL_REQUIRES = [
-    "Orange3 >= 3.3.5",
-    "setuptools",
-    "numpy",
-    "pillow",
-    "requests"
-]
+INSTALL_REQUIRES = sorted(set(
+    line.partition('#')[0].strip()
+    for line in open(os.path.join(os.path.dirname(__file__), 'requirements.txt'))
+) - {''})
 
 ENTRY_POINTS = {
     "orange.widgets":

@@ -8,7 +8,7 @@ import requests
 from Orange.misc.environ import cache_dir
 from PIL.Image import open, LANCZOS
 from hyper import HTTP20Connection
-from requests.exceptions import ConnectionError
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from orangecontrib.imageanalytics.utils import get_hostname, md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
@@ -20,7 +20,15 @@ _DEFAULT_SERVER_DISCOVERY_URL = (
 
 
 class ImageEmbedder(object):
-    """"todo"""
+    """"Client side functionality for accessing a remote ImageNet embedder.
+
+    Examples
+    --------
+    >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+    >>> image_file_paths = [...]
+    >>> with ImageEmbedder() as embedder:
+    ...    profiles = embedder(image_file_paths)
+    """
     _target_image_size = (299, 299)
     _cache_file_path = join(cache_dir(), 'image_embeddings.pickle')
     _conn_err_msg = "No connection with {:s}:{:d}, call reconnect_to_server()"
@@ -70,7 +78,7 @@ class ImageEmbedder(object):
     def _discover_server(self):
         try:
             response = requests.get(self._server_discovery_url)
-        except ConnectionError:
+        except RequestsConnectionError:
             return None
 
         return get_hostname(response.text)
@@ -87,18 +95,49 @@ class ImageEmbedder(object):
             return False
         return True
 
-    def __call__(self, file_paths, image_processed_callback=None):
-        """todo raises connection error"""
+    def __call__(self, file_paths, persist_cache=False,
+                 image_processed_callback=None):
+        """Embeds the images.
+
+        Parameters
+        ----------
+        file_paths: list
+            A list of file paths for images to be embedded.
+
+        persist_cache: bool (default=False)
+            An option to explicitly persist the cache before returning
+            the results. This should only be set to True if using the
+            embedder without the `with as` statement.
+
+        image_processed_callback: callable (default=None)
+            A function that is called after each image is fully processed
+            by either getting a successful response from the server,
+            getting the result from cache or skipping the image.
+
+        Returns
+        -------
+        embeddings: array-like
+            Array-like of float16 arrays (profiles) for
+            successfully embedded images and Nones for skipped images.
+
+        Raises
+        ------
+        ConnectionError:
+            If connection with the server is lost during the embedding
+            process.
+        """
         images = self._load_images_or_none_for_skipped(file_paths)
+        cache_keys = self._compute_cache_keys_or_none_for_skipped(images)
 
         # send requests to http2 server in a non-blocking manner
-        # todo: read from local cache if entry exists
         http_streams = []
-        for image in images:
-            if not image:
-                # image was skipped at loading
+
+        for image, cache_key in zip(images, cache_keys):
+            if not image or cache_key in self._cache_dict:
+                # image skipped at loading or already cached
                 http_streams.append(None)
                 continue
+
             try:
                 stream_id = self._send_request(
                     method='POST',
@@ -110,33 +149,36 @@ class ImageEmbedder(object):
                 raise
 
         # wait for all responses in a blocking manner
-        # todo: run this in a separate thread
         embeddings = []
-        for i, stream_id in enumerate(http_streams):
+
+        for stream_id, cache_key in zip(http_streams, cache_keys):
             if not stream_id:
-                # image was skipped at loading or server doesn't use http2
-                embeddings.append(None)
+                # image skipped at loading or already cached
+                profile = self._get_cached_result_or_none(cache_key)
+                embeddings.append(profile)
                 continue
+
             try:
                 response = self._get_json_response_or_none(stream_id)
             except ConnectionError:
                 raise
 
             if not response or 'profile' not in response:
-                # returned response is not a valid json response
-                # or the profile key is not present
+                # returned response not a valid json response
+                # or the profile key not present
                 embeddings.append(None)
             else:
                 # successful response
                 profile = np.array(response['profile'], dtype=np.float16)
                 embeddings.append(profile)
-                self._save_cache_entry(images[i], profile)
+                self._cache_dict[cache_key] = profile
 
             if image_processed_callback:
                 image_processed_callback()
 
-        self.persist_cache()
-        return embeddings
+        if persist_cache:
+            self.persist_cache()
+        return np.array(embeddings)
 
     def _load_images_or_none_for_skipped(self, file_paths):
         images = []
@@ -155,6 +197,15 @@ class ImageEmbedder(object):
             image_bytes.close()
 
         return images
+
+    @staticmethod
+    def _compute_cache_keys_or_none_for_skipped(images):
+        return [md5_hash(image) if image else None for image in images]
+
+    def _get_cached_result_or_none(self, cache_key):
+        if cache_key in self._cache_dict:
+            return self._cache_dict[cache_key]
+        return None
 
     def _send_request(self, method, url, body_bytes):
         if not self._server_connection:
@@ -192,10 +243,6 @@ class ImageEmbedder(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.persist_cache()
         self.disconnect_from_server()
-
-    def _save_cache_entry(self, image_bytes, profile):
-        entry_key = md5_hash(image_bytes)
-        self._cache_dict[entry_key] = profile
 
     def clear_cache(self):
         self._cache_dict = {}

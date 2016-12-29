@@ -1,11 +1,11 @@
+import numpy as np
 from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import QLayout
-from Orange.data import Table
+from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.widget import OWWidget, Default
-from requests.exceptions import ConnectionError
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 
@@ -16,7 +16,7 @@ class _Input:
 
 class _Output:
     EMBEDDINGS = "Embeddings"
-    MISSING_IMAGES = "Missing Images"
+    SKIPPED_IMAGES = "Skipped Images"
 
 
 class OWImageNetEmbedding(OWWidget):
@@ -31,7 +31,7 @@ class OWImageNetEmbedding(OWWidget):
     inputs = [(_Input.IMAGES, Table, "set_data")]
     outputs = [
         (_Output.EMBEDDINGS, Table, Default),
-        (_Output.MISSING_IMAGES, Table)
+        (_Output.SKIPPED_IMAGES, Table)
     ]
 
     cb_image_attr_current_id = Setting(default=0)
@@ -40,7 +40,7 @@ class OWImageNetEmbedding(OWWidget):
     def __init__(self):
         super().__init__()
         self._image_attributes = None
-        self._input_data_table = None
+        self._input_data = None
 
         self._setup_layout()
 
@@ -77,7 +77,7 @@ class OWImageNetEmbedding(OWWidget):
     def set_data(self, data):
         if data is None:
             self.send(_Output.EMBEDDINGS, None)
-            self.send(_Output.MISSING_IMAGES, None)
+            self.send(_Output.SKIPPED_IMAGES, None)
             self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
             return
 
@@ -88,7 +88,7 @@ class OWImageNetEmbedding(OWWidget):
                 .format(len(data)))
             input_data_info_text.format(input_data_info_text)
             self.input_data_info.setText(input_data_info_text)
-            self._input_data_table = None
+            self._input_data = None
             return
 
         if not self.cb_image_attr_current_id < len(self._image_attributes):
@@ -97,7 +97,7 @@ class OWImageNetEmbedding(OWWidget):
         self.cb_image_attr.setModel(VariableListModel(self._image_attributes))
         self.cb_image_attr.setCurrentIndex(self.cb_image_attr_current_id)
 
-        self._input_data_table = data
+        self._input_data = data
         input_data_info_text = "Data with {:d} instances.".format(len(data))
         self.input_data_info.setText(input_data_info_text)
 
@@ -113,23 +113,59 @@ class OWImageNetEmbedding(OWWidget):
             self.commit()
 
     def commit(self):
+        # todo: implement in a non-blocking manner
+        # todo: implement a reconnecting mechanism
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
-        file_paths = self._input_data_table[:, file_paths_attr].metas.flatten()
+        file_paths = self._input_data[:, file_paths_attr].metas.flatten()
 
         with self.progressBar(len(file_paths)) as progress:
             try:
                 embeddings = self._image_embedder(
-                    file_paths,
+                    file_paths=file_paths,
+                    persist_cache=True,
                     image_processed_callback=lambda: progress.advance()
                 )
             except ConnectionError:
                 self.send(_Output.EMBEDDINGS, None)
-                self.send(_Output.MISSING_IMAGES, None)
+                self.send(_Output.SKIPPED_IMAGES, None)
                 self._set_server_info(connected=False)
                 return
 
-        print(embeddings)
-        # todo: construct Orange table and send output signals
+        skipped_images_bool = [x is None for x in embeddings]
+
+        if any(skipped_images_bool):
+            skipped_images = self._input_data[skipped_images_bool]
+            self.send(_Output.SKIPPED_IMAGES, Table(skipped_images))
+        else:
+            self.send(_Output.SKIPPED_IMAGES, None)
+
+        embedded_images_bool = np.logical_not(skipped_images_bool)
+
+        if any(embedded_images_bool):
+            embedded_images = self._input_data[embedded_images_bool]
+            output_data_table = self._construct_output_data_table(
+                embedded_images,
+                embeddings
+            )
+            self.send(_Output.EMBEDDINGS, output_data_table)
+        else:
+            self.send(_Output.EMBEDDINGS, None)
+
+    def _construct_output_data_table(self, embedded_images, embeddings):
+        X = np.hstack((embedded_images.X, embeddings))
+        Y = embedded_images.Y
+
+        dimensions = range(embeddings.shape[1])
+        attributes = [ContinuousVariable('n{:d}'.format(d)) for d in dimensions]
+        attributes = list(self._input_data.domain.attributes) + attributes
+
+        domain = Domain(
+            attributes=attributes,
+            class_vars=self._input_data.domain.class_vars,
+            metas=self._input_data.domain.metas
+        )
+
+        return Table(domain, X, Y, self._input_data.metas)
 
     def _set_server_info(self, connected):
         self.clear_messages()

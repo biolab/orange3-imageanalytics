@@ -4,19 +4,12 @@ from json.decoder import JSONDecodeError
 from os.path import join, isfile
 
 import numpy as np
-import requests
 from Orange.misc.environ import cache_dir
 from PIL.Image import open, LANCZOS
 from hyper import HTTP20Connection
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
-from orangecontrib.imageanalytics.utils import get_hostname, md5_hash
+from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
-
-_DEFAULT_SERVER_DISCOVERY_URL = (
-    "https://raw.githubusercontent.com/biolab/"
-    "orange3-imageanalytics/master/SERVERS.txt"
-)
 
 
 class ImageEmbedder(object):
@@ -29,23 +22,17 @@ class ImageEmbedder(object):
     >>> with ImageEmbedder() as embedder:
     ...    profiles = embedder(image_file_paths)
     """
+
     _target_image_size = (299, 299)
     _cache_file_path = join(cache_dir(), 'image_embeddings.pickle')
-    _conn_err_msg = "No connection with {:s}:{:d}, call reconnect_to_server()"
+    _conn_err_msg = "No connection with server, call reconnect_to_server()"
 
-    def __init__(self, server_url=None, server_port=80,
-                 server_discovery_url=_DEFAULT_SERVER_DISCOVERY_URL):
+    def __init__(self, server_url='api.biolab.si', server_port=8080):
 
         self._cache_dict = self._init_cache()
         self._server_url = server_url
         self._server_port = server_port
-        self._server_discovery_url = server_discovery_url
         self._server_connection = self._connect_to_server()
-
-        self._conn_err_msg = self._conn_err_msg.format(
-            self._server_url,
-            self._server_port
-        )
 
     def _init_cache(self):
         if isfile(self._cache_file_path):
@@ -63,10 +50,7 @@ class ImageEmbedder(object):
             self._server_connection.close()
 
     def _connect_to_server(self):
-        if not self._server_url:
-            self._server_url = self._discover_server()
-
-        if not self._server_url:
+        if not self._server_url or not self._server_port:
             return None
 
         return HTTP20Connection(
@@ -74,14 +58,6 @@ class ImageEmbedder(object):
             port=self._server_port,
             force_proto='h2'
         )
-
-    def _discover_server(self):
-        try:
-            response = requests.get(self._server_discovery_url)
-        except RequestsConnectionError:
-            return None
-
-        return get_hostname(response.text)
 
     def is_connected_to_server(self):
         if not self._server_connection:

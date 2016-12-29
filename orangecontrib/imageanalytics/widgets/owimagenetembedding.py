@@ -20,6 +20,8 @@ class _Output:
 
 
 class OWImageNetEmbedding(OWWidget):
+    # todo: implement embedding in a non-blocking manner
+    # todo: implement a reconnecting mechanism
     name = "ImageNet Embedding"
     description = "Image embedding through deep neural network from ImageNet."
     icon = "icons/ImageNetEmbedding.svg"
@@ -44,9 +46,10 @@ class OWImageNetEmbedding(OWWidget):
 
         self._setup_layout()
 
-        self._image_embedder = ImageEmbedder(server_url='127.0.0.1')
-        connection_info = self._image_embedder.is_connected_to_server()
-        self._set_server_info(connection_info)
+        self._image_embedder = ImageEmbedder()
+        self._set_server_info(
+            self._image_embedder.is_connected_to_server()
+        )
 
     def _setup_layout(self):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
@@ -113,8 +116,11 @@ class OWImageNetEmbedding(OWWidget):
             self.commit()
 
     def commit(self):
-        # todo: implement in a non-blocking manner
-        # todo: implement a reconnecting mechanism
+        if not self._image_attributes or not self._input_data:
+            self.send(_Output.EMBEDDINGS, None)
+            self.send(_Output.SKIPPED_IMAGES, None)
+            return
+
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
 
@@ -135,7 +141,9 @@ class OWImageNetEmbedding(OWWidget):
 
         if any(skipped_images_bool):
             skipped_images = self._input_data[skipped_images_bool]
-            self.send(_Output.SKIPPED_IMAGES, Table(skipped_images))
+            skipped_images = Table(skipped_images)
+            skipped_images.ids = self._input_data.ids[skipped_images_bool]
+            self.send(_Output.SKIPPED_IMAGES, skipped_images)
         else:
             self.send(_Output.SKIPPED_IMAGES, None)
 
@@ -143,11 +151,12 @@ class OWImageNetEmbedding(OWWidget):
 
         if any(embedded_images_bool):
             embedded_images = self._input_data[embedded_images_bool]
-            output_data_table = self._construct_output_data_table(
+            embedded_images = self._construct_output_data_table(
                 embedded_images,
                 embeddings
             )
-            self.send(_Output.EMBEDDINGS, output_data_table)
+            embedded_images.ids = self._input_data.ids[embedded_images_bool]
+            self.send(_Output.EMBEDDINGS, embedded_images)
         else:
             self.send(_Output.EMBEDDINGS, None)
 

@@ -37,7 +37,7 @@ class ImageEmbedderTest(TestCase):
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def setUp(self):
-        self.embedder = ImageEmbedder(server_url='example.com')
+        self.embedder = ImageEmbedder(server_url='example.com', server_port=80)
         self.embedder.clear_cache()
         self.example_images = [_EXAMPLE_IMAGE]
 
@@ -99,11 +99,11 @@ class ImageEmbedderTest(TestCase):
         self.assertEquals(len(self.embedder._cache_dict), 1)
 
         self.embedder.persist_cache()
-        self.embedder = ImageEmbedder(server_url='example.com')
+        self.embedder = ImageEmbedder(server_url='example.com', server_port=80)
         self.assertEquals(len(self.embedder._cache_dict), 1)
 
         self.embedder.clear_cache()
-        self.embedder = ImageEmbedder(server_url='example.com')
+        self.embedder = ImageEmbedder(server_url='example.com', server_port=80)
         self.assertEquals(len(self.embedder._cache_dict), 0)
 
     def test_with_statement(self):
@@ -111,5 +111,5 @@ class ImageEmbedderTest(TestCase):
             embedder(self.example_images)
 
         self.assertEquals(self.embedder.is_connected_to_server(), False)
-        self.embedder = ImageEmbedder(server_url='example.com')
+        self.embedder = ImageEmbedder(server_url='example.com', server_port=80)
         self.assertEquals(len(self.embedder._cache_dict), 1)

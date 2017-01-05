@@ -3,4 +3,5 @@ Orange3_ImageAnalytics.egg-info
 build
 dist
 __pycache__
+.idea/
 

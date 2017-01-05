@@ -185,9 +185,11 @@ class OWImageNetEmbedding(widget.OWWidget):
                         self.data.domain.class_vars,
                         self.data.domain.metas)
         embeddings = Table(domain, x, data.Y, data.metas)
+        embeddings.ids = self.data.ids[sel]
         self.send("Embeddings", embeddings)
         if np.any(np.logical_not(sel)):
             missing_data = Table(self.data[np.logical_not(sel)])
+            missing_data.ids = self.data.ids[np.logical_not(sel)]
             self.send("Missing Images", missing_data)
         else:
             self.send("Missing Images", None)

@@ -7,6 +7,7 @@ import numpy as np
 from Orange.misc.environ import cache_dir
 from PIL.Image import open, LANCZOS
 from hyper import HTTP20Connection
+from hyper.http20.exceptions import StreamResetError
 
 from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
@@ -117,7 +118,7 @@ class ImageEmbedder(object):
             try:
                 stream_id = self._send_request(
                     method='POST',
-                    url='/v2/image_profiler',
+                    url='/image/inception-v3',
                     body_bytes=image
                 )
                 http_streams.append(stream_id)
@@ -209,7 +210,7 @@ class ImageEmbedder(object):
             return json.loads(response_txt)
         except JSONDecodeError:
             return None
-        except (ConnectionResetError, BrokenPipeError):
+        except (ConnectionResetError, BrokenPipeError, StreamResetError):
             self._server_connection = None
             raise ConnectionError(self._conn_err_msg)
 

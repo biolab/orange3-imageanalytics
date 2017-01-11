@@ -57,6 +57,7 @@ class OWImageNetEmbedding(OWWidget):
 
         widget_box = widgetBox(self.controlArea, "Info")
         self.input_data_info = widgetLabel(widget_box, self._NO_DATA_INFO_TEXT)
+        self.connection_info = widgetLabel(widget_box, "")
 
         widget_box = widgetBox(self.controlArea, "Settings")
         self.cb_image_attr = comboBox(
@@ -137,9 +138,9 @@ class OWImageNetEmbedding(OWWidget):
                 self._set_server_info(connected=False)
                 return
 
-        skipped_images_bool = [x is None for x in embeddings]
+        skipped_images_bool = np.array([x is None for x in embeddings])
 
-        if any(skipped_images_bool):
+        if np.any(skipped_images_bool):
             skipped_images = self._input_data[skipped_images_bool]
             skipped_images = Table(skipped_images)
             skipped_images.ids = self._input_data.ids[skipped_images_bool]
@@ -149,8 +150,12 @@ class OWImageNetEmbedding(OWWidget):
 
         embedded_images_bool = np.logical_not(skipped_images_bool)
 
-        if any(embedded_images_bool):
+        if np.any(embedded_images_bool):
             embedded_images = self._input_data[embedded_images_bool]
+
+            embeddings = embeddings[embedded_images_bool]
+            embeddings = np.stack(embeddings)
+
             embedded_images = self._construct_output_data_table(
                 embedded_images,
                 embeddings
@@ -160,27 +165,29 @@ class OWImageNetEmbedding(OWWidget):
         else:
             self.send(_Output.EMBEDDINGS, None)
 
-    def _construct_output_data_table(self, embedded_images, embeddings):
+    @staticmethod
+    def _construct_output_data_table(embedded_images, embeddings):
         X = np.hstack((embedded_images.X, embeddings))
         Y = embedded_images.Y
 
         dimensions = range(embeddings.shape[1])
         attributes = [ContinuousVariable('n{:d}'.format(d)) for d in dimensions]
-        attributes = list(self._input_data.domain.attributes) + attributes
+        attributes = list(embedded_images.domain.attributes) + attributes
 
         domain = Domain(
             attributes=attributes,
-            class_vars=self._input_data.domain.class_vars,
-            metas=self._input_data.domain.metas
+            class_vars=embedded_images.domain.class_vars,
+            metas=embedded_images.domain.metas
         )
 
-        return Table(domain, X, Y, self._input_data.metas)
+        return Table(domain, X, Y, embedded_images.metas)
 
     def _set_server_info(self, connected):
         self.clear_messages()
         if connected:
-            self.information("Connected to server.")
+            self.connection_info.setText("Connected to server.")
         else:
+            self.connection_info.setText("")
             self.warning("Not connected to server.")
 
     def onDeleteWidget(self):

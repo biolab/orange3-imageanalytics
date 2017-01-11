@@ -1,11 +1,12 @@
 import json
 from io import BytesIO
+from itertools import islice
 from json.decoder import JSONDecodeError
 from os.path import join, isfile
 
 import numpy as np
 from Orange.misc.environ import cache_dir
-from PIL.Image import open, LANCZOS
+from PIL.Image import open as open_image, LANCZOS
 from hyper import HTTP20Connection
 from hyper.http20.exceptions import StreamResetError
 
@@ -21,7 +22,7 @@ class ImageEmbedder(object):
     >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
     >>> image_file_paths = [...]
     >>> with ImageEmbedder() as embedder:
-    ...    profiles = embedder(image_file_paths)
+    ...    embeddings = embedder(image_file_paths)
     """
 
     _target_image_size = (299, 299)
@@ -29,11 +30,13 @@ class ImageEmbedder(object):
     _conn_err_msg = "No connection with server, call reconnect_to_server()"
 
     def __init__(self, server_url='api.biolab.si', server_port=8080):
-
         self._cache_dict = self._init_cache()
+
         self._server_url = server_url
         self._server_port = server_port
+
         self._server_connection = self._connect_to_server()
+        self._max_concurrent_streams = self._ack_max_concurrent_streams()
 
     def _init_cache(self):
         if isfile(self._cache_file_path):
@@ -44,24 +47,34 @@ class ImageEmbedder(object):
     def reconnect_to_server(self):
         self.disconnect_from_server()
         self._server_connection = self._connect_to_server()
+        self._max_concurrent_streams = self._ack_max_concurrent_streams()
         return self.is_connected_to_server()
 
     def disconnect_from_server(self):
         if self._server_connection:
             self._server_connection.close()
+        self._server_connection = None
+        self._max_concurrent_streams = None
 
     def _connect_to_server(self):
-        if not self._server_url or not self._server_port:
-            return None
-
         return HTTP20Connection(
             host=self._server_url,
             port=self._server_port,
             force_proto='h2'
         )
 
+    def _ack_max_concurrent_streams(self):
+        if not self._server_ping_successful():
+            return None
+
+        # pylint: disable=protected-access
+        remote_settings = self._server_connection._conn._obj.remote_settings
+        return remote_settings.max_concurrent_streams
+
     def is_connected_to_server(self):
         if not self._server_connection:
+            return False
+        if not self._max_concurrent_streams:
             return False
         return self._server_ping_successful()
 
@@ -74,7 +87,8 @@ class ImageEmbedder(object):
 
     def __call__(self, file_paths, persist_cache=False,
                  image_processed_callback=None):
-        """Embeds the images.
+        """Send the images to the remote server in batches. The batch size
+        parameter is set by the http2 remote peer (i.e. the server).
 
         Parameters
         ----------
@@ -94,24 +108,68 @@ class ImageEmbedder(object):
         Returns
         -------
         embeddings: array-like
-            Array-like of float16 arrays (profiles) for
+            Array-like of float16 arrays (embeddings) for
             successfully embedded images and Nones for skipped images.
 
         Raises
         ------
         ConnectionError:
-            If connection with the server is lost during the embedding
-            process.
+            If disconnected or connection with the server is lost
+            during the embedding process.
         """
-        images = self._load_images_or_none_for_skipped(file_paths)
-        cache_keys = self._compute_cache_keys_or_none_for_skipped(images)
+        # check connection at the beginning to avoid doing unnecessary work
+        if not self.is_connected_to_server():
+            self.disconnect_from_server()
+            raise ConnectionError(self._conn_err_msg)
 
-        # send requests to http2 server in a non-blocking manner
+        all_embeddings = []
+
+        for batch in self._yield_in_batches(file_paths):
+            embeddings = self._send_to_server(batch, image_processed_callback)
+            all_embeddings += embeddings
+
+        if persist_cache:
+            self.persist_cache()
+
+        return np.array(all_embeddings)
+
+    def _yield_in_batches(self, list_):
+        gen_ = (path for path in list_)
+        batch_size = self._max_concurrent_streams
+
+        num_yielded = 0
+
+        while True:
+            batch = list(islice(gen_, batch_size))
+            num_yielded += len(batch)
+
+            yield batch
+
+            if num_yielded == len(list_):
+                return
+
+    def _send_to_server(self, file_paths, image_processed_callback):
+        """ Load images and compute cache keys and send requests to
+        an http2 server for valid ones.
+        """
+        cache_keys = []
         http_streams = []
 
-        for image, cache_key in zip(images, cache_keys):
-            if not image or cache_key in self._cache_dict:
-                # image skipped at loading or already cached
+        for file_path in file_paths:
+
+            image = self._load_image_or_none(file_path)
+            if not image:
+                # skip rest of the sending because image was
+                # skipped at loading
+                http_streams.append(None)
+                cache_keys.append(None)
+                continue
+
+            cache_key = md5_hash(image)
+            cache_keys.append(cache_key)
+            if cache_key in self._cache_dict:
+                # skip rest of the sending because image is
+                # present in the local cache
                 http_streams.append(None)
                 continue
 
@@ -125,14 +183,39 @@ class ImageEmbedder(object):
             except ConnectionError:
                 raise
 
-        # wait for all responses in a blocking manner
+        # wait for the responses in a blocking manner
+        return self._get_responses_from_server(
+            http_streams,
+            cache_keys,
+            image_processed_callback
+        )
+
+    def _load_image_or_none(self, file_path):
+        try:
+            image = open_image(file_path)
+        except IOError:
+            return None
+
+        image.thumbnail(self._target_image_size, LANCZOS)
+        image_bytes = BytesIO()
+        image.save(image_bytes, format="JPEG")
+        image_bytes.seek(0)
+        image = image_bytes.read()
+        image_bytes.close()
+        return image
+
+    def _get_responses_from_server(self, http_streams, cache_keys,
+                                   image_processed_callback):
+        """Wait for responses from an http2 server in a blocking manner."""
         embeddings = []
 
         for stream_id, cache_key in zip(http_streams, cache_keys):
+
             if not stream_id:
-                # image skipped at loading or already cached
-                profile = self._get_cached_result_or_none(cache_key)
-                embeddings.append(profile)
+                # skip rest of the waiting because image was either
+                # skipped at loading or is present in the local cache
+                embedding = self._get_cached_result_or_none(cache_key)
+                embeddings.append(embedding)
                 continue
 
             try:
@@ -140,44 +223,20 @@ class ImageEmbedder(object):
             except ConnectionError:
                 raise
 
-            if not response or 'profile' not in response:
-                # returned response not a valid json response
-                # or the profile key not present
+            if not response or 'embedding' not in response:
+                # returned response is not a valid json response
+                # or the embedding key not present in the json
                 embeddings.append(None)
             else:
                 # successful response
-                profile = np.array(response['profile'], dtype=np.float16)
-                embeddings.append(profile)
-                self._cache_dict[cache_key] = profile
+                embedding = np.array(response['embedding'], dtype=np.float16)
+                embeddings.append(embedding)
+                self._cache_dict[cache_key] = embedding
 
             if image_processed_callback:
                 image_processed_callback()
 
-        if persist_cache:
-            self.persist_cache()
-        return np.array(embeddings)
-
-    def _load_images_or_none_for_skipped(self, file_paths):
-        images = []
-        for file_path in file_paths:
-            try:
-                image = open(file_path)
-            except IOError:
-                images.append(None)
-                continue
-
-            image.thumbnail(self._target_image_size, LANCZOS)
-            image_bytes = BytesIO()
-            image.save(image_bytes, format="JPEG")
-            image_bytes.seek(0)
-            images.append(image_bytes.read())
-            image_bytes.close()
-
-        return images
-
-    @staticmethod
-    def _compute_cache_keys_or_none_for_skipped(images):
-        return [md5_hash(image) if image else None for image in images]
+        return embeddings
 
     def _get_cached_result_or_none(self, cache_key):
         if cache_key in self._cache_dict:
@@ -186,6 +245,7 @@ class ImageEmbedder(object):
 
     def _send_request(self, method, url, body_bytes):
         if not self._server_connection:
+            self.persist_cache()
             raise ConnectionError(self._conn_err_msg)
 
         try:
@@ -197,11 +257,13 @@ class ImageEmbedder(object):
                 headers=headers
             )
         except (ConnectionRefusedError, BrokenPipeError):
-            self._server_connection = None
+            self.persist_cache()
+            self.disconnect_from_server()
             raise ConnectionError(self._conn_err_msg)
 
     def _get_json_response_or_none(self, stream_id):
         if not self._server_connection:
+            self.persist_cache()
             raise ConnectionError(self._conn_err_msg)
 
         try:
@@ -211,7 +273,8 @@ class ImageEmbedder(object):
         except JSONDecodeError:
             return None
         except (ConnectionResetError, BrokenPipeError, StreamResetError):
-            self._server_connection = None
+            self.persist_cache()
+            self.disconnect_from_server()
             raise ConnectionError(self._conn_err_msg)
 
     def __enter__(self):

@@ -1,0 +1,37 @@
+language: python
+
+sudo: false   # use container-based infrastructure
+
+python:
+  - "3.5"
+  - "3.4"
+
+addons:
+    apt:
+        packages:
+            - gfortran
+            - libblas-dev
+            - liblapack-dev
+
+cache:
+    apt: true
+    pip: true
+    ccache: true
+    directories:
+        - $TRAVIS_BUILD_DIR/orange
+
+before_install:
+    - set -e
+
+install:
+    # Update pip to be able to install wheel dependencies
+    - pip install -U pip wheel
+    - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
+    - pip install -e .
+    - pip install codecov
+
+script:
+    - coverage run setup.py test
+
+after_success:
+    - codecov

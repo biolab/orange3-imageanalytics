@@ -49,6 +49,8 @@ ENTRY_POINTS = {
 
 NAMESPACE_PACKAGES = ["orangecontrib"]
 
+TEST_SUITE = "orangecontrib.imageanalytics.tests"
+
 
 if __name__ == "__main__":
     setup(
@@ -63,6 +65,7 @@ if __name__ == "__main__":
         packages=PACKAGES,
         package_data=PACKAGE_DATA,
         keywords=KEYWORDS,
+        # test_suite=TEST_SUITE,
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
         namespace_packages=NAMESPACE_PACKAGES,

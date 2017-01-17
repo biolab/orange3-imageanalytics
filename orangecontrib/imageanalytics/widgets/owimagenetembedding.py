@@ -21,7 +21,7 @@ class _Output:
 
 class OWImageNetEmbedding(OWWidget):
     # todo: implement embedding in a non-blocking manner
-    # todo: implement a reconnecting mechanism
+    # todo: stop running task action
     name = "ImageNet Embedding"
     description = "Image embedding through deep neural network from ImageNet."
     icon = "icons/ImageNetEmbedding.svg"
@@ -69,7 +69,7 @@ class OWImageNetEmbedding(OWWidget):
             callback=self._cb_image_attr_changed
         )
 
-        auto_commit(
+        self.auto_commit_widget = auto_commit(
             widget=self.controlArea,
             master=self,
             value="_auto_apply",
@@ -122,6 +122,8 @@ class OWImageNetEmbedding(OWWidget):
             self.send(_Output.SKIPPED_IMAGES, None)
             return
 
+        self.auto_commit_widget.setDisabled(True)
+
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
 
@@ -129,15 +131,19 @@ class OWImageNetEmbedding(OWWidget):
             try:
                 embeddings = self._image_embedder(
                     file_paths=file_paths,
-                    persist_cache=True,
                     image_processed_callback=lambda: progress.advance()
                 )
             except ConnectionError:
                 self.send(_Output.EMBEDDINGS, None)
                 self.send(_Output.SKIPPED_IMAGES, None)
                 self._set_server_info(connected=False)
+                self.auto_commit_widget.setDisabled(False)
                 return
 
+        self._send_output_signals(embeddings)
+        self.auto_commit_widget.setDisabled(False)
+
+    def _send_output_signals(self, embeddings):
         skipped_images_bool = np.array([x is None for x in embeddings])
 
         if np.any(skipped_images_bool):

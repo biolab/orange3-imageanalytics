@@ -76,20 +76,31 @@ class ImageEmbedderTest(TestCase):
         self.embedder._server_connection.close()
         self.assertEquals(self.embedder.is_connected_to_server(), False)
 
-    def test_connection_errors(self):
+    @patch(_TESTED_MODULE.format('HTTP20Connection'))
+    def test_connection_errors(self, ConnectionMock):
         res = self.embedder(self.single_example)
         assert_array_equal(res, np.array([np.array([0, 1], dtype=np.float16)]))
         self.embedder.clear_cache()
 
         self.embedder._server_connection.close()
+        ConnectionMock.side_effect = ConnectionRefusedError
         with self.assertRaises(ConnectionError):
             self.embedder(self.single_example)
 
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_disconnect_reconnect(self):
         self.assertEquals(self.embedder.is_connected_to_server(), True)
         self.embedder.disconnect_from_server()
         self.assertEquals(self.embedder.is_connected_to_server(), False)
         self.embedder.reconnect_to_server()
+        self.assertEquals(self.embedder.is_connected_to_server(), True)
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_auto_reconnect(self):
+        self.assertEquals(self.embedder.is_connected_to_server(), True)
+        self.embedder.disconnect_from_server()
+        self.assertEquals(self.embedder.is_connected_to_server(), False)
+        self.embedder(self.single_example)
         self.assertEquals(self.embedder.is_connected_to_server(), True)
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'))
@@ -101,6 +112,7 @@ class ImageEmbedderTest(TestCase):
         ConnectionMock.get_response.assert_not_called()
         self.assertEquals(self.embedder._cache_dict, {})
 
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_on_successful_response(self):
         res = self.embedder(self.single_example)
         assert_array_equal(res, np.array([np.array([0, 1], dtype=np.float16)]))
@@ -143,9 +155,11 @@ class ImageEmbedderTest(TestCase):
         self.embedder = ImageEmbedder(server_url='example.com', server_port=80)
         self.assertEquals(len(self.embedder._cache_dict), 1)
 
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_max_concurrent_streams_setting(self):
         self.assertEquals(self.embedder._max_concurrent_streams, 128)
 
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_too_many_examples_for_one_batch(self):
         too_many_examples = [_EXAMPLE_IMAGE_0 for _ in range(200)]
         true_res = [np.array([0, 1], dtype=np.float16) for _ in range(200)]
@@ -154,6 +168,7 @@ class ImageEmbedderTest(TestCase):
         res = self.embedder(too_many_examples)
         assert_array_equal(res, true_res)
 
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_successful_result_shape(self):
         more_examples = [_EXAMPLE_IMAGE_0 for _ in range(5)]
         res = self.embedder(more_examples)

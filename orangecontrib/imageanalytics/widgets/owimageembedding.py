@@ -11,26 +11,26 @@ from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 
 
 class _Input:
-    IMAGES = "Images"
+    IMAGES = 'Images'
 
 
 class _Output:
-    EMBEDDINGS = "Embeddings"
-    SKIPPED_IMAGES = "Skipped Images"
+    EMBEDDINGS = 'Embeddings'
+    SKIPPED_IMAGES = 'Skipped Images'
 
 
-class OWImageNetEmbedding(OWWidget):
+class OWImageEmbedding(OWWidget):
     # todo: implement embedding in a non-blocking manner
     # todo: stop running task action
-    name = "ImageNet Embedding"
-    description = "Image embedding through deep neural network from ImageNet."
-    icon = "icons/ImageNetEmbedding.svg"
+    name = "Image Embedding"
+    description = "Image embedding through deep neural networks."
+    icon = "icons/ImageEmbedding.svg"
     priority = 150
 
     want_main_area = False
     _auto_apply = Setting(default=True)
 
-    inputs = [(_Input.IMAGES, Table, "set_data")]
+    inputs = [(_Input.IMAGES, Table, 'set_data')]
     outputs = [
         (_Output.EMBEDDINGS, Table, Default),
         (_Output.SKIPPED_IMAGES, Table)
@@ -46,7 +46,10 @@ class OWImageNetEmbedding(OWWidget):
 
         self._setup_layout()
 
-        self._image_embedder = ImageEmbedder()
+        self._image_embedder = ImageEmbedder(
+            model='inception-v3',
+            layer='penultimate',
+        )
         self._set_server_info(
             self._image_embedder.is_connected_to_server()
         )
@@ -55,16 +58,16 @@ class OWImageNetEmbedding(OWWidget):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
         self.layout().setSizeConstraint(QLayout.SetFixedSize)
 
-        widget_box = widgetBox(self.controlArea, "Info")
+        widget_box = widgetBox(self.controlArea, 'Info')
         self.input_data_info = widgetLabel(widget_box, self._NO_DATA_INFO_TEXT)
         self.connection_info = widgetLabel(widget_box, "")
 
-        widget_box = widgetBox(self.controlArea, "Settings")
+        widget_box = widgetBox(self.controlArea, 'Settings')
         self.cb_image_attr = comboBox(
             widget=widget_box,
             master=self,
-            value="cb_image_attr_current_id",
-            label="Image attribute:",
+            value='cb_image_attr_current_id',
+            label='Image attribute:',
             orientation=Qt.Horizontal,
             callback=self._cb_image_attr_changed
         )
@@ -72,9 +75,9 @@ class OWImageNetEmbedding(OWWidget):
         self.auto_commit_widget = auto_commit(
             widget=self.controlArea,
             master=self,
-            value="_auto_apply",
-            label="Apply",
-            checkbox_label="Auto Apply",
+            value='_auto_apply',
+            label='Apply',
+            checkbox_label='Auto Apply',
             commit=self.commit
         )
 
@@ -110,7 +113,7 @@ class OWImageNetEmbedding(OWWidget):
     @staticmethod
     def _filter_image_attributes(data):
         metas = data.domain.metas
-        return [m for m in metas if m.attributes.get("type") == "image"]
+        return [m for m in metas if m.attributes.get('type') == 'image']
 
     def _cb_image_attr_changed(self):
         if self._auto_apply:
@@ -205,7 +208,7 @@ if __name__ == '__main__':
     import sys
     from AnyQt.QtWidgets import QApplication
     app = QApplication(sys.argv)
-    widget = OWImageNetEmbedding()
+    widget = OWImageEmbedding()
     widget.show()
     app.exec()
     widget.saveSettings()

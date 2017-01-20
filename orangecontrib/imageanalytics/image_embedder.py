@@ -1,96 +1,73 @@
-import json
 from io import BytesIO
 from itertools import islice
-from json.decoder import JSONDecodeError
 from os.path import join, isfile
 
 import numpy as np
 from Orange.misc.environ import cache_dir
 from PIL.Image import open as open_image, LANCZOS
-from h2.exceptions import ProtocolError
-from hyper import HTTP20Connection
-from hyper.http20.exceptions import StreamResetError
 
+from orangecontrib.imageanalytics.http2_client import Http2Client
+from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
 
+MODELS_SETTINGS = {
+    'inception-v3': {
+        'target_image_size': (299, 299),
+        'layers': ['penultimate']
+    },
+}
 
-class MaximumNumberOfRequestsError(Exception):
-    """Thrown when remote peer closes the connection because
-    maximum number of requests were served through a single connection."""
-    pass
 
-
-class ImageEmbedder(object):
-    """"Client side functionality for accessing a remote ImageNet embedder.
+class ImageEmbedder(Http2Client):
+    """"Client side functionality for accessing a remote http2
+    image embedding backend.
 
     Examples
     --------
     >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
     >>> image_file_paths = [...]
-    >>> with ImageEmbedder() as embedder:
+    >>> with ImageEmbedder(model='model_name', layer='penultimate') as embedder:
     ...    embeddings = embedder(image_file_paths)
     """
+    _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
 
-    _target_image_size = (299, 299)
-    _cache_file_path = join(cache_dir(), 'image_embeddings.pickle')
-    _conn_err_msg = "No connection with server, call reconnect_to_server()"
+    def __init__(self, model, layer,
+                 server_url='api.biolab.si', server_port=8080):
+        super().__init__(server_url, server_port)
+        model_settings = self._get_model_settings_confidently(model, layer)
 
-    def __init__(self, server_url='api.biolab.si', server_port=8080):
+        self._model = model
+        self._layer = layer
+        self._target_image_size = model_settings['target_image_size']
+
+        cache_file_path = self._cache_file_blueprint.format(model, layer)
+        self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
 
-        self._server_url = server_url
-        self._server_port = server_port
+    @staticmethod
+    def _get_model_settings_confidently(model, layer):
+        if model not in MODELS_SETTINGS.keys():
+            model_error = "'{:s}' is not a valid model, should be one of: {:s}"
+            available_models = ', '.join(MODELS_SETTINGS.keys())
+            raise ValueError(model_error.format(model, available_models))
 
-        self._server_connection = self._connect_to_server()
-        self._max_concurrent_streams = self._ack_max_concurrent_streams()
+        model_settings = MODELS_SETTINGS[model]
+
+        if layer not in model_settings['layers']:
+            layer_error = (
+                "'{:s}' is not a valid layer for the '{:s}'"
+                " model, should be one of: {:s}")
+            available_layers = ', '.join(model_settings['layers'])
+            raise ValueError(layer_error.format(layer, model, available_layers))
+
+        return model_settings
 
     def _init_cache(self):
         if isfile(self._cache_file_path):
             return load_pickle(self._cache_file_path)
         else:
             return {}
-
-    def reconnect_to_server(self):
-        self.disconnect_from_server()
-        self._server_connection = self._connect_to_server()
-        self._max_concurrent_streams = self._ack_max_concurrent_streams()
-        return self.is_connected_to_server()
-
-    def disconnect_from_server(self):
-        if self._server_connection:
-            self._server_connection.close()
-        self._server_connection = None
-        self._max_concurrent_streams = None
-
-    def _connect_to_server(self):
-        return HTTP20Connection(
-            host=self._server_url,
-            port=self._server_port,
-            force_proto='h2'
-        )
-
-    def _ack_max_concurrent_streams(self):
-        if not self._server_ping_successful():
-            return None
-
-        # pylint: disable=protected-access
-        remote_settings = self._server_connection._conn._obj.remote_settings
-        return remote_settings.max_concurrent_streams
-
-    def is_connected_to_server(self):
-        if not self._server_connection:
-            return False
-        if not self._max_concurrent_streams:
-            return False
-        return self._server_ping_successful()
-
-    def _server_ping_successful(self):
-        try:
-            self._server_connection.ping(bytes(8))
-        except ConnectionRefusedError:
-            return False
-        return True
 
     def __call__(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
@@ -132,7 +109,7 @@ class ImageEmbedder(object):
                 embeddings = self._send_to_server(
                     batch, image_processed_callback
                 )
-            except MaximumNumberOfRequestsError:
+            except MaxNumberOfRequestsError:
                 # maximum number of http2 requests through a single
                 # connection is exceeded and a remote peer has closed
                 # the connection so establish a new connection and retry
@@ -188,13 +165,19 @@ class ImageEmbedder(object):
                 continue
 
             try:
+                headers = {
+                    'Content-Type': 'image/jpeg',
+                    'Content-Length': str(len(image))
+                }
                 stream_id = self._send_request(
                     method='POST',
-                    url='/image/inception-v3',
+                    url='/image/' + self._model,
+                    headers=headers,
                     body_bytes=image
                 )
                 http_streams.append(stream_id)
             except ConnectionError:
+                self.persist_cache()
                 raise
 
         # wait for the responses in a blocking manner
@@ -211,12 +194,20 @@ class ImageEmbedder(object):
             return None
 
         image.thumbnail(self._target_image_size, LANCZOS)
-        image_bytes = BytesIO()
-        image.save(image_bytes, format="JPEG")
-        image_bytes.seek(0)
-        image = image_bytes.read()
-        image_bytes.close()
-        return image
+        image_bytes_io = BytesIO()
+        image.save(image_bytes_io, format="JPEG")
+        image.close()
+
+        image_bytes_io.seek(0)
+        image_bytes = image_bytes_io.read()
+        image_bytes_io.close()
+
+        # todo: temporary here because of a backend bug: when body
+        # of exactly 19456 bytes in size is sent in the http2 post
+        # request the request doesn't reach the upstream servers
+        if len(image_bytes) == 19456:
+            return None
+        return image_bytes
 
     def _get_responses_from_server(self, http_streams, cache_keys,
                                    image_processed_callback):
@@ -260,44 +251,6 @@ class ImageEmbedder(object):
         if cache_key in self._cache_dict:
             return self._cache_dict[cache_key]
         return None
-
-    def _send_request(self, method, url, body_bytes):
-        if not self._server_connection:
-            raise ConnectionError(self._conn_err_msg)
-
-        headers = {
-            'Content-Type': 'image/jpeg',
-            'Content-Length': str(len(body_bytes))
-        }
-        try:
-            return self._server_connection.request(
-                method=method,
-                url=url,
-                body=body_bytes,
-                headers=headers
-            )
-        except (ConnectionRefusedError, BrokenPipeError):
-            self.disconnect_from_server()
-            raise ConnectionError(self._conn_err_msg)
-
-    def _get_json_response_or_none(self, stream_id):
-        if not self._server_connection:
-            raise ConnectionError(self._conn_err_msg)
-
-        try:
-            response_raw = self._server_connection.get_response(stream_id)
-            response_txt = response_raw.read().decode()
-            return json.loads(response_txt)
-
-        except JSONDecodeError:
-            return None
-
-        except ProtocolError:
-            raise MaximumNumberOfRequestsError()
-
-        except (ConnectionResetError, BrokenPipeError, StreamResetError):
-            self.disconnect_from_server()
-            raise ConnectionError(self._conn_err_msg)
 
     def __enter__(self):
         return self

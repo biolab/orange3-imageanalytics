@@ -3,7 +3,8 @@ language: python
 sudo: false   # use container-based infrastructure
 
 python:
-  - "3.4"
+  - "3.5"
+  - "3.6"
 
 addons:
     apt:
@@ -12,22 +13,22 @@ addons:
             - libblas-dev
             - liblapack-dev
 
+before_cache:   # prevent logs from caching
+    - rm -f $HOME/.cache/pip/log/debug.log
+
 cache:
     apt: true
     pip: true
     ccache: true
-    directories:
-        - $TRAVIS_BUILD_DIR/orange
 
 before_install:
-    - set -e
+    - pip install -U pip wheel setuptools
+    - pip install codecov
 
 install:
-    # Update pip to be able to install wheel dependencies
-    - pip install -U pip wheel
-    - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .
-    - pip install codecov
+    # orange cache dir doesn't get created at installation
+    - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
 
 script:
     - coverage run setup.py test

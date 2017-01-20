@@ -1,3 +1,4 @@
+hyper==0.7.0
+numpy
 Orange3>=3.3.5
-hyper
-pillow
+Pillow

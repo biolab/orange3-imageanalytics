@@ -1,9 +1,5 @@
 import hashlib
 import pickle
-import re
-
-_HOSTNAME_REGEX = re.compile(r'^(https?://)?(?P<hostname>[\wd.]+)')
-_PORT_REGEX = re.compile(r':(?P<port>\d{2,4})/?')
 
 
 def save_pickle(obj, file_name):

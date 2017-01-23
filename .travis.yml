@@ -1,0 +1,37 @@
+language: python
+
+sudo: false   # use container-based infrastructure
+
+python:
+  - "3.5"
+  - "3.6"
+
+addons:
+    apt:
+        packages:
+            - gfortran
+            - libblas-dev
+            - liblapack-dev
+
+before_cache:   # prevent logs from caching
+    - rm -f $HOME/.cache/pip/log/debug.log
+
+cache:
+    apt: true
+    pip: true
+    ccache: true
+
+before_install:
+    - pip install -U pip wheel setuptools
+    - pip install codecov
+
+install:
+    - pip install -e .
+    # orange cache dir doesn't get created at installation
+    - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
+
+script:
+    - coverage run setup.py test
+
+after_success:
+    - codecov

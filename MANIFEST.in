@@ -1,1 +1,6 @@
-recursive-include orangecontrib/imageanalytics *.svg *.png
+recursive-include orangecontrib/imageanalytics *.svg *.png *.jpg
+
+include requirements.txt
+include README.md
+include LICENSE.txt
+include *.py *.txt

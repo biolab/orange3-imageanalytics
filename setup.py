@@ -1,56 +1,60 @@
 #!/usr/bin/env python3
 
-from setuptools import setup, find_packages
 import io
+import os
 
-with io.open("README.rst", "r", encoding="utf-8") as f:
+from setuptools import setup, find_packages
+
+with io.open('README.md', 'r', encoding='utf-8') as f:
     README = f.read()
 
-NAME = "Orange3-ImageAnalytics"
-VERSION = "0.0.5"
+NAME = 'Orange3-ImageAnalytics'
+
+MAJOR = 0
+MINOR = 0
+MICRO = 5
+VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
+
 AUTHOR = 'Bioinformatics Laboratory, FRI UL'
 AUTHOR_EMAIL = 'contact@orange.biolab.si'
+
 URL = 'http://orange.biolab.si/download'
-DESCRIPTION = "Orange3 add-on for image data mining."
+DESCRIPTION = 'Orange3 add-on for image data mining.'
 LONG_DESCRIPTION = README
-LICENSE = "GPL3+"
+LICENSE = 'GPL3+'
+
 CLASSIFIERS = [
-    "Development Status :: 1 - Planning",
-    "Intended Audience :: Education",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    "Programming Language :: Python :: 3 :: Only"
+    'Development Status :: 1 - Planning',
+    'Intended Audience :: Education',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+    'Programming Language :: Python :: 3 :: Only'
 ]
 
 KEYWORDS = [
-    "orange3 add-on",
+    'orange3 add-on',
+    'orange3-imageanalytics'
 ]
 
 PACKAGES = find_packages()
 
 PACKAGE_DATA = {
-    "orangecontrib.imageanalytics.widgets": ["icons/*.svg"],
+    'orangecontrib.imageanalytics.widgets': ['icons/*.svg'],
 }
 
-INSTALL_REQUIRES = [
-    "Orange3 >= 3.3.5",
-    "setuptools",
-    "numpy",
-    "pillow",
-    "requests"
-]
+INSTALL_REQUIRES = sorted(set(
+    line.partition('#')[0].strip()
+    for line in open(os.path.join(os.path.dirname(__file__), 'requirements.txt'))
+) - {''})
 
 ENTRY_POINTS = {
-    "orange.widgets":
-        ("Image Analytics = orangecontrib.imageanalytics.widgets",),
-    "orange3.addon":
-        ("Orange3-Imageanalytics = orangecontrib.imageanalytics",)
+    'orange.widgets':
+        ('Image Analytics = orangecontrib.imageanalytics.widgets',),
+    'orange3.addon':
+        ('Orange3-Imageanalytics = orangecontrib.imageanalytics',)
 }
 
-NAMESPACE_PACKAGES = ["orangecontrib"]
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     setup(
         name=NAME,
         version=VERSION,
@@ -65,6 +69,7 @@ if __name__ == "__main__":
         keywords=KEYWORDS,
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
-        namespace_packages=NAMESPACE_PACKAGES,
-        entry_points=ENTRY_POINTS
+        namespace_packages=['orangecontrib'],
+        entry_points=ENTRY_POINTS,
+        test_suite='orangecontrib.imageanalytics.tests'
     )

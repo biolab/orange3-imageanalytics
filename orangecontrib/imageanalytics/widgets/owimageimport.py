@@ -622,10 +622,15 @@ class OWImportImages(widget.OWWidget):
 
             cat_data = numpy.array(cat_data, dtype=float)
             meta_data = numpy.array(meta_data, dtype=object)
-            table = Orange.data.Table.from_numpy(
-                domain, numpy.empty((len(cat_data), 0), dtype=float),
-                cat_data, meta_data
-            )
+
+            if len(meta_data):
+                table = Orange.data.Table.from_numpy(
+                    domain, numpy.empty((len(cat_data), 0), dtype=float),
+                    cat_data, meta_data
+                )
+            else:
+                # empty results, no images found
+                table = None
         else:
             table = None
 

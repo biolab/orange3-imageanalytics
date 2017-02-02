@@ -3,6 +3,7 @@ language: python
 sudo: false   # use container-based infrastructure
 
 python:
+  - "3.4"
   - "3.5"
   - "3.6"
 

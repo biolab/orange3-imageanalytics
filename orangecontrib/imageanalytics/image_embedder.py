@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 from itertools import islice
 from os.path import join, isfile
@@ -10,6 +11,8 @@ from orangecontrib.imageanalytics.http2_client import Http2Client
 from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
+
+log = logging.getLogger(__name__)
 
 MODELS_SETTINGS = {
     'inception-v3': {
@@ -100,7 +103,7 @@ class ImageEmbedder(Http2Client):
             reconnected = self.reconnect_to_server()
 
             if not reconnected:
-                raise ConnectionError(self._conn_err_msg)
+                raise ConnectionError("Couldn't reconnect to server")
 
         all_embeddings = []
 
@@ -191,6 +194,7 @@ class ImageEmbedder(Http2Client):
         try:
             image = open_image(file_path)
         except IOError:
+            log.warning("Image skipped (invalid file path)", exc_info=True)
             return None
 
         image.thumbnail(self._target_image_size, LANCZOS)

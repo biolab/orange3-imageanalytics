@@ -344,17 +344,31 @@ class OWImportImages(widget.OWWidget):
                 os.path.samefile(self.currentPath, path):
             return True
 
-        if not os.path.exists(path):
-            warnings.warn("'{}' does not exist".format(path), UserWarning)
-            return False
-        elif not os.path.isdir(path):
-            warnings.warn("'{}' is not a directory".format(path), UserWarning)
-            return False
+        success = True
+        error = None
+        if path is not None:
+            if not os.path.exists(path):
+                error = "'{}' does not exist".format(path)
+                path = None
+                success = False
+            elif not os.path.isdir(path):
+                error = "'{}' is not a directory".format(path)
+                path = None
+                success = False
 
-        newindex = self.addRecentPath(path)
-        self.recent_cb.setCurrentIndex(newindex)
-        if newindex >= 0:
-            self.currentPath = path
+        if error is not None:
+            self.error(error)
+            warnings.warn(error, UserWarning, stacklevel=3)
+        else:
+            self.error()
+
+        if path is not None:
+            newindex = self.addRecentPath(path)
+            self.recent_cb.setCurrentIndex(newindex)
+            if newindex >= 0:
+                self.currentPath = path
+            else:
+                self.currentPath = None
         else:
             self.currentPath = None
         self.__actions.reload.setEnabled(self.currentPath is not None)
@@ -362,7 +376,7 @@ class OWImportImages(widget.OWWidget):
         if self.__state == State.Processing:
             self.cancel()
 
-        return True
+        return success
 
     def addRecentPath(self, path):
         """
@@ -377,9 +391,13 @@ class OWImportImages(widget.OWWidget):
         """
         existing = None
         for pathitem in self.recent_paths:
-            if os.path.samefile(pathitem.abspath, path):
-                existing = pathitem
-                break
+            try:
+                if os.path.samefile(pathitem.abspath, path):
+                    existing = pathitem
+                    break
+            except FileNotFoundError:
+                # file not found if the `pathitem.abspath` no longer exists
+                pass
 
         model = self.recent_cb.model()
 
@@ -604,10 +622,15 @@ class OWImportImages(widget.OWWidget):
 
             cat_data = numpy.array(cat_data, dtype=float)
             meta_data = numpy.array(meta_data, dtype=object)
-            table = Orange.data.Table.from_numpy(
-                domain, numpy.empty((len(cat_data), 0), dtype=float),
-                cat_data, meta_data
-            )
+
+            if len(meta_data):
+                table = Orange.data.Table.from_numpy(
+                    domain, numpy.empty((len(cat_data), 0), dtype=float),
+                    cat_data, meta_data
+                )
+            else:
+                # empty results, no images found
+                table = None
         else:
             table = None
 

@@ -1,5 +1,9 @@
 import json
-from json.decoder import JSONDecodeError
+try:
+    from json.decoder import JSONDecodeError
+except ImportError:
+    # json decoder in Python3.4 raises ValueError on invalid json
+    JSONDecodeError = ValueError
 
 from h2.exceptions import ProtocolError
 from hyper import HTTP20Connection

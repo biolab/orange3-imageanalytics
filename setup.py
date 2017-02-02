@@ -12,7 +12,7 @@ NAME = 'Orange3-ImageAnalytics'
 
 MAJOR = 0
 MINOR = 1
-MICRO = 0
+MICRO = 1
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 AUTHOR = 'Bioinformatics Laboratory, FRI UL'

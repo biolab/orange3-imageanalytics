@@ -1,4 +1,5 @@
 import json
+import logging
 import unittest
 from io import BytesIO
 from os.path import join, dirname
@@ -61,6 +62,7 @@ class DummyHttp2Connection(object):
 class ImageEmbedderTest(unittest.TestCase):
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def setUp(self):
+        logging.disable(logging.CRITICAL)
         self.embedder = ImageEmbedder(
             model='inception-v3',
             layer='penultimate',
@@ -72,6 +74,7 @@ class ImageEmbedderTest(unittest.TestCase):
 
     def tearDown(self):
         self.embedder.clear_cache()
+        logging.disable(logging.NOTSET)
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'))
     def test_connected_to_server(self, ConnectionMock):

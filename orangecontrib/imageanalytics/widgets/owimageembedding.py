@@ -21,7 +21,7 @@ class _Output:
 
 class OWImageEmbedding(OWWidget):
     # todo: implement embedding in a non-blocking manner
-    # todo: stop running task action
+    # todo: implement stop running task action
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
     icon = "icons/ImageEmbedding.svg"
@@ -125,6 +125,7 @@ class OWImageEmbedding(OWWidget):
             self.send(_Output.SKIPPED_IMAGES, None)
             return
 
+        self._set_server_info(connected=True)
         self.auto_commit_widget.setDisabled(True)
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
@@ -196,8 +197,8 @@ class OWImageEmbedding(OWWidget):
         if connected:
             self.connection_info.setText("Connected to server.")
         else:
-            self.connection_info.setText("")
-            self.warning("Not connected to server.")
+            self.connection_info.setText("No connection with server.")
+            self.warning("Click Apply to try again.")
 
     def onDeleteWidget(self):
         super().onDeleteWidget()

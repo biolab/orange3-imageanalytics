@@ -259,7 +259,7 @@ class OWImportImages(widget.OWWidget):
     def __runOpenDialog(self):
         startdir = os.path.expanduser("~/")
         if self.recent_paths:
-            startdir = self.recent_paths[0].abspath
+            startdir = os.path.dirname(self.recent_paths[0].abspath)
 
         if OWImportImages.Modality == Qt.WindowModal:
             dlg = QFileDialog(

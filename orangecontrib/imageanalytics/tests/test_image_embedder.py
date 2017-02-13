@@ -12,8 +12,9 @@ from numpy.testing import assert_array_equal
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 
 _TESTED_MODULE = 'orangecontrib.imageanalytics.http2_client.{:s}'
-_EXAMPLE_IMAGE_0 = join(dirname(__file__), 'example_image_0.jpg')
-_EXAMPLE_IMAGE_1 = join(dirname(__file__), 'example_image_1.png')
+_EXAMPLE_IMAGE_JPG = join(dirname(__file__), 'example_image_0.jpg')
+_EXAMPLE_IMAGE_TIFF = join(dirname(__file__), 'example_image_1.tiff')
+_EXAMPLE_IMAGE_GRAYSCALE = join(dirname(__file__), 'example_image_2.png')
 
 
 # dummy classes for hyper.HTTP20Connection monkey patching
@@ -70,7 +71,7 @@ class ImageEmbedderTest(unittest.TestCase):
             server_port=80
         )
         self.embedder.clear_cache()
-        self.single_example = [_EXAMPLE_IMAGE_0]
+        self.single_example = [_EXAMPLE_IMAGE_JPG]
 
     def tearDown(self):
         self.embedder.clear_cache()
@@ -184,7 +185,7 @@ class ImageEmbedderTest(unittest.TestCase):
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_too_many_examples_for_one_batch(self):
-        too_many_examples = [_EXAMPLE_IMAGE_0 for _ in range(200)]
+        too_many_examples = [_EXAMPLE_IMAGE_JPG for _ in range(200)]
         true_res = [np.array([0, 1], dtype=np.float16) for _ in range(200)]
         true_res = np.array(true_res)
 
@@ -193,7 +194,7 @@ class ImageEmbedderTest(unittest.TestCase):
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_successful_result_shape(self):
-        more_examples = [_EXAMPLE_IMAGE_0 for _ in range(5)]
+        more_examples = [_EXAMPLE_IMAGE_JPG for _ in range(5)]
         res = self.embedder(more_examples)
         self.assertEqual(res.shape, (5, 2))
 
@@ -216,3 +217,15 @@ class ImageEmbedderTest(unittest.TestCase):
                 server_url='example.com',
                 server_port=80
             )
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_with_grayscale_image(self):
+        res = self.embedder([_EXAMPLE_IMAGE_GRAYSCALE])
+        assert_array_equal(res, np.array([np.array([0, 1], dtype=np.float16)]))
+        self.assertEqual(len(self.embedder._cache_dict), 1)
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_with_tiff_image(self):
+        res = self.embedder([_EXAMPLE_IMAGE_TIFF])
+        assert_array_equal(res, np.array([np.array([0, 1], dtype=np.float16)]))
+        self.assertEqual(len(self.embedder._cache_dict), 1)

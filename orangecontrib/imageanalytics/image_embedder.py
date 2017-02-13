@@ -5,6 +5,7 @@ from os.path import join, isfile
 
 import numpy as np
 from Orange.misc.environ import cache_dir
+from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
 
 from orangecontrib.imageanalytics.http2_client import Http2Client
@@ -13,6 +14,7 @@ from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
 
 log = logging.getLogger(__name__)
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 MODELS_SETTINGS = {
     'inception-v3': {
@@ -196,6 +198,9 @@ class ImageEmbedder(Http2Client):
         except IOError:
             log.warning("Image skipped (invalid file path)", exc_info=True)
             return None
+
+        if not image.mode == 'RGB':
+            image = image.convert('RGB')
 
         image.thumbnail(self._target_image_size, LANCZOS)
         image_bytes_io = BytesIO()

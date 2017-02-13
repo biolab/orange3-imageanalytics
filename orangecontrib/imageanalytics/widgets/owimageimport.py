@@ -647,7 +647,7 @@ class UserInterruptError(BaseException):
     """
     pass
 
-DefaultFormats = ("jpeg", "jpg", "png")
+DefaultFormats = ("jpeg", "jpg", "png", "tiff", "tif")
 
 
 class ImageScan:

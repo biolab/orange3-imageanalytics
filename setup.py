@@ -71,5 +71,5 @@ if __name__ == '__main__':
         install_requires=INSTALL_REQUIRES,
         namespace_packages=['orangecontrib'],
         entry_points=ENTRY_POINTS,
-        test_suite='orangecontrib.imageanalytics.tests'
+        test_suite='orangecontrib.imageanalytics.tests.suite'
     )

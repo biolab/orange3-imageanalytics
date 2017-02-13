@@ -13,6 +13,8 @@ addons:
             - gfortran
             - libblas-dev
             - liblapack-dev
+            - libqt4-dev
+            - xvfb
 
 before_cache:   # prevent logs from caching
     - rm -f $HOME/.cache/pip/log/debug.log
@@ -21,18 +23,23 @@ cache:
     apt: true
     pip: true
     ccache: true
+    directories:
+        - $TRAVIS_BUILD_DIR/pyqt
+        - $TRAVIS_BUILD_DIR/orange
 
 before_install:
     - pip install -U pip wheel setuptools
     - pip install codecov
 
 install:
+    - source $TRAVIS_BUILD_DIR/.travis/install_pyqt.sh
+    - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .
-    # orange cache dir doesn't get created at installation
+    # todo: orange cache dir doesn't get created at installation
     - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
 
 script:
-    - coverage run setup.py test
+    - catchsegv xvfb-run coverage run setup.py test
 
 after_success:
     - codecov

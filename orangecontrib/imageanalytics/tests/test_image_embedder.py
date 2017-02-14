@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 from h2.exceptions import TooManyStreamsError
+from hyper.http20.exceptions import StreamResetError
 from numpy.testing import assert_array_equal
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
@@ -95,6 +96,12 @@ class ImageEmbedderTest(unittest.TestCase):
         ConnectionMock.side_effect = ConnectionRefusedError
         with self.assertRaises(ConnectionError):
             self.embedder(self.single_example)
+
+    @patch.object(DummyHttp2Connection, 'get_response')
+    def test_on_stream_reset_by_server(self, ConnectionMock):
+        ConnectionMock.side_effect = StreamResetError
+        self.assertEqual(self.embedder(self.single_example), [None])
+        self.assertEqual(len(self.embedder._cache_dict), 0)
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_disconnect_reconnect(self):

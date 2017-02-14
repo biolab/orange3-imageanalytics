@@ -5,7 +5,7 @@ except ImportError:
     # json decoder in Python3.4 raises ValueError on invalid json
     JSONDecodeError = ValueError
 import logging
-from socket import gaierror
+from socket import gaierror, timeout
 
 from h2.exceptions import ProtocolError
 from hyper import HTTP20Connection
@@ -68,7 +68,7 @@ class Http2Client(object):
     def _server_ping_successful(self):
         try:
             self._server_connection.ping(bytes(8))
-        except (TimeoutError, ConnectionRefusedError, gaierror):
+        except (ConnectionRefusedError, gaierror, timeout):
             log.error("Remote server not reachable", exc_info=True)
             return False
         return True
@@ -103,6 +103,12 @@ class Http2Client(object):
             log.warning("Response skipped (not valid json)", exc_info=True)
             return None
 
+        except StreamResetError:
+            log.warning(
+                "Response skipped (request didn't reach the server)",
+                exc_info=True)
+            return None
+
         except ProtocolError:
             error = MaxNumberOfRequestsError(
                 "Maximum number of http2 requests through a single"
@@ -110,8 +116,7 @@ class Http2Client(object):
             log.warning(error, exc_info=True)
             raise error
 
-        except (ConnectionResetError, BrokenPipeError,
-                StreamResetError, OSError):
+        except (ConnectionResetError, BrokenPipeError, OSError):
             self.disconnect_from_server()
             error = ConnectionError("Response receiving failed")
             log.error(error, exc_info=True)

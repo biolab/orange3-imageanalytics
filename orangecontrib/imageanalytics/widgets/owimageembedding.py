@@ -1,5 +1,5 @@
 import numpy as np
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QTimer
 from AnyQt.QtWidgets import QLayout
 from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
@@ -45,14 +45,8 @@ class OWImageEmbedding(OWWidget):
         self._input_data = None
 
         self._setup_layout()
-
-        self._image_embedder = ImageEmbedder(
-            model='inception-v3',
-            layer='penultimate',
-        )
-        self._set_server_info(
-            self._image_embedder.is_connected_to_server()
-        )
+        self._image_embedder = None
+        QTimer.singleShot(0, self._init_server_connection)
 
     def _setup_layout(self):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
@@ -79,6 +73,15 @@ class OWImageEmbedding(OWWidget):
             label='Apply',
             checkbox_label='Auto Apply',
             commit=self.commit
+        )
+
+    def _init_server_connection(self):
+        self._image_embedder = ImageEmbedder(
+            model='inception-v3',
+            layer='penultimate',
+        )
+        self._set_server_info(
+            self._image_embedder.is_connected_to_server()
         )
 
     def set_data(self, data):

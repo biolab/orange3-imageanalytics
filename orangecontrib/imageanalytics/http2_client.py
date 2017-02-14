@@ -68,7 +68,7 @@ class Http2Client(object):
     def _server_ping_successful(self):
         try:
             self._server_connection.ping(bytes(8))
-        except (ConnectionRefusedError, gaierror):
+        except (TimeoutError, ConnectionRefusedError, gaierror):
             log.error("Remote server not reachable", exc_info=True)
             return False
         return True

@@ -210,12 +210,6 @@ class ImageEmbedder(Http2Client):
         image_bytes_io.seek(0)
         image_bytes = image_bytes_io.read()
         image_bytes_io.close()
-
-        # todo: temporary here because of a backend bug: when body
-        # of exactly 19456 bytes in size is sent in the http2 post
-        # request the request doesn't reach the upstream servers
-        if len(image_bytes) == 19456:
-            return None
         return image_bytes
 
     def _get_responses_from_server(self, http_streams, cache_keys,

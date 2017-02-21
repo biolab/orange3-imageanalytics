@@ -39,7 +39,11 @@ class Http2Client(object):
 
     def disconnect_from_server(self):
         if self._server_connection:
-            self._server_connection.close()
+            try:
+                self._server_connection.close()
+            except ConnectionError:
+                log.error("Error when disconnecting from server", exc_info=True)
+
         self._server_connection = None
         self._max_concurrent_streams = None
 
@@ -68,7 +72,7 @@ class Http2Client(object):
     def _server_ping_successful(self):
         try:
             self._server_connection.ping(bytes(8))
-        except (ConnectionRefusedError, gaierror, timeout):
+        except (TimeoutError, ConnectionError, gaierror, timeout):
             log.error("Remote server not reachable", exc_info=True)
             return False
         return True
@@ -84,10 +88,9 @@ class Http2Client(object):
                 body=body_bytes,
                 headers=headers
             )
-        except (ConnectionRefusedError, BrokenPipeError):
+        except ConnectionError as error:
             self.disconnect_from_server()
-            error = ConnectionError("Request sending failed")
-            log.error(error, exc_info=True)
+            log.error("Request sending failed", exc_info=True)
             raise error
 
     def _get_json_response_or_none(self, stream_id):
@@ -105,7 +108,8 @@ class Http2Client(object):
 
         except StreamResetError:
             log.warning(
-                "Response skipped (request didn't reach the server)",
+                "Response skipped (request didn't reach the server "
+                "or was malformed)",
                 exc_info=True)
             return None
 
@@ -116,7 +120,7 @@ class Http2Client(object):
             log.warning(error, exc_info=True)
             raise error
 
-        except (ConnectionResetError, BrokenPipeError, OSError):
+        except OSError:
             self.disconnect_from_server()
             error = ConnectionError("Response receiving failed")
             log.error(error, exc_info=True)

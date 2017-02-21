@@ -97,6 +97,10 @@ class ImageEmbedderTest(unittest.TestCase):
         with self.assertRaises(ConnectionError):
             self.embedder(self.single_example)
 
+        ConnectionMock.side_effect = BrokenPipeError
+        with self.assertRaises(ConnectionError):
+            self.embedder(self.single_example)
+
     @patch.object(DummyHttp2Connection, 'get_response')
     def test_on_stream_reset_by_server(self, ConnectionMock):
         ConnectionMock.side_effect = StreamResetError

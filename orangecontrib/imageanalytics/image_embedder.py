@@ -102,10 +102,7 @@ class ImageEmbedder(Http2Client):
         """
         # check connection at the beginning to avoid doing unnecessary work
         if not self.is_connected_to_server():
-            reconnected = self.reconnect_to_server()
-
-            if not reconnected:
-                raise ConnectionError("Couldn't reconnect to server")
+            self.reconnect_to_server()
 
         all_embeddings = []
 

@@ -1,7 +1,22 @@
-
-Orange3_ImageAnalytics.egg-info
+# Build files
 build
 dist
+*.egg-info/*
+doc/_build
+*.so
+*.la
+*.o
+*.py[doc]
+MANIFEST
+
+# Cython generated files
 __pycache__
-.idea/
+
+# Editor files
+.idea
+.idea/*
+*~
+.project
+.pydevproject
+.settings/*
 .DS_Store

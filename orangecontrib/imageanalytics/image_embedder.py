@@ -13,6 +13,9 @@ from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils import md5_hash
 from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
 
+from urllib.parse import urlparse
+import requests
+
 log = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -193,11 +196,21 @@ class ImageEmbedder(Http2Client):
         )
 
     def _load_image_or_none(self, file_path):
-        try:
-            image = open_image(file_path)
-        except IOError:
-            log.warning("Image skipped (invalid file path)", exc_info=True)
-            return None
+	o = urlparse(file_path)
+        if is_valid_url(file_path) and (o.scheme == 'http' or o.scheme == 'https'):
+            response = requests.get(file_path, stream=True)
+            response.raw.decode_content = True
+            try:
+                image = open_image(response.content)
+            except IOError: 
+                log.warning("Image skipped (invalid file path)", exc_info=True)
+                return None
+	else:
+            try:
+                image = open_image(file_path)
+            except IOError:
+                log.warning("Image skipped (invalid file path)", exc_info=True)
+                return None
 
         if not image.mode == 'RGB':
             image = image.convert('RGB')

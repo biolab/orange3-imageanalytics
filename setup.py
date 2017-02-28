@@ -5,14 +5,14 @@ import os
 
 from setuptools import setup, find_packages
 
-with io.open('README.md', 'r', encoding='utf-8') as f:
-    README = f.read()
+with io.open('about.md', 'r', encoding='utf-8') as f:
+    ABOUT = f.read()
 
 NAME = 'Orange3-ImageAnalytics'
 
 MAJOR = 0
 MINOR = 1
-MICRO = 3
+MICRO = 4
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 AUTHOR = 'Bioinformatics Laboratory, FRI UL'
@@ -20,7 +20,7 @@ AUTHOR_EMAIL = 'contact@orange.biolab.si'
 
 URL = 'http://orange.biolab.si/download'
 DESCRIPTION = 'Orange3 add-on for image data mining.'
-LONG_DESCRIPTION = README
+LONG_DESCRIPTION = ABOUT
 LICENSE = 'GPL3+'
 
 CLASSIFIERS = [

@@ -196,8 +196,8 @@ class ImageEmbedder(Http2Client):
         )
 
     def _load_image_or_none(self, file_path):
-	parsed_url = urlparse(file_path)
-        if is_valid_url(file_path) and (parsed_url.scheme == 'http' or parsed_url.scheme == 'https'):
+        parsed_url = urlparse(file_path)
+        if parsed_url.scheme == 'http' or parsed_url.scheme == 'https':
             response = requests.get(file_path, stream=True)
             response.raw.decode_content = True
             try:
@@ -205,7 +205,7 @@ class ImageEmbedder(Http2Client):
             except IOError: 
                 log.warning("Image skipped (invalid file path)", exc_info=True)
                 return None
-	else:
+        else:
             try:
                 image = open_image(file_path)
             except IOError:

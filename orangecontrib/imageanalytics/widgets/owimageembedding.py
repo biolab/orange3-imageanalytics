@@ -71,7 +71,6 @@ class OWImageEmbedding(OWWidget):
             master=self,
             value='_auto_apply',
             label='Apply',
-            checkbox_label='Auto Apply',
             commit=self.commit
         )
 
@@ -119,8 +118,7 @@ class OWImageEmbedding(OWWidget):
         return [m for m in metas if m.attributes.get('type') == 'image']
 
     def _cb_image_attr_changed(self):
-        if self._auto_apply:
-            self.commit()
+        self.commit()
 
     def commit(self):
         if not self._image_attributes or not self._input_data:

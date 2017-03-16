@@ -198,7 +198,13 @@ class ImageEmbedder(Http2Client):
     def _load_image_or_none(self, file_path):
         parsed_url = urlparse(file_path)
         if parsed_url.scheme == 'http' or parsed_url.scheme == 'https':
-            response = requests.get(file_path, stream=True)
+           # response = requests.get(file_path, stream=True)
+            try:
+                response = requests.get(file_path, stream=True)
+            except requests.exceptions.RequestException as e:  # this is the base requests exception
+                self.Error.request_failed(' '.join(e.args))  # See the link below
+                log.error(...)
+                return
             response.raw.decode_content = True
             try:
                 image = open_image(response.content)

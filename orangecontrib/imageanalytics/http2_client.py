@@ -5,6 +5,7 @@ except ImportError:
     # json decoder in Python3.4 raises ValueError on invalid json
     JSONDecodeError = ValueError
 import logging
+from os import getenv
 from socket import gaierror, timeout
 
 from h2.exceptions import ProtocolError
@@ -25,8 +26,11 @@ class Http2Client(object):
     _no_conn_err = "No connection with server, call reconnect_to_server()"
 
     def __init__(self, server_url, server_port):
-        self._server_url = server_url
-        self._server_port = server_port
+        self._server_url = getenv('ORANGE_EMBEDDING_API_URL', server_url)
+        self._server_port = getenv('ORANGE_EMBEDDING_API_PORT', server_port)
+
+        if isinstance(self._server_port, str):
+            self._server_port = int(self._server_port)
 
         self._server_connection = self._connect_to_server()
         self._max_concurrent_streams = self._ack_max_concurrent_streams()
@@ -115,7 +119,7 @@ class Http2Client(object):
 
         except ProtocolError:
             error = MaxNumberOfRequestsError(
-                "Maximum number of http2 requests through a single"
+                "Maximum number of http2 requests through a single "
                 "connection exceeded")
             log.warning(error, exc_info=True)
             raise error

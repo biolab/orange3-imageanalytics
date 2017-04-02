@@ -70,7 +70,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.embedder.clear_cache()
         self.single_example = [_EXAMPLE_IMAGE_JPG]
@@ -164,7 +163,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 1)
 
@@ -173,7 +171,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 0)
 
@@ -187,7 +184,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 1)
 
@@ -217,7 +213,6 @@ class ImageEmbedderTest(unittest.TestCase):
                 model='invalid_model',
                 layer='penultimate',
                 server_url='example.com',
-                server_port=80
             )
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
@@ -227,7 +222,6 @@ class ImageEmbedderTest(unittest.TestCase):
                 model='inception-v3',
                 layer='first',
                 server_url='example.com',
-                server_port=80
             )
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
@@ -243,24 +237,15 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(len(self.embedder._cache_dict), 1)
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
-    def test_server_url_port_env_vars(self):
-        url_value = 'url'
-        port_value = '1234'
-
+    def test_server_url_env_var(self):
+        url_value = 'url:1234'
         self.assertTrue(self.embedder._server_url != url_value)
-        self.assertTrue(self.embedder._server_port != int(port_value))
 
         environ['ORANGE_EMBEDDING_API_URL'] = url_value
-        environ['ORANGE_EMBEDDING_API_PORT'] = port_value
         self.embedder = ImageEmbedder(
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
-
         self.assertTrue(self.embedder._server_url == url_value)
-        self.assertTrue(self.embedder._server_port == int(port_value))
-
         del environ['ORANGE_EMBEDDING_API_URL']
-        del environ['ORANGE_EMBEDDING_API_PORT']

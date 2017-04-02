@@ -25,13 +25,8 @@ class Http2Client(object):
     """Base class for an http2 client."""
     _no_conn_err = "No connection with server, call reconnect_to_server()"
 
-    def __init__(self, server_url, server_port):
+    def __init__(self, server_url):
         self._server_url = getenv('ORANGE_EMBEDDING_API_URL', server_url)
-        self._server_port = getenv('ORANGE_EMBEDDING_API_PORT', server_port)
-
-        if isinstance(self._server_port, str):
-            self._server_port = int(self._server_port)
-
         self._server_connection = self._connect_to_server()
         self._max_concurrent_streams = self._ack_max_concurrent_streams()
 
@@ -52,11 +47,7 @@ class Http2Client(object):
         self._max_concurrent_streams = None
 
     def _connect_to_server(self):
-        return HTTP20Connection(
-            host=self._server_url,
-            port=self._server_port,
-            force_proto='h2'
-        )
+        return HTTP20Connection(host=self._server_url, force_proto='h2')
 
     def _ack_max_concurrent_streams(self):
         if not self._server_ping_successful():

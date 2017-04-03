@@ -2,11 +2,14 @@ import logging
 from io import BytesIO
 from itertools import islice
 from os.path import join, isfile
+from urllib.parse import urlparse
 
 import numpy as np
+import requests
 from Orange.misc.environ import cache_dir
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
+from requests.exceptions import RequestException
 
 from orangecontrib.imageanalytics.http2_client import Http2Client
 from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
@@ -190,11 +193,10 @@ class ImageEmbedder(Http2Client):
         )
 
     def _load_image_or_none(self, file_path):
-        try:
-            image = open_image(file_path)
-        except IOError:
-            log.warning("Image skipped (invalid file path)", exc_info=True)
-            return None
+        image = self._load_image_from_url_or_local_path(file_path)
+
+        if image is None:
+            return image
 
         if not image.mode == 'RGB':
             image = image.convert('RGB')
@@ -208,6 +210,23 @@ class ImageEmbedder(Http2Client):
         image_bytes = image_bytes_io.read()
         image_bytes_io.close()
         return image_bytes
+
+    @staticmethod
+    def _load_image_from_url_or_local_path(file_path):
+        if urlparse(file_path).scheme in ('http', 'https'):
+            try:
+                file = requests.get(file_path, stream=True).raw
+            except RequestException:
+                log.warning("Image skipped", exc_info=True)
+                return None
+        else:
+            file = file_path
+
+        try:
+            return open_image(file)
+        except IOError:
+            log.warning("Image skipped", exc_info=True)
+            return None
 
     def _get_responses_from_server(self, http_streams, cache_keys,
                                    image_processed_callback):

@@ -641,6 +641,7 @@ class OWImportImages(widget.OWWidget):
     def onDeleteWidget(self):
         self.cancel()
         self.__executor.shutdown(wait=True)
+        self.__invalidated = False
 
     def eventFilter(self, receiver, event):
         # re-implemented from QWidget

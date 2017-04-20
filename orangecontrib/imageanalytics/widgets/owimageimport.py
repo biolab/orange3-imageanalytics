@@ -24,15 +24,15 @@ from types import SimpleNamespace as namespace
 
 import numpy
 
-from AnyQt.QtGui import (
-    QAction, QPushButton, QComboBox, QLabel, QApplication, QStyle,
-    QImageReader, QFileDialog, QFileIconProvider, QStandardItem,
-    QStackedWidget, QProgressBar, QWidget, QHBoxLayout, QVBoxLayout,
-    QLabel
-)
+from AnyQt.QtCore import Qt, QEvent, QFileInfo, QThread
+from AnyQt.QtCore import pyqtSlot as Slot
+from AnyQt.QtGui import QStandardItem, QImageReader, QDropEvent
 
-from PyQt4.QtCore import Qt, QEvent, QFileInfo, QThread
-from PyQt4.QtCore import pyqtSlot as Slot
+from AnyQt.QtWidgets import (
+    QAction, QPushButton, QComboBox, QApplication, QStyle, QFileDialog,
+    QFileIconProvider, QStackedWidget, QProgressBar, QWidget, QHBoxLayout,
+    QVBoxLayout, QLabel
+)
 
 import Orange.data
 

@@ -24,7 +24,7 @@ from types import SimpleNamespace as namespace
 
 import numpy
 
-from PyQt4.QtGui import (
+from AnyQt.QtGui import (
     QAction, QPushButton, QComboBox, QLabel, QApplication, QStyle,
     QImageReader, QFileDialog, QFileIconProvider, QStandardItem,
     QStackedWidget, QProgressBar, QWidget, QHBoxLayout, QVBoxLayout,
@@ -132,7 +132,9 @@ class OWImportImages(widget.OWWidget):
         self.recent_cb = QComboBox(
             sizeAdjustPolicy=QComboBox.AdjustToMinimumContentsLengthWithIcon,
             minimumContentsLength=16,
+            acceptDrops=True
         )
+        self.recent_cb.installEventFilter(self)
         self.recent_cb.activated[int].connect(self.__onRecentActivated)
         icons = standard_icons(self)
 
@@ -639,6 +641,39 @@ class OWImportImages(widget.OWWidget):
     def onDeleteWidget(self):
         self.cancel()
         self.__executor.shutdown(wait=True)
+
+    def eventFilter(self, receiver, event):
+        # re-implemented from QWidget
+        # intercept and process drag drop events on the recent directory
+        # selection combo box
+        def dirpath(event):
+            # type: (QDropEvent) -> Optional[str]
+            """Return the directory from a QDropEvent."""
+            data = event.mimeData()
+            urls = data.urls()
+            if len(urls) == 1:
+                url = urls[0]
+                path = url.toLocalFile()
+                if os.path.isdir(path):
+                    return path
+            return None
+
+        if receiver is self.recent_cb and \
+                event.type() in {QEvent.DragEnter, QEvent.DragMove,
+                                 QEvent.Drop}:
+            assert isinstance(event, QDropEvent)
+            path = dirpath(event)
+            if path is not None and event.possibleActions() & Qt.LinkAction:
+                event.setDropAction(Qt.LinkAction)
+                event.accept()
+                if event.type() == QEvent.Drop:
+                    self.setCurrentPath(path)
+                    self.start()
+            else:
+                event.ignore()
+            return True
+
+        return super().eventFilter(receiver, event)
 
 
 class UserInterruptError(BaseException):

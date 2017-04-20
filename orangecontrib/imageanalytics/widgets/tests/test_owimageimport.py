@@ -2,7 +2,8 @@ import os
 import tempfile
 import unittest
 
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QUrl, QMimeData
+from AnyQt.QtGui import QDropEvent, QDragEnterEvent
 from AnyQt.QtWidgets import QApplication
 from AnyQt.QtTest import QTest, QSignalSpy
 
@@ -56,3 +57,25 @@ class TestOWImageImport(unittest.TestCase):
             widget.setCurrentPath(tempdir)
             self._startandwait(widget)
             widget.commit()
+
+    def test_drop(self):
+        widget = self.widget
+        with tempfile.TemporaryDirectory() as tmpdir:
+            urlpath = QUrl.fromLocalFile(tmpdir)
+            data = QMimeData()
+            data.setUrls([urlpath])
+            pos = widget.recent_cb.rect().center()
+            actions = Qt.LinkAction | Qt.CopyAction
+            ev = QDragEnterEvent(pos, actions, data,
+                                 Qt.LeftButton, Qt.NoModifier)
+            assert QApplication.sendEvent(widget.recent_cb, ev)
+            self.assertTrue(ev.isAccepted())
+            del ev
+            ev = QDropEvent(pos, actions, data,
+                            Qt.LeftButton, Qt.NoModifier, QDropEvent.Drop)
+            assert QApplication.sendEvent(widget.recent_cb, ev)
+            self.assertTrue(ev.isAccepted())
+            del ev
+            self.assertEqual(widget.currentPath, urlpath.toLocalFile())
+            self._startandwait(widget)
+            self.widget.commit()

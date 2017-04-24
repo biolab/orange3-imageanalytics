@@ -3,6 +3,8 @@ from io import BytesIO
 from itertools import islice
 from os.path import join, isfile
 from urllib.parse import urlparse
+from urllib.request import urlopen, URLError
+import ftplib
 
 import numpy as np
 import requests
@@ -213,10 +215,17 @@ class ImageEmbedder(Http2Client):
 
     @staticmethod
     def _load_image_from_url_or_local_path(file_path):
-        if urlparse(file_path).scheme in ('http', 'https'):
+        urlparts = urlparse(file_path)
+        if urlparts.scheme in ('http', 'https'):
             try:
                 file = requests.get(file_path, stream=True).raw
             except RequestException:
+                log.warning("Image skipped", exc_info=True)
+                return None
+        elif urlparts.scheme == "ftp":
+            try:
+                file = urlopen(file_path)
+            except (URLError, ) + ftplib.all_errors:
                 log.warning("Image skipped", exc_info=True)
                 return None
         else:

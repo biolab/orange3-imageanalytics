@@ -2,6 +2,7 @@ import json
 import logging
 import unittest
 from io import BytesIO
+from os import environ
 from os.path import join, dirname
 from unittest.mock import patch
 
@@ -69,7 +70,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.embedder.clear_cache()
         self.single_example = [_EXAMPLE_IMAGE_JPG]
@@ -163,7 +163,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 1)
 
@@ -172,7 +171,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 0)
 
@@ -186,7 +184,6 @@ class ImageEmbedderTest(unittest.TestCase):
             model='inception-v3',
             layer='penultimate',
             server_url='example.com',
-            server_port=80
         )
         self.assertEqual(len(self.embedder._cache_dict), 1)
 
@@ -216,7 +213,6 @@ class ImageEmbedderTest(unittest.TestCase):
                 model='invalid_model',
                 layer='penultimate',
                 server_url='example.com',
-                server_port=80
             )
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
@@ -226,7 +222,6 @@ class ImageEmbedderTest(unittest.TestCase):
                 model='inception-v3',
                 layer='first',
                 server_url='example.com',
-                server_port=80
             )
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
@@ -240,3 +235,17 @@ class ImageEmbedderTest(unittest.TestCase):
         res = self.embedder([_EXAMPLE_IMAGE_TIFF])
         assert_array_equal(res, np.array([np.array([0, 1], dtype=np.float16)]))
         self.assertEqual(len(self.embedder._cache_dict), 1)
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_server_url_env_var(self):
+        url_value = 'url:1234'
+        self.assertTrue(self.embedder._server_url != url_value)
+
+        environ['ORANGE_EMBEDDING_API_URL'] = url_value
+        self.embedder = ImageEmbedder(
+            model='inception-v3',
+            layer='penultimate',
+            server_url='example.com',
+        )
+        self.assertTrue(self.embedder._server_url == url_value)
+        del environ['ORANGE_EMBEDDING_API_URL']

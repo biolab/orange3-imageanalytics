@@ -14,9 +14,6 @@ pip install scipy
 pip install -r requirements-core.txt  # For Orange Python library
 pip install -r requirements-gui.txt   # For Orange GUI
 
-pip install -r requirements-sql.txt   # To use SQL support
-
-
 # install orange
 pip install -e .
 

@@ -5,6 +5,7 @@ except ImportError:
     # json decoder in Python3.4 raises ValueError on invalid json
     JSONDecodeError = ValueError
 import logging
+import sys
 from os import getenv
 from socket import gaierror, timeout
 
@@ -28,12 +29,12 @@ class Http2Client(object):
     def __init__(self, server_url):
         self._server_url = getenv('ORANGE_EMBEDDING_API_URL', server_url)
         self._server_connection = self._connect_to_server()
-        self._max_concurrent_streams = self._ack_max_concurrent_streams()
+        self._max_concurrent_streams = self._read_max_concurrent_streams()
 
     def reconnect_to_server(self):
         self.disconnect_from_server()
         self._server_connection = self._connect_to_server()
-        self._max_concurrent_streams = self._ack_max_concurrent_streams()
+        self._max_concurrent_streams = self._read_max_concurrent_streams()
         return self.is_connected_to_server()
 
     def disconnect_from_server(self):
@@ -49,13 +50,18 @@ class Http2Client(object):
     def _connect_to_server(self):
         return HTTP20Connection(host=self._server_url, force_proto='h2')
 
-    def _ack_max_concurrent_streams(self):
+    def _read_max_concurrent_streams(self):
         if not self._server_ping_successful():
             return None
 
         # pylint: disable=protected-access
-        remote_settings = self._server_connection._conn._obj.remote_settings
-        return remote_settings.max_concurrent_streams
+        max_concurrent_streams = (self._server_connection._conn._obj
+                                  .remote_settings.max_concurrent_streams)
+
+        if not max_concurrent_streams <= sys.maxsize:
+            return 1
+
+        return max_concurrent_streams
 
     def is_connected_to_server(self):
         if not self._server_connection:

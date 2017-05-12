@@ -91,7 +91,7 @@ class OWImageEmbedding(OWWidget):
             return
 
         self._image_attributes = self._filter_image_attributes(data)
-        if not self._image_attributes:
+        if self._image_attributes is None:
             input_data_info_text = (
                 "Data with {:d} instances, but without image attributes."
                 .format(len(data)))
@@ -121,7 +121,11 @@ class OWImageEmbedding(OWWidget):
         self.commit()
 
     def commit(self):
-        if not self._image_attributes or not self._input_data:
+        if self._image_embedder is None:
+            self._set_server_info(connected=False)
+            return
+
+        if self._image_attributes is None or self._input_data is None:
             self.send(_Output.EMBEDDINGS, None)
             self.send(_Output.SKIPPED_IMAGES, None)
             return

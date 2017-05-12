@@ -1,10 +1,10 @@
+import ftplib
 import logging
 from io import BytesIO
 from itertools import islice
 from os.path import join, isfile
 from urllib.parse import urlparse
 from urllib.request import urlopen, URLError
-import ftplib
 
 import numpy as np
 import requests
@@ -74,9 +74,12 @@ class ImageEmbedder(Http2Client):
 
     def _init_cache(self):
         if isfile(self._cache_file_path):
-            return load_pickle(self._cache_file_path)
-        else:
-            return {}
+            try:
+                return load_pickle(self._cache_file_path)
+            except EOFError:
+                return {}
+
+        return {}
 
     def __call__(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
@@ -104,7 +107,6 @@ class ImageEmbedder(Http2Client):
             If disconnected or connection with the server is lost
             during the embedding process.
         """
-        # check connection at the beginning to avoid doing unnecessary work
         if not self.is_connected_to_server():
             self.reconnect_to_server()
 
@@ -200,7 +202,10 @@ class ImageEmbedder(Http2Client):
             return image
 
         if not image.mode == 'RGB':
-            image = image.convert('RGB')
+            try:
+                image = image.convert('RGB')
+            except ValueError:
+                return None
 
         image.thumbnail(self._target_image_size, LANCZOS)
         image_bytes_io = BytesIO()
@@ -232,7 +237,7 @@ class ImageEmbedder(Http2Client):
 
         try:
             return open_image(file)
-        except IOError:
+        except (IOError, ValueError):
             log.warning("Image skipped", exc_info=True)
             return None
 

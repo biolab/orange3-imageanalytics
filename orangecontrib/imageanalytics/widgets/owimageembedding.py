@@ -135,11 +135,16 @@ class OWImageEmbedding(OWWidget):
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
+        assert file_paths_attr.is_string
+        assert file_paths.dtype == np.dtype('O')
 
-        with self.progressBar(len(file_paths)) as progress:
+        file_paths_mask = file_paths == file_paths_attr.Unknown
+        file_paths_valid = file_paths[~file_paths_mask]
+
+        with self.progressBar(len(file_paths_valid)) as progress:
             try:
                 embeddings = self._image_embedder(
-                    file_paths=file_paths,
+                    file_paths=file_paths_valid,
                     image_processed_callback=lambda: progress.advance()
                 )
             except ConnectionError:
@@ -149,7 +154,12 @@ class OWImageEmbedding(OWWidget):
                 self.auto_commit_widget.setDisabled(False)
                 return
 
-        self._send_output_signals(embeddings)
+        embeddings_all = [None] * len(file_paths_mask)
+        for i, embedding in zip(np.flatnonzero(~file_paths_mask), embeddings):
+            embeddings_all[i] = embedding
+        embeddings_all = np.array(embeddings_all)
+
+        self._send_output_signals(embeddings_all)
         self.auto_commit_widget.setDisabled(False)
 
     def _send_output_signals(self, embeddings):

@@ -226,7 +226,7 @@ class ImageEmbedder(Http2Client):
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None
-        elif urlparts.scheme == "ftp":
+        elif urlparts.scheme in ("ftp", "data"):
             try:
                 file = urlopen(file_path)
             except (URLError, ) + ftplib.all_errors:

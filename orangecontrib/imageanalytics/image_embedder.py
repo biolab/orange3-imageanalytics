@@ -7,12 +7,15 @@ from urllib.parse import urlparse
 from urllib.request import urlopen, URLError
 
 import numpy as np
+
 import requests
-from Orange.misc.environ import cache_dir
+from requests.exceptions import RequestException
+import cachecontrol.caches
+
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
-from requests.exceptions import RequestException
 
+from Orange.misc.environ import cache_dir
 from orangecontrib.imageanalytics.http2_client import Http2Client
 from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils import md5_hash
@@ -53,6 +56,11 @@ class ImageEmbedder(Http2Client):
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
+        self._session = cachecontrol.CacheControl(
+            requests.session(),
+            cache=cachecontrol.caches.FileCache(
+                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
+        )
 
     @staticmethod
     def _get_model_settings_confidently(model, layer):
@@ -217,12 +225,11 @@ class ImageEmbedder(Http2Client):
         image_bytes_io.close()
         return image_bytes
 
-    @staticmethod
-    def _load_image_from_url_or_local_path(file_path):
+    def _load_image_from_url_or_local_path(self, file_path):
         urlparts = urlparse(file_path)
         if urlparts.scheme in ('http', 'https'):
             try:
-                file = requests.get(file_path, stream=True).raw
+                file = self._session.get(file_path, stream=True).raw
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

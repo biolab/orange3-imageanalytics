@@ -1,22 +1,15 @@
 language: python
 
 sudo: false   # use container-based infrastructure
+dist: trusty
 
-python:
-  - "3.4"
-  - "3.5"
+matrix:
+  include:
+    - python: '3.4'
+      env: PYQT4=true
 
-addons:
-    apt:
-        packages:
-            - gfortran
-            - libblas-dev
-            - liblapack-dev
-            - libqt4-dev
-            - xvfb
-
-before_cache:   # prevent logs from caching
-    - rm -f $HOME/.cache/pip/log/debug.log
+    - python: '3.5'
+      env: PYQT5=true
 
 cache:
     apt: true
@@ -31,14 +24,20 @@ before_install:
     - pip install codecov
 
 install:
-    - source $TRAVIS_BUILD_DIR/.travis/install_pyqt.sh
+    - pip install --only-binary numpy,scipy,scikit-learn numpy scipy scikit-learn
+
+    - if [[ "${PYQT4}" == true ]]; then source $TRAVIS_BUILD_DIR/.travis/install_pyqt.sh; fi
+    - if [[ "${PYQT5}" == true ]]; then pip install PyQt5; fi
+
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .
     # todo: orange cache dir doesn't get created at installation
     - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
 
 script:
-    - catchsegv xvfb-run coverage run setup.py test
+    # Screen must be at least 24bpp (see https://github.com/pytest-dev/pytest-qt/issues/35)
+    - XVFBARGS="-screen 0 1280x1024x24"
+    - catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest discover -v
 
 after_success:
     - codecov

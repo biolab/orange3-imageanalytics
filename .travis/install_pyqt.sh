@@ -24,7 +24,7 @@ if [ ! "$(ls $PYQT)" ]; then
 
     cd $PYQT/PyQt
     pwd
-    python configure.py --confirm-license --no-designer-plugin
+    python configure.py --confirm-license --no-designer-plugin --concatenate
     make
 fi
 

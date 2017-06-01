@@ -10,7 +10,7 @@ import numpy as np
 
 import requests
 from requests.exceptions import RequestException
-import cachecontrol.caches
+from joblib import Memory
 
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
@@ -56,11 +56,13 @@ class ImageEmbedder(Http2Client):
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
-        self._session = cachecontrol.CacheControl(
-            requests.session(),
-            cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
-        )
+
+        cached = Memory(
+            cachedir=join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"),
+            compress=1, bytes_limit=100e6).cache
+        _session = requests.session()
+        self._requests_get_bytes = cached(
+            lambda *args, **kwargs: _session.get(*args, **kwargs).raw.read())
 
     @staticmethod
     def _get_model_settings_confidently(model, layer):
@@ -229,7 +231,7 @@ class ImageEmbedder(Http2Client):
         urlparts = urlparse(file_path)
         if urlparts.scheme in ('http', 'https'):
             try:
-                file = self._session.get(file_path, stream=True).raw
+                file = BytesIO(self._requests_get_bytes(file_path, stream=True))
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

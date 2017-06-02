@@ -31,6 +31,11 @@ MODELS_SETTINGS = {
     },
 }
 
+memory = Memory(
+    cachedir=join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"),
+    bytes_limit=100e6)
+memory.reduce_size()
+
 
 class ImageEmbedder(Http2Client):
     """"Client side functionality for accessing a remote http2
@@ -57,11 +62,8 @@ class ImageEmbedder(Http2Client):
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
 
-        cached = Memory(
-            cachedir=join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"),
-            compress=1, bytes_limit=100e6).cache
         _session = requests.session()
-        self._requests_get_bytes = cached(
+        self._requests_get_bytes = memory.cache(
             lambda *args, **kwargs: _session.get(*args, **kwargs).raw.read())
 
     @staticmethod
@@ -231,7 +233,7 @@ class ImageEmbedder(Http2Client):
         urlparts = urlparse(file_path)
         if urlparts.scheme in ('http', 'https'):
             try:
-                file = BytesIO(self._requests_get_bytes(file_path, stream=True))
+                file = BytesIO(self._requests_get_bytes(file_path))
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

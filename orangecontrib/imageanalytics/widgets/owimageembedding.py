@@ -296,8 +296,8 @@ class OWImageEmbedding(OWWidget):
         X = np.hstack((embedded_images.X, embeddings))
         Y = embedded_images.Y
 
-        dimensions = range(embeddings.shape[1])
-        attributes = [ContinuousVariable('n{:d}'.format(d)) for d in dimensions]
+        attributes = [ContinuousVariable.make('n{:d}'.format(d))
+                      for d in range(embeddings.shape[1])]
         attributes = list(embedded_images.domain.attributes) + attributes
 
         domain = Domain(

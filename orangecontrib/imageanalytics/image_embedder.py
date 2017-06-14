@@ -6,16 +6,14 @@ from os.path import join, isfile
 from urllib.parse import urlparse
 from urllib.request import urlopen, URLError
 
-import numpy as np
-
-import requests
-from requests.exceptions import RequestException
 import cachecontrol.caches
-
+import numpy as np
+import requests
+from Orange.misc.environ import cache_dir
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
+from requests.exceptions import RequestException
 
-from Orange.misc.environ import cache_dir
 from orangecontrib.imageanalytics.http2_client import Http2Client
 from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils import md5_hash
@@ -24,9 +22,18 @@ from orangecontrib.imageanalytics.utils import save_pickle, load_pickle
 log = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-MODELS_SETTINGS = {
+MODELS = {
     'inception-v3': {
+        'name': 'Inception v3',
+        'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
+        'layers': ['penultimate']
+    },
+    'painters': {
+        'name': 'Painters',
+        'description':
+            'A model trained to predict painters from artwork images.',
+        'target_image_size': (256, 256),
         'layers': ['penultimate']
     },
 }
@@ -54,7 +61,6 @@ class ImageEmbedder(Http2Client):
     def __init__(self, model, layer, server_url='api.biolab.si:8080'):
         super().__init__(server_url)
         model_settings = self._get_model_settings_confidently(model, layer)
-
         self._model = model
         self._layer = layer
         self._target_image_size = model_settings['target_image_size']
@@ -62,6 +68,7 @@ class ImageEmbedder(Http2Client):
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
+
         self._session = cachecontrol.CacheControl(
             requests.session(),
             cache=cachecontrol.caches.FileCache(
@@ -74,12 +81,12 @@ class ImageEmbedder(Http2Client):
 
     @staticmethod
     def _get_model_settings_confidently(model, layer):
-        if model not in MODELS_SETTINGS.keys():
+        if model not in MODELS.keys():
             model_error = "'{:s}' is not a valid model, should be one of: {:s}"
-            available_models = ', '.join(MODELS_SETTINGS.keys())
+            available_models = ', '.join(MODELS.keys())
             raise ValueError(model_error.format(model, available_models))
 
-        model_settings = MODELS_SETTINGS[model]
+        model_settings = MODELS[model]
 
         if layer not in model_settings['layers']:
             layer_error = (

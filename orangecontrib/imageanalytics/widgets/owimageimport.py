@@ -583,7 +583,7 @@ class OWImportImages(widget.OWWidget):
         if self._imageMeta:
             categories = self._imageCategories
             if len(categories) > 1:
-                cat_var = Orange.data.DiscreteVariable(
+                cat_var = Orange.data.DiscreteVariable.make(
                     "category", values=list(sorted(categories.values()))
                 )
             else:
@@ -596,9 +596,9 @@ class OWImportImages(widget.OWWidget):
             # file size/width/height
             size_var = Orange.data.ContinuousVariable.make("size")
             size_var.number_of_decimals = 0
-            width_var = Orange.data.ContinuousVariable("width")
+            width_var = Orange.data.ContinuousVariable.make("width")
             width_var.number_of_decimals = 0
-            height_var = Orange.data.ContinuousVariable("height")
+            height_var = Orange.data.ContinuousVariable.make("height")
             height_var.number_of_decimals = 0
             domain = Orange.data.Domain(
                 [], [cat_var] if cat_var is not None else [],

@@ -7,10 +7,11 @@ import numpy as np
 
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
 from AnyQt.QtCore import pyqtSlot as Slot
-from AnyQt.QtWidgets import QLayout
 from AnyQt.QtTest import QSignalSpy
+from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
 from Orange.data import Table, ContinuousVariable, Domain
+from Orange.widgets.gui import hBox
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.itemmodels import VariableListModel
@@ -28,21 +29,6 @@ class _Input:
 class _Output:
     EMBEDDINGS = 'Embeddings'
     SKIPPED_IMAGES = 'Skipped Images'
-
-
-class InterruptableImageEmbedder(ImageEmbedder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cancelled = False
-
-    def _yield_in_batches(self, list_):
-        # TODO:Is this the best place to interrupt the task?
-        # Probably need more support in base ImageEmbedder.
-        for batch in super()._yield_in_batches(list_):
-            if self.cancelled:
-                raise Exception
-            else:
-                yield batch
 
 
 class OWImageEmbedding(OWWidget):
@@ -105,9 +91,18 @@ class OWImageEmbedding(OWWidget):
             commit=self.commit
         )
 
+        self.cancel_button = QPushButton(
+            'Cancel',
+            icon=self.style().standardIcon(QStyle.SP_DialogCancelButton),
+        )
+        self.cancel_button.clicked.connect(self.cancel)
+        hbox = hBox(self.controlArea)
+        hbox.layout().addWidget(self.cancel_button)
+        self.cancel_button.hide()
+
     def _init_server_connection(self):
         self.setBlocking(False)
-        self._image_embedder = InterruptableImageEmbedder(
+        self._image_embedder = ImageEmbedder(
             model='inception-v3',
             layer='penultimate',
         )
@@ -167,6 +162,7 @@ class OWImageEmbedding(OWWidget):
             return
 
         self._set_server_info(connected=True)
+        self.cancel_button.show()
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
@@ -233,6 +229,7 @@ class OWImageEmbedding(OWWidget):
 
         task, self._task = self._task, None
         self.auto_commit_widget.setDisabled(False)
+        self.cancel_button.hide()
         self.progressBarFinished(processEvents=None)
         self.setBlocking(False)
 
@@ -332,8 +329,12 @@ class OWImageEmbedding(OWWidget):
                 pass
             # Reset the image embedder on cancel to reset the connection.
             self._image_embedder.__exit__(None, None, None)
-            self._image_embedder = InterruptableImageEmbedder(
+            self._image_embedder = ImageEmbedder(
                 model='inception-v3', layer='penultimate')
+            self.auto_commit_widget.setDisabled(False)
+            self.cancel_button.hide()
+            self.progressBarFinished(processEvents=None)
+            self.setBlocking(False)
 
 
 def main(argv=None):

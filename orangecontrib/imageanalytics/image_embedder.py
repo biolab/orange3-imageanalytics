@@ -32,6 +32,12 @@ MODELS_SETTINGS = {
 }
 
 
+class EmbeddingCancelledException(Exception):
+    """Thrown when the embedding task is cancelled from another thread.
+    (i.e. ImageEmbedder.cancelled attribute is set to True).
+    """
+
+
 class ImageEmbedder(Http2Client):
     """"Client side functionality for accessing a remote http2
     image embedding backend.
@@ -61,6 +67,10 @@ class ImageEmbedder(Http2Client):
             cache=cachecontrol.caches.FileCache(
                 join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
         )
+
+        # attribute that offers support for cancelling the embedding
+        # if ran in another thread
+        self.cancelled = False
 
     @staticmethod
     def _get_model_settings_confidently(model, layer):
@@ -114,6 +124,9 @@ class ImageEmbedder(Http2Client):
         ConnectionError:
             If disconnected or connection with the server is lost
             during the embedding process.
+
+        EmbeddingCancelledException:
+            If cancelled attribute is set to True (default=False).
         """
         if not self.is_connected_to_server():
             self.reconnect_to_server()
@@ -164,6 +177,8 @@ class ImageEmbedder(Http2Client):
         http_streams = []
 
         for file_path in file_paths:
+            if self.cancelled:
+                raise EmbeddingCancelledException()
 
             image = self._load_image_or_none(file_path)
             if not image:
@@ -254,6 +269,8 @@ class ImageEmbedder(Http2Client):
         embeddings = []
 
         for stream_id, cache_key in zip(http_streams, cache_keys):
+            if self.cancelled:
+                raise EmbeddingCancelledException()
 
             if not stream_id:
                 # skip rest of the waiting because image was either

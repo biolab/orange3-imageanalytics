@@ -116,7 +116,7 @@ class OWImageEmbedding(OWWidget):
         )
 
     def set_data(self, data):
-        if data is None:
+        if not data:
             self._input_data = None
             self.send(_Output.EMBEDDINGS, None)
             self.send(_Output.SKIPPED_IMAGES, None)

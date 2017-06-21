@@ -31,3 +31,12 @@ class TestOWImageEmbedding(WidgetTest):
         """
         table = Table("iris")
         self.send_signal("Images", table)
+
+    def test_none_data(self):
+        """
+        It should not fail when there is no data.
+        GH-46
+        """
+        table = Table("iris")[:0]
+        self.send_signal("Images", table)
+        self.send_signal("Images", None)

@@ -10,7 +10,7 @@ import numpy as np
 
 import requests
 from requests.exceptions import RequestException
-import cachecontrol.caches
+from joblib import Memory
 
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
@@ -30,6 +30,11 @@ MODELS_SETTINGS = {
         'layers': ['penultimate']
     },
 }
+
+memory = Memory(
+    cachedir=join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"),
+    bytes_limit=100e6)
+memory.reduce_size()
 
 
 class EmbeddingCancelledException(Exception):
@@ -62,11 +67,10 @@ class ImageEmbedder(Http2Client):
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
-        self._session = cachecontrol.CacheControl(
-            requests.session(),
-            cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
-        )
+
+        _session = requests.session()
+        self._requests_get_bytes = memory.cache(
+            lambda *args, **kwargs: _session.get(*args, **kwargs).raw.read())
 
         # attribute that offers support for cancelling the embedding
         # if ran in another thread
@@ -244,7 +248,7 @@ class ImageEmbedder(Http2Client):
         urlparts = urlparse(file_path)
         if urlparts.scheme in ('http', 'https'):
             try:
-                file = self._session.get(file_path, stream=True).raw
+                file = BytesIO(self._requests_get_bytes(file_path))
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

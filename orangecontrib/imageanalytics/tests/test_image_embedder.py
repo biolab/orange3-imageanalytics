@@ -249,3 +249,10 @@ class ImageEmbedderTest(unittest.TestCase):
         )
         self.assertTrue(self.embedder._server_url == url_value)
         del environ['ORANGE_EMBEDDING_API_URL']
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_embedding_cancelled(self):
+        self.assertFalse(self.embedder.cancelled)
+        self.embedder.cancelled = True
+        with self.assertRaises(Exception):
+            self.embedder(self.single_example)

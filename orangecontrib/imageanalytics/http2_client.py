@@ -18,8 +18,8 @@ log = logging.getLogger(__name__)
 
 class MaxNumberOfRequestsError(Exception):
     """Thrown when remote peer closes the connection because
-    maximum number of requests were served through a single connection."""
-    pass
+    maximum number of requests were served through a single connection.
+    """
 
 
 class Http2Client(object):

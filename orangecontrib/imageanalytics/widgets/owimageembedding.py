@@ -1,10 +1,8 @@
 import logging
 import traceback
-
 from types import SimpleNamespace as namespace
 
 import numpy as np
-
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
 from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtTest import QSignalSpy
@@ -14,12 +12,12 @@ from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.gui import hBox
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
+from Orange.widgets.utils import concurrent as qconcurrent
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.widget import OWWidget, Default
 
-from Orange.widgets.utils import concurrent as qconcurrent
-
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+from orangecontrib.imageanalytics.image_embedder import MODELS as EMBEDDERS_INFO
 
 
 class _Input:
@@ -32,8 +30,6 @@ class _Output:
 
 
 class OWImageEmbedding(OWWidget):
-    # todo: implement embedding in a non-blocking manner
-    # todo: implement stop running task action
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
     icon = "icons/ImageEmbedding.svg"
@@ -49,10 +45,13 @@ class OWImageEmbedding(OWWidget):
     ]
 
     cb_image_attr_current_id = Setting(default=0)
+    cb_embedder_current_id = Setting(default=0)
+
     _NO_DATA_INFO_TEXT = "No data on input."
 
     def __init__(self):
         super().__init__()
+        self.embedders = sorted(list(EMBEDDERS_INFO))
         self._image_attributes = None
         self._input_data = None
         self._log = logging.getLogger(__name__)
@@ -83,6 +82,26 @@ class OWImageEmbedding(OWWidget):
             callback=self._cb_image_attr_changed
         )
 
+        self.cb_embedder = comboBox(
+            widget=widget_box,
+            master=self,
+            value='cb_embedder_current_id',
+            label='Embedder:',
+            orientation=Qt.Horizontal,
+            callback=self._cb_embedder_changed
+        )
+        self.cb_embedder.setModel(VariableListModel(
+            [EMBEDDERS_INFO[e]['name'] for e in self.embedders]))
+        if not self.cb_embedder_current_id < len(self.embedders):
+            self.cb_embedder_current_id = 0
+        self.cb_embedder.setCurrentIndex(self.cb_embedder_current_id)
+
+        current_embedder = self.embedders[self.cb_embedder_current_id]
+        self.embedder_info = widgetLabel(
+            widget_box,
+            EMBEDDERS_INFO[current_embedder]['description']
+        )
+
         self.auto_commit_widget = auto_commit(
             widget=self.controlArea,
             master=self,
@@ -103,8 +122,8 @@ class OWImageEmbedding(OWWidget):
     def _init_server_connection(self):
         self.setBlocking(False)
         self._image_embedder = ImageEmbedder(
-            model='inception-v3',
-            layer='penultimate',
+            model=self.embedders[self.cb_embedder_current_id],
+            layer='penultimate'
         )
         self._set_server_info(
             self._image_embedder.is_connected_to_server()
@@ -148,6 +167,16 @@ class OWImageEmbedding(OWWidget):
     def _cb_image_attr_changed(self):
         self.commit()
 
+    def _cb_embedder_changed(self):
+        current_embedder = self.embedders[self.cb_embedder_current_id]
+        self._image_embedder = ImageEmbedder(
+            model=current_embedder,
+            layer='penultimate'
+        )
+        self.embedder_info.setText(
+            EMBEDDERS_INFO[current_embedder]['description'])
+        self.commit()
+
     def commit(self):
         if self._task is not None:
             self.cancel()
@@ -163,6 +192,8 @@ class OWImageEmbedding(OWWidget):
 
         self._set_server_info(connected=True)
         self.cancel_button.show()
+        self.cb_image_attr.setDisabled(True)
+        self.cb_embedder.setDisabled(True)
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
@@ -230,6 +261,8 @@ class OWImageEmbedding(OWWidget):
         task, self._task = self._task, None
         self.auto_commit_widget.setDisabled(False)
         self.cancel_button.hide()
+        self.cb_image_attr.setDisabled(False)
+        self.cb_embedder.setDisabled(False)
         self.progressBarFinished(processEvents=None)
         self.setBlocking(False)
 
@@ -327,14 +360,17 @@ class OWImageEmbedding(OWWidget):
                 task.future.exception()
             except qconcurrent.CancelledError:
                 pass
-            # Reset the image embedder on cancel to reset the connection.
-            self._image_embedder.__exit__(None, None, None)
-            self._image_embedder = ImageEmbedder(
-                model='inception-v3', layer='penultimate')
+
             self.auto_commit_widget.setDisabled(False)
             self.cancel_button.hide()
             self.progressBarFinished(processEvents=None)
             self.setBlocking(False)
+            self.cb_image_attr.setDisabled(False)
+            self.cb_embedder.setDisabled(False)
+            self._image_embedder.cancelled = False
+            # reset the connection.
+            connected = self._image_embedder.reconnect_to_server()
+            self._set_server_info(connected=connected)
 
 
 def main(argv=None):

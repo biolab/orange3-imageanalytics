@@ -175,6 +175,35 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(len(self.embedder._cache_dict), 0)
 
     @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_different_models_caches(self):
+        embedder = ImageEmbedder(
+            model='painters',
+            layer='penultimate',
+            server_url='example.com',
+        )
+        embedder.clear_cache()
+        self.assertEqual(len(embedder._cache_dict), 0)
+        embedder(self.single_example)
+        self.assertEqual(len(embedder._cache_dict), 1)
+        embedder.persist_cache()
+
+        self.embedder = ImageEmbedder(
+            model='inception-v3',
+            layer='penultimate',
+            server_url='example.com',
+        )
+        self.assertEqual(len(self.embedder._cache_dict), 0)
+        self.embedder.persist_cache()
+
+        embedder = ImageEmbedder(
+            model='painters',
+            layer='penultimate',
+            server_url='example.com',
+        )
+        self.assertEqual(len(embedder._cache_dict), 1)
+        embedder.clear_cache()
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
     def test_with_statement(self):
         with self.embedder as embedder:
             embedder(self.single_example)

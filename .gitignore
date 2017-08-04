@@ -1,7 +1,8 @@
 # Build files
 build
 dist
-*.egg-info/*
+*.egg-info
+.eggs
 doc/_build
 *.so
 *.la

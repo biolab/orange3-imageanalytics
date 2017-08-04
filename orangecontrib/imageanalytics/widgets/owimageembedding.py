@@ -154,8 +154,8 @@ class OWImageEmbedding(OWWidget):
         self.cb_image_attr.setCurrentIndex(self.cb_image_attr_current_id)
 
         self._input_data = data
-        input_data_info_text = "Data with {:d} instances.".format(len(data))
-        self.input_data_info.setText(input_data_info_text)
+        self.input_data_info.setText(
+            "Data with {:d} instances.".format(len(data)))
 
         self._cb_image_attr_changed()
 
@@ -175,6 +175,8 @@ class OWImageEmbedding(OWWidget):
         )
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]['description'])
+        self.input_data_info.setText(
+            "Data with {:d} instances.".format(len(self._input_data)))
         self.commit()
 
     def commit(self):
@@ -300,8 +302,10 @@ class OWImageEmbedding(OWWidget):
             skipped_images = self._input_data[skipped_images_bool]
             skipped_images = Table(skipped_images)
             skipped_images.ids = self._input_data.ids[skipped_images_bool]
+            num_skipped = len(skipped_images)
             self.send(_Output.SKIPPED_IMAGES, skipped_images)
         else:
+            num_skipped = 0
             self.send(_Output.SKIPPED_IMAGES, None)
 
         embedded_images_bool = np.logical_not(skipped_images_bool)
@@ -320,6 +324,11 @@ class OWImageEmbedding(OWWidget):
             self.send(_Output.EMBEDDINGS, embedded_images)
         else:
             self.send(_Output.EMBEDDINGS, None)
+
+        if num_skipped is not 0:
+            self.input_data_info.setText(
+                "Data with {:d} instances, {:d} images skipped.".format(
+                    len(self._input_data), num_skipped))
 
     @staticmethod
     def _construct_output_data_table(embedded_images, embeddings):
@@ -349,7 +358,8 @@ class OWImageEmbedding(OWWidget):
     def onDeleteWidget(self):
         self.cancel()
         super().onDeleteWidget()
-        self._image_embedder.__exit__(None, None, None)
+        if self._image_embedder is not None:
+            self._image_embedder.__exit__(None, None, None)
 
     def cancel(self):
         if self._task is not None:

@@ -687,19 +687,22 @@ DefaultFormats = ("jpeg", "jpg", "png", "tiff", "tif")
 
 
 class ImageScan:
-    def __init__(self, startdir, formats=DefaultFormats, report_progress=None):
+    def __init__(self, startdir, formats=DefaultFormats, report_progress=None,
+                 case_insensitive=True):
         self.startdir = startdir
         self.formats = formats
         self.report_progress = report_progress
         self.cancelled = False
+        self.case_insensitive = case_insensitive
 
     def run(self):
         imgmeta = []
         filescanner = scan(self.startdir)
-        patterns = ["*.{}".format(fmt.lower()) for fmt in self.formats]
+        patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
+                    for fmt in self.formats]
 
         def fnmatch_any(fname, patterns):
-            return any(fnmatch.fnmatch(fname.lower(), pattern)
+            return any(fnmatch.fnmatch(fname.lower() if self.case_insensitive else fname, pattern)
                        for pattern in patterns)
 
         batch = []

@@ -780,17 +780,6 @@ def scan(topdir, include_patterns=("*",), exclude_patterns=(".*",)):
         yield from (os.path.join(dirpath, fname) for fname in filenames)
 
 
-def scan_images(topdir, formats=DefaultFormats):
-    include_patterns = ["*.{}".format(fmt) for fmt in formats]
-    path_iter = scan(topdir, include_patterns=include_patterns)
-    yield from map(image_meta_data, path_iter)
-
-
-def supportedImageFormats():
-    return [bytes(fmt).decode("ascii")
-            for fmt in QImageReader.supportedImageFormats()]
-
-
 ImgData = namedtuple(
     "ImgData",
     ["path", "format", "height", "width", "size"]

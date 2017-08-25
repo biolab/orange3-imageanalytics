@@ -733,18 +733,6 @@ class ImageScan:
         return imgmeta
 
 
-def batches(iter, batch_size=10):
-    """
-    Yield items from iter by batches of size `batch_size`.
-    """
-    while True:
-        batch = list(itertools.islice(iter, 0, batch_size))
-        if batch:
-            yield batch
-        else:
-            break
-
-
 def scan(topdir, include_patterns=("*",), exclude_patterns=(".*",)):
     """
     Yield file system paths under `topdir` that match include/exclude patterns

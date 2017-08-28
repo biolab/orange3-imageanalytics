@@ -13,20 +13,15 @@ Allows the user to load[1] all images in a directory
 import sys
 import os
 import enum
-import fnmatch
 import warnings
-import itertools
 import logging
 import traceback
 
-from collections import namedtuple
 from types import SimpleNamespace as namespace
-
-import numpy
 
 from AnyQt.QtCore import Qt, QEvent, QFileInfo, QThread
 from AnyQt.QtCore import pyqtSlot as Slot
-from AnyQt.QtGui import QStandardItem, QImageReader, QDropEvent
+from AnyQt.QtGui import QStandardItem, QDropEvent
 
 from AnyQt.QtWidgets import (
     QAction, QPushButton, QComboBox, QApplication, QStyle, QFileDialog,
@@ -43,6 +38,8 @@ from Orange.widgets.utils.concurrent import (
 )
 
 from Orange.canvas.preview.previewbrowser import TextLabel
+
+from orangecontrib.imageanalytics.import_images import ImportImages
 
 
 def prettyfypath(path):
@@ -121,8 +118,10 @@ class OWImportImages(widget.OWWidget):
         super().__init__()
         #: widget's runtime state
         self.__state = State.NoState
-        self._imageMeta = []
-        self._imageCategories = {}
+        self.data = None
+        self._n_image_categories = 0
+        self._n_image_data = 0
+        self._n_skipped = 0
 
         self.__invalidated = False
         self.__pendingTask = None
@@ -303,12 +302,15 @@ class OWImportImages(widget.OWWidget):
         elif self.__state == State.Processing:
             text = "Processing"
         elif self.__state == State.Done:
-            nvalid = sum(imeta.isvalid for imeta in self._imageMeta)
-            ncategories = len(self._imageCategories)
+            nvalid = self._n_image_data
+            ncategories = self._n_image_categories
+            n_skipped = self._n_skipped
             if ncategories < 2:
-                text = "{} images".format(nvalid)
+                text = "{} image{}".format(nvalid, "s" if nvalid != 1 else "")
             else:
                 text = "{} images / {} categories".format(nvalid, ncategories)
+            if n_skipped > 0:
+                text = text + ", {} skipped".format(n_skipped)
         elif self.__state == State.Cancelled:
             text = "Cancelled"
         elif self.__state == State.Error:
@@ -455,8 +457,7 @@ class OWImportImages(widget.OWWidget):
         if self.__state == State.Processing:
             self.cancel()
 
-        self._imageMeta = []
-        self._imageCategories = {}
+        self.data = None
         self.start()
 
     def start(self):
@@ -483,7 +484,7 @@ class OWImportImages(widget.OWWidget):
         report_progress = methodinvoke(
             self, "__onReportProgress", (object,))
 
-        task = ImageScan(startdir, report_progress=report_progress)
+        task = ImportImages(report_progress=report_progress)
 
         # collect the task state in one convenient place
         self.__pendingTask = taskstate = namespace(
@@ -514,7 +515,7 @@ class OWImportImages(widget.OWWidget):
 
         def run_image_scan_task_interupt():
             try:
-                return task.run()
+                return task(startdir)
             except UserInterruptError:
                 # Suppress interrupt errors, so they are not logged
                 return
@@ -534,26 +535,24 @@ class OWImportImages(widget.OWWidget):
         self.__pendingTask = None
 
         try:
-            image_meta = task.future.result()
-        except Exception as err:
+            data, n_skipped = task.future.result()
+        except Exception:
             sys.excepthook(*sys.exc_info())
             state = State.Error
-            image_meta = []
+            data = None
+            n_skipped = 0
             self.error(traceback.format_exc())
         else:
             state = State.Done
             self.error()
 
-        categories = {}
+        if data:
+            self._n_image_data = len(data)
+            self._n_image_categories = len(data.domain.class_var.values)\
+                if data.domain.class_var else 0
 
-        for imeta in image_meta:
-            # derive categories from the path relative to the starting dir
-            dirname = os.path.dirname(imeta.path)
-            relpath = os.path.relpath(dirname, task.startdir)
-            categories[dirname] = relpath
-
-        self._imageMeta = image_meta
-        self._imageCategories = categories
+        self.data = data
+        self._n_skipped = n_skipped
 
         self.__setRuntimeState(state)
         self.commit()
@@ -578,65 +577,9 @@ class OWImportImages(widget.OWWidget):
 
     def commit(self):
         """
-        Create and commit a Table from the collected image meta data.
+        Commit a Table from the collected image meta data.
         """
-        if self._imageMeta:
-            categories = self._imageCategories
-            if len(categories) > 1:
-                cat_var = Orange.data.DiscreteVariable.make(
-                    "category", values=list(sorted(categories.values()))
-                )
-            else:
-                cat_var = None
-            # Image name (file basename without the extension)
-            imagename_var = Orange.data.StringVariable.make("image name")
-            # Full fs path
-            image_var = Orange.data.StringVariable.make("image")
-            image_var.attributes["type"] = "image"
-            # file size/width/height
-            size_var = Orange.data.ContinuousVariable.make("size")
-            size_var.number_of_decimals = 0
-            width_var = Orange.data.ContinuousVariable.make("width")
-            width_var.number_of_decimals = 0
-            height_var = Orange.data.ContinuousVariable.make("height")
-            height_var.number_of_decimals = 0
-            domain = Orange.data.Domain(
-                [], [cat_var] if cat_var is not None else [],
-                [imagename_var, image_var, size_var, width_var, height_var]
-            )
-            cat_data = []
-            meta_data = []
-
-            for imgmeta in self._imageMeta:
-                if imgmeta.isvalid:
-                    if cat_var is not None:
-                        category = categories.get(os.path.dirname(imgmeta.path))
-                        cat_data.append([cat_var.to_val(category)])
-                    else:
-                        cat_data.append([])
-                    basename = os.path.basename(imgmeta.path)
-                    imgname, _ = os.path.splitext(basename)
-
-                    meta_data.append(
-                        [imgname, imgmeta.path, imgmeta.size,
-                         imgmeta.width, imgmeta.height]
-                    )
-
-            cat_data = numpy.array(cat_data, dtype=float)
-            meta_data = numpy.array(meta_data, dtype=object)
-
-            if len(meta_data):
-                table = Orange.data.Table.from_numpy(
-                    domain, numpy.empty((len(cat_data), 0), dtype=float),
-                    cat_data, meta_data
-                )
-            else:
-                # empty results, no images found
-                table = None
-        else:
-            table = None
-
-        self.send("Data", table)
+        self.send("Data", self.data)
 
     def onDeleteWidget(self):
         self.cancel()
@@ -682,126 +625,6 @@ class UserInterruptError(BaseException):
     A BaseException subclass used for cooperative task/thread cancellation
     """
     pass
-
-DefaultFormats = ("jpeg", "jpg", "png", "tiff", "tif")
-
-
-class ImageScan:
-    def __init__(self, startdir, formats=DefaultFormats, report_progress=None,
-                 case_insensitive=True):
-        self.startdir = startdir
-        self.formats = formats
-        self.report_progress = report_progress
-        self.cancelled = False
-        self.case_insensitive = case_insensitive
-
-    def run(self):
-        imgmeta = []
-        filescanner = scan(self.startdir)
-        patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
-                    for fmt in self.formats]
-
-        def fnmatch_any(fname, patterns):
-            return any(fnmatch.fnmatch(fname.lower() if self.case_insensitive else fname, pattern)
-                       for pattern in patterns)
-
-        batch = []
-
-        for path in filescanner:
-            if fnmatch_any(path, patterns):
-                imeta = image_meta_data(path)
-                imgmeta.append(imeta)
-                batch.append(imgmeta)
-
-            if self.cancelled:
-                return
-                # raise UserInterruptError
-
-            if len(batch) == 10 and self.report_progress is not None:
-                self.report_progress(
-                    namespace(count=len(imgmeta),
-                              lastpath=imgmeta[-1].path,
-                              batch=batch))
-                batch = []
-
-        if batch and self.report_progress is not None:
-            self.report_progress(
-                    namespace(count=len(imgmeta),
-                              lastpath=imgmeta[-1].path,
-                              batch=batch))
-
-        return imgmeta
-
-
-def scan(topdir, include_patterns=("*",), exclude_patterns=(".*",)):
-    """
-    Yield file system paths under `topdir` that match include/exclude patterns
-
-    Parameters
-    ----------
-    topdir: str
-        Top level directory path for the search.
-    include_patterns: List[str]
-        `fnmatch.fnmatch` include patterns.
-    exclude_patterns: List[str]
-        `fnmatch.fnmatch` exclude patterns.
-
-    Returns
-    -------
-    iter: generator
-        A generator yielding matching filesystem paths
-    """
-    if include_patterns is None:
-        include_patterns = ["*"]
-
-    for dirpath, dirnames, filenames in os.walk(topdir):
-        for dirname in list(dirnames):
-            # do not recurse into hidden dirs
-            if fnmatch.fnmatch(dirname, ".*"):
-                dirnames.remove(dirname)
-
-        def matches_any(fname, patterns):
-            return any(fnmatch.fnmatch(fname, pattern)
-                       for pattern in patterns)
-
-        filenames = [fname for fname in filenames
-                     if matches_any(fname, include_patterns)
-                        and not matches_any(fname, exclude_patterns)]
-
-        yield from (os.path.join(dirpath, fname) for fname in filenames)
-
-
-ImgData = namedtuple(
-    "ImgData",
-    ["path", "format", "height", "width", "size"]
-)
-ImgData.isvalid = property(lambda self: True)
-
-ImgDataError = namedtuple(
-    "ImgDataError",
-    ["path", "error", "error_str"]
-)
-ImgDataError.isvalid = property(lambda self: False)
-
-
-def image_meta_data(path):
-    reader = QImageReader(path)
-    if not reader.canRead():
-        return ImgDataError(path, reader.error(), reader.errorString())
-
-    img_format = reader.format()
-    img_format = bytes(img_format).decode("ascii")
-    size = reader.size()
-    if not size.isValid():
-        height = width = float("nan")
-    else:
-        height, width = size.height(), size.width()
-    try:
-        st_size = os.stat(path).st_size
-    except OSError:
-        st_size = -1
-
-    return ImgData(path, img_format, height, width, st_size)
 
 
 def main(argv=sys.argv):

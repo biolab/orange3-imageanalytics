@@ -9,6 +9,7 @@ from urllib.request import urlopen, URLError
 import cachecontrol.caches
 import numpy as np
 import requests
+from Orange.data import Table
 from Orange.misc.environ import cache_dir
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
@@ -58,7 +59,8 @@ class ImageEmbedder(Http2Client):
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
 
-    def __init__(self, model, layer, server_url='api.biolab.si:8080'):
+    def __init__(self, model=MODELS["inception-v3"], layer="penultimate",
+                 server_url='api.biolab.si:8080'):
         super().__init__(server_url)
         model_settings = self._get_model_settings_confidently(model, layer)
         self._model = model
@@ -106,7 +108,21 @@ class ImageEmbedder(Http2Client):
 
         return {}
 
-    def __call__(self, file_paths, image_processed_callback=None):
+    def __call__(self, *args, **kwargs):
+        if len(args) and isinstance(args[0], Table) or \
+                ("data" in kwargs and isinstance(kwargs["data"], Table)):
+            return self.from_table(*args, **kwargs)
+        elif (len(args) and isinstance(args[0], (np.ndarray, list))) or \
+                ("file_paths" in kwargs and isinstance(kwargs["file_paths"], (np.ndarray, list))):
+            return self.from_file_paths(*args, **kwargs)
+        else:
+            raise TypeError
+
+    def from_table(self, data, col="image", image_processed_callback=None):
+        file_paths = list(data.get_column_view(col)[0])
+        return self.from_file_paths(file_paths, image_processed_callback)
+
+    def from_file_paths(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
         parameter is set by the http2 remote peer (i.e. the server).
 

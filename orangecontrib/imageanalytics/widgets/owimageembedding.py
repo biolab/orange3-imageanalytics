@@ -137,7 +137,7 @@ class OWImageEmbedding(OWWidget):
             self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
             return
 
-        self._image_attributes = self._filter_image_attributes(data)
+        self._image_attributes = ImageEmbedder.filter_image_attributes(data)
         if not self._image_attributes:
             input_data_info_text = (
                 "Data with {:d} instances, but without image attributes."
@@ -158,11 +158,6 @@ class OWImageEmbedding(OWWidget):
             "Data with {:d} instances.".format(len(data)))
 
         self._cb_image_attr_changed()
-
-    @staticmethod
-    def _filter_image_attributes(data):
-        metas = data.domain.metas
-        return [m for m in metas if m.attributes.get('type') == 'image']
 
     def _cb_image_attr_changed(self):
         self.commit()
@@ -296,56 +291,14 @@ class OWImageEmbedding(OWWidget):
         self._send_output_signals(embeddings_all)
 
     def _send_output_signals(self, embeddings):
-        skipped_images_bool = np.array([x is None for x in embeddings])
-
-        if np.any(skipped_images_bool):
-            skipped_images = self._input_data[skipped_images_bool]
-            skipped_images = Table(skipped_images)
-            skipped_images.ids = self._input_data.ids[skipped_images_bool]
-            num_skipped = len(skipped_images)
-            self.send(_Output.SKIPPED_IMAGES, skipped_images)
-        else:
-            num_skipped = 0
-            self.send(_Output.SKIPPED_IMAGES, None)
-
-        embedded_images_bool = np.logical_not(skipped_images_bool)
-
-        if np.any(embedded_images_bool):
-            embedded_images = self._input_data[embedded_images_bool]
-
-            embeddings = embeddings[embedded_images_bool]
-            embeddings = np.stack(embeddings)
-
-            embedded_images = self._construct_output_data_table(
-                embedded_images,
-                embeddings
-            )
-            embedded_images.ids = self._input_data.ids[embedded_images_bool]
-            self.send(_Output.EMBEDDINGS, embedded_images)
-        else:
-            self.send(_Output.EMBEDDINGS, None)
-
+        embedded_images, skipped_images, num_skipped =\
+            ImageEmbedder.prepare_output_data(self._input_data, embeddings)
+        self.send(_Output.SKIPPED_IMAGES, skipped_images)
+        self.send(_Output.EMBEDDINGS, embedded_images)
         if num_skipped is not 0:
             self.input_data_info.setText(
                 "Data with {:d} instances, {:d} images skipped.".format(
                     len(self._input_data), num_skipped))
-
-    @staticmethod
-    def _construct_output_data_table(embedded_images, embeddings):
-        X = np.hstack((embedded_images.X, embeddings))
-        Y = embedded_images.Y
-
-        attributes = [ContinuousVariable.make('n{:d}'.format(d))
-                      for d in range(embeddings.shape[1])]
-        attributes = list(embedded_images.domain.attributes) + attributes
-
-        domain = Domain(
-            attributes=attributes,
-            class_vars=embedded_images.domain.class_vars,
-            metas=embedded_images.domain.metas
-        )
-
-        return Table(domain, X, Y, embedded_images.metas)
 
     def _set_server_info(self, connected):
         self.clear_messages()

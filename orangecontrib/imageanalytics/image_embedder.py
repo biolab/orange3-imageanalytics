@@ -9,7 +9,8 @@ from urllib.request import urlopen, URLError
 import cachecontrol.caches
 import numpy as np
 import requests
-from Orange.data import Table
+
+from Orange.data import ContinuousVariable, Domain, Table
 from Orange.misc.environ import cache_dir
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
@@ -59,7 +60,7 @@ class ImageEmbedder(Http2Client):
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
 
-    def __init__(self, model=MODELS["inception-v3"], layer="penultimate",
+    def __init__(self, model="inception-v3", layer="penultimate",
                  server_url='api.biolab.si:8080'):
         super().__init__(server_url)
         model_settings = self._get_model_settings_confidently(model, layer)
@@ -119,8 +120,9 @@ class ImageEmbedder(Http2Client):
             raise TypeError
 
     def from_table(self, data, col="image", image_processed_callback=None):
-        file_paths = list(data.get_column_view(col)[0])
-        return self.from_file_paths(file_paths, image_processed_callback)
+        file_paths = self._input_data[:, col].metas.flatten()
+        embeddings = self.from_file_paths(file_paths, image_processed_callback)
+        return ImageEmbedder.prepare_output_data(data, embeddings)
 
     def from_file_paths(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
@@ -343,3 +345,56 @@ class ImageEmbedder(Http2Client):
 
     def persist_cache(self):
         save_pickle(self._cache_dict, self._cache_file_path)
+
+    @staticmethod
+    def construct_output_data_table(embedded_images, embeddings):
+        X = np.hstack((embedded_images.X, embeddings))
+        Y = embedded_images.Y
+
+        attributes = [ContinuousVariable.make('n{:d}'.format(d))
+                      for d in range(embeddings.shape[1])]
+        attributes = list(embedded_images.domain.attributes) + attributes
+
+        domain = Domain(
+            attributes=attributes,
+            class_vars=embedded_images.domain.class_vars,
+            metas=embedded_images.domain.metas
+        )
+
+        return Table(domain, X, Y, embedded_images.metas)
+
+    @staticmethod
+    def prepare_output_data(input_data, embeddings):
+        skipped_images_bool = np.array([x is None for x in embeddings])
+
+        if np.any(skipped_images_bool):
+            skipped_images = input_data[skipped_images_bool]
+            skipped_images = Table(skipped_images)
+            skipped_images.ids = input_data.ids[skipped_images_bool]
+            num_skipped = len(skipped_images)
+        else:
+            num_skipped = 0
+            skipped_images = None
+
+        embedded_images_bool = np.logical_not(skipped_images_bool)
+
+        if np.any(embedded_images_bool):
+            embedded_images = input_data[embedded_images_bool]
+
+            embeddings = embeddings[embedded_images_bool]
+            embeddings = np.stack(embeddings)
+
+            embedded_images = ImageEmbedder.construct_output_data_table(
+                embedded_images,
+                embeddings
+            )
+            embedded_images.ids = input_data.ids[embedded_images_bool]
+        else:
+            embedded_images = None
+
+        return embedded_images, skipped_images, num_skipped
+
+    @staticmethod
+    def filter_image_attributes(data):
+        metas = data.domain.metas
+        return [m for m in metas if m.attributes.get('type') == 'image']

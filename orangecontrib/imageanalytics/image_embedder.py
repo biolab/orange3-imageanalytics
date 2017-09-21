@@ -57,6 +57,13 @@ class ImageEmbedder(Http2Client):
     >>> image_file_paths = [...]
     >>> with ImageEmbedder(model='model_name', layer='penultimate') as embedder:
     ...    embeddings = embedder(image_file_paths)
+    or:
+    >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+    >>> from orangecontrib.imageanalytics.import_images import ImportImages
+    >>> import_images = ImportImages()
+    >>> images, err = import_images("...")
+    >>> image_embedder = ImageEmbedder()
+    >>> embedded_images, skipped_images, num_skipped = image_embedder(images)
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
 
@@ -120,7 +127,7 @@ class ImageEmbedder(Http2Client):
             raise TypeError
 
     def from_table(self, data, col="image", image_processed_callback=None):
-        file_paths = self._input_data[:, col].metas.flatten()
+        file_paths = data[:, col].metas.flatten()
         embeddings = self.from_file_paths(file_paths, image_processed_callback)
         return ImageEmbedder.prepare_output_data(data, embeddings)
 

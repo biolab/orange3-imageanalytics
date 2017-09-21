@@ -59,19 +59,19 @@ class ImportImages:
         self.cancelled = False
         self.case_insensitive = case_insensitive
 
-    def __call__(self, startdir):
+    def __call__(self, start_dir):
         patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
                     for fmt in self.formats]
 
-        images = self.image_meta(scan(startdir), patterns)
+        images = self.image_meta(scan(start_dir), patterns)
         categories = {}
         for imeta in images:
             # derive categories from the path relative to the starting dir
             dirname = os.path.dirname(imeta.path)
-            relpath = os.path.relpath(dirname, startdir)
+            relpath = os.path.relpath(dirname, start_dir)
             categories[dirname] = relpath
 
-        return create_table(images, categories=categories)
+        return create_table(images, categories=categories, start_dir=start_dir)
 
     def image_meta(self, filescanner, patterns=('*', )):
         def fnmatch_any(fname, patterns):
@@ -166,7 +166,7 @@ def image_meta_data(path):
     return ImportImages.ImgData(path, img_format, height, width, st_size)
 
 
-def create_table(image_meta, categories=None):
+def create_table(image_meta, categories=None, start_dir=None):
     """
     Create and commit a Table from the collected image meta data.
     """
@@ -183,6 +183,8 @@ def create_table(image_meta, categories=None):
         # Full fs path
         image_var = Orange.data.StringVariable.make("image")
         image_var.attributes["type"] = "image"
+        if start_dir:
+            image_var.attributes["origin"] = start_dir
         # file size/width/height
         size_var = Orange.data.ContinuousVariable.make("size")
         size_var.number_of_decimals = 0
@@ -208,8 +210,9 @@ def create_table(image_meta, categories=None):
                 imgname, _ = os.path.splitext(basename)
 
                 meta_data.append(
-                    [imgname, imgmeta.path, imgmeta.size,
-                     imgmeta.width, imgmeta.height]
+                    [imgname,
+                     imgmeta.path[len(start_dir)+1:] if start_dir else imgmeta.path,
+                     imgmeta.size, imgmeta.width, imgmeta.height]
                 )
             else:
                 n_skipped += 1

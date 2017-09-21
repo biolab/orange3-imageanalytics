@@ -199,11 +199,14 @@ class OWImageEmbedding(OWWidget):
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
+        origin = file_paths_attr.attributes.get("origin", "")
+
         assert file_paths_attr.is_string
         assert file_paths.dtype == np.dtype('O')
 
         file_paths_mask = file_paths == file_paths_attr.Unknown
         file_paths_valid = file_paths[~file_paths_mask]
+        file_paths_valid = origin + "/" + file_paths_valid
 
         ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
         set_progress = qconcurrent.methodinvoke(

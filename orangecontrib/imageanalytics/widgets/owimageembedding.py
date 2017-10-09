@@ -1,6 +1,5 @@
 import logging
 import traceback
-import os.path
 from types import SimpleNamespace as namespace
 
 import numpy as np
@@ -207,7 +206,8 @@ class OWImageEmbedding(OWWidget):
 
         file_paths_mask = file_paths == file_paths_attr.Unknown
         file_paths_valid = file_paths[~file_paths_mask]
-        file_paths_valid = os.path.join(origin, file_paths_valid)
+        if origin:
+            file_paths_valid = origin + "/" + file_paths_valid
 
         ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
         set_progress = qconcurrent.methodinvoke(

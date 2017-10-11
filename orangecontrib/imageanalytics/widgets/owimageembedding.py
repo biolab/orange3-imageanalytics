@@ -176,7 +176,8 @@ class OWImageEmbedding(OWWidget):
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]['description'])
         self.input_data_info.setText(
-            "Data with {:d} instances.".format(len(self._input_data)))
+            "Data with {:d} instances.".format(len(self._input_data))
+            if self._input_data else self._NO_DATA_INFO_TEXT)
         self.commit()
 
     def commit(self):

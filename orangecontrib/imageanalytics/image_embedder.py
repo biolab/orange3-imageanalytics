@@ -67,6 +67,7 @@ class ImageEmbedder(Http2Client):
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
     maximal_trials = 10
+    CANNOT_LOAD = "cannot load"
 
     def __init__(self, model="inception-v3", layer="penultimate",
                  server_url='api.biolab.si:8080'):
@@ -199,6 +200,11 @@ class ImageEmbedder(Http2Client):
                 self.persist_cache()
             trials_counter += 1
 
+        # change images that were not loaded from 'cannot loaded' to None
+        all_embeddings = \
+            [None if not isinstance(el, np.ndarray) and el == self.CANNOT_LOAD
+             else el for el in all_embeddings]
+
         return np.array(all_embeddings)
 
     def _yield_in_batches(self, list_):
@@ -318,6 +324,15 @@ class ImageEmbedder(Http2Client):
         for stream_id, cache_key in zip(http_streams, cache_keys):
             if self.cancelled:
                 raise EmbeddingCancelledException()
+
+            if not stream_id and not cache_key:
+                # when image cannot be loaded
+                embeddings.append(self.CANNOT_LOAD)
+
+                if image_processed_callback:
+                    image_processed_callback()
+                continue
+
 
             if not stream_id:
                 # skip rest of the waiting because image was either

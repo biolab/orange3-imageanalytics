@@ -66,7 +66,7 @@ class ImageEmbedder(Http2Client):
     >>> embedded_images, skipped_images, num_skipped = image_embedder(images)
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
-    maximal_trials = 10
+    MAX_REPEATS = 4
     CANNOT_LOAD = "cannot load"
 
     def __init__(self, model="inception-v3", layer="penultimate",
@@ -166,12 +166,12 @@ class ImageEmbedder(Http2Client):
             self.reconnect_to_server()
 
         all_embeddings = [None] * len(file_paths)
-        trials_counter = 0
+        repeats_counter = 0
 
         # repeat while all images has embeddings or
         # while counter counts out (prevents cycling)
         while len([el for el in all_embeddings if el is None]) > 0 and \
-            trials_counter < self.maximal_trials:
+            repeats_counter < self.MAX_REPEATS:
 
             # take all images without embeddings yet
             selected_indices = [i for i, v in enumerate(all_embeddings)
@@ -198,7 +198,7 @@ class ImageEmbedder(Http2Client):
                     all_embeddings[i] = emb
 
                 self.persist_cache()
-            trials_counter += 1
+            repeats_counter += 1
 
         # change images that were not loaded from 'cannot loaded' to None
         all_embeddings = \

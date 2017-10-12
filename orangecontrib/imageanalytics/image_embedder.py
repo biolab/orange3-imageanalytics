@@ -37,7 +37,7 @@ MODELS = {
             'A model trained to predict painters from artwork images.',
         'target_image_size': (256, 256),
         'layers': ['penultimate']
-    },
+    }
 }
 
 
@@ -66,6 +66,7 @@ class ImageEmbedder(Http2Client):
     >>> embedded_images, skipped_images, num_skipped = image_embedder(images)
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
+    maximal_trials = 10
 
     def __init__(self, model="inception-v3", layer="penultimate",
                  server_url='api.biolab.si:8080'):
@@ -163,26 +164,40 @@ class ImageEmbedder(Http2Client):
         if not self.is_connected_to_server():
             self.reconnect_to_server()
 
-        all_embeddings = []
+        all_embeddings = [None] * len(file_paths)
+        trials_counter = 0
 
-        for batch in self._yield_in_batches(file_paths):
-            try:
-                embeddings = self._send_to_server(
-                    batch, image_processed_callback
-                )
-            except MaxNumberOfRequestsError:
-                # maximum number of http2 requests through a single
-                # connection is exceeded and a remote peer has closed
-                # the connection so establish a new connection and retry
-                # with the same batch (should happen rarely as the setting
-                # is usually set to >= 1000 requests in http2)
-                self.reconnect_to_server()
-                embeddings = self._send_to_server(
-                    batch, image_processed_callback
-                )
+        # repeat while all images has embeddings or
+        # while counter counts out (prevents cycling)
+        while len([el for el in all_embeddings if el is None]) > 0 and \
+            trials_counter < self.maximal_trials:
 
-            all_embeddings += embeddings
-            self.persist_cache()
+            # take all images without embeddings yet
+            selected_indices = [i for i, v in enumerate(all_embeddings)
+                                if v is None]
+            file_paths_wo_emb = [(file_paths[i], i) for i in selected_indices]
+
+            for batch in self._yield_in_batches(file_paths_wo_emb):
+                b_images, b_indices = zip(*batch)
+                try:
+                    embeddings = self._send_to_server(
+                        b_images, image_processed_callback
+                    )
+                except MaxNumberOfRequestsError:
+                    # maximum number of http2 requests through a single
+                    # connection is exceeded and a remote peer has closed
+                    # the connection so establish a new connection and retry
+                    # with the same batch (should happen rarely as the setting
+                    # is usually set to >= 1000 requests in http2)
+                    self.reconnect_to_server()
+                    embeddings = [None] * len(batch)
+
+                # insert embeddings into the list
+                for i, emb in zip(b_indices, embeddings):
+                    all_embeddings[i] = emb
+
+                self.persist_cache()
+            trials_counter += 1
 
         return np.array(all_embeddings)
 

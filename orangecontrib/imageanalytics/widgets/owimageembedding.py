@@ -211,8 +211,9 @@ class OWImageEmbedding(OWWidget):
         set_progress = qconcurrent.methodinvoke(
             self, "__progress_set", (float,))
 
-        def advance():
-            set_progress(next(ticks))
+        def advance(success=True):
+            if success:
+                set_progress(next(ticks))
 
         def cancel():
             task.future.cancel()

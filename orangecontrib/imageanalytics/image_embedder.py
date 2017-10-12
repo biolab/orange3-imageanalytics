@@ -330,7 +330,7 @@ class ImageEmbedder(Http2Client):
                 embeddings.append(self.CANNOT_LOAD)
 
                 if image_processed_callback:
-                    image_processed_callback()
+                    image_processed_callback(success=False)
                 continue
 
 
@@ -341,7 +341,7 @@ class ImageEmbedder(Http2Client):
                 embeddings.append(embedding)
 
                 if image_processed_callback:
-                    image_processed_callback()
+                    image_processed_callback(success=embedding is not None)
                 continue
 
             try:
@@ -361,7 +361,7 @@ class ImageEmbedder(Http2Client):
                 self._cache_dict[cache_key] = embedding
 
             if image_processed_callback:
-                image_processed_callback()
+                image_processed_callback(embeddings[-1] is not None)
 
         return embeddings
 

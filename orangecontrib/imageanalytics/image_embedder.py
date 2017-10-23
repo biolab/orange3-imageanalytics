@@ -37,6 +37,24 @@ MODELS = {
             'A model trained to predict painters from artwork images.',
         'target_image_size': (256, 256),
         'layers': ['penultimate']
+    },
+    'deeploc': {
+        'name': 'DeepLoc',
+        'description': 'A model trained to analyze yeast cell images.',
+        'target_image_size': (64, 64),
+        'layers': ['penultimate']
+    },
+    'vgg16': {
+        'name': 'VGG-16',
+        'description': '16-layer image recognition model trained on ImageNet.',
+        'target_image_size': (224, 224),
+        'layers': ['penultimate']
+    },
+    'vgg19': {
+        'name': 'VGG-19',
+        'description': '19-layer image recognition model trained on ImageNet.',
+        'target_image_size': (224, 224),
+        'layers': ['penultimate']
     }
 }
 

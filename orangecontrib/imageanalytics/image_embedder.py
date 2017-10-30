@@ -88,7 +88,7 @@ class ImageEmbedder(Http2Client):
     CANNOT_LOAD = "cannot load"
 
     def __init__(self, model="inception-v3", layer="penultimate",
-                 server_url='api.biolab.si:8080'):
+                 server_url='api.garaza.io:443'):
         super().__init__(server_url)
         model_settings = self._get_model_settings_confidently(model, layer)
         self._model = model

@@ -285,3 +285,12 @@ class ImageEmbedderTest(unittest.TestCase):
         self.embedder.cancelled = True
         with self.assertRaises(Exception):
             self.embedder(self.single_example)
+
+    def test_version(self):
+        """
+        Test if new version of a hyper library is published
+        When this test start to fails remove temporary fix in http2_client
+        marked with TODO
+        """
+        import hyper
+        self.assertEqual(hyper.__version__, "0.7.0")

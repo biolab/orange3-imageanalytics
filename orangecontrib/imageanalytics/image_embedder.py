@@ -29,32 +29,37 @@ MODELS = {
         'name': 'Inception v3',
         'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 0
     },
     'painters': {
         'name': 'Painters',
         'description':
             'A model trained to predict painters from artwork images.',
         'target_image_size': (256, 256),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 3
     },
     'deeploc': {
         'name': 'DeepLoc',
         'description': 'A model trained to analyze yeast cell images.',
         'target_image_size': (64, 64),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 4
     },
     'vgg16': {
         'name': 'VGG-16',
         'description': '16-layer image recognition model trained on ImageNet.',
         'target_image_size': (224, 224),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 1
     },
     'vgg19': {
         'name': 'VGG-19',
         'description': '19-layer image recognition model trained on ImageNet.',
         'target_image_size': (224, 224),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 2
     }
 }
 

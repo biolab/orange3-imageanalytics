@@ -52,7 +52,8 @@ class OWImageEmbedding(OWWidget):
 
     def __init__(self):
         super().__init__()
-        self.embedders = sorted(list(EMBEDDERS_INFO))
+        self.embedders = sorted(list(EMBEDDERS_INFO),
+                                key=lambda k: EMBEDDERS_INFO[k]['order'])
         self._image_attributes = None
         self._input_data = None
         self._log = logging.getLogger(__name__)

@@ -119,7 +119,7 @@ class OWImageEmbedding(OWWidget):
         self.cancel_button.clicked.connect(self.cancel)
         hbox = hBox(self.controlArea)
         hbox.layout().addWidget(self.cancel_button)
-        self.cancel_button.hide()
+        self.cancel_button.setDisabled(True)
 
     def _init_server_connection(self):
         self.setBlocking(False)
@@ -193,7 +193,7 @@ class OWImageEmbedding(OWWidget):
             return
 
         self._set_server_info(connected=True)
-        self.cancel_button.show()
+        self.cancel_button.setDisabled(False)
         self.cb_image_attr.setDisabled(True)
         self.cb_embedder.setDisabled(True)
 
@@ -266,7 +266,7 @@ class OWImageEmbedding(OWWidget):
 
         task, self._task = self._task, None
         self.auto_commit_widget.setDisabled(False)
-        self.cancel_button.hide()
+        self.cancel_button.setDisabled(True)
         self.cb_image_attr.setDisabled(False)
         self.cb_embedder.setDisabled(False)
         self.progressBarFinished(processEvents=None)
@@ -334,7 +334,7 @@ class OWImageEmbedding(OWWidget):
                 pass
 
             self.auto_commit_widget.setDisabled(False)
-            self.cancel_button.hide()
+            self.cancel_button.setDisabled(True)
             self.progressBarFinished(processEvents=None)
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)

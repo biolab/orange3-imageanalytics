@@ -29,15 +29,38 @@ MODELS = {
         'name': 'Inception v3',
         'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 0
     },
     'painters': {
         'name': 'Painters',
         'description':
             'A model trained to predict painters from artwork images.',
         'target_image_size': (256, 256),
-        'layers': ['penultimate']
+        'layers': ['penultimate'],
+        'order': 3
     },
+    'deeploc': {
+        'name': 'DeepLoc',
+        'description': 'A model trained to analyze yeast cell images.',
+        'target_image_size': (64, 64),
+        'layers': ['penultimate'],
+        'order': 4
+    },
+    'vgg16': {
+        'name': 'VGG-16',
+        'description': '16-layer image recognition model trained on ImageNet.',
+        'target_image_size': (224, 224),
+        'layers': ['penultimate'],
+        'order': 1
+    },
+    'vgg19': {
+        'name': 'VGG-19',
+        'description': '19-layer image recognition model trained on ImageNet.',
+        'target_image_size': (224, 224),
+        'layers': ['penultimate'],
+        'order': 2
+    }
 }
 
 
@@ -66,9 +89,11 @@ class ImageEmbedder(Http2Client):
     >>> embedded_images, skipped_images, num_skipped = image_embedder(images)
     """
     _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
+    MAX_REPEATS = 4
+    CANNOT_LOAD = "cannot load"
 
     def __init__(self, model="inception-v3", layer="penultimate",
-                 server_url='api.biolab.si:8080'):
+                 server_url='api.garaza.io:443'):
         super().__init__(server_url)
         model_settings = self._get_model_settings_confidently(model, layer)
         self._model = model
@@ -163,26 +188,45 @@ class ImageEmbedder(Http2Client):
         if not self.is_connected_to_server():
             self.reconnect_to_server()
 
-        all_embeddings = []
+        all_embeddings = [None] * len(file_paths)
+        repeats_counter = 0
 
-        for batch in self._yield_in_batches(file_paths):
-            try:
-                embeddings = self._send_to_server(
-                    batch, image_processed_callback
-                )
-            except MaxNumberOfRequestsError:
-                # maximum number of http2 requests through a single
-                # connection is exceeded and a remote peer has closed
-                # the connection so establish a new connection and retry
-                # with the same batch (should happen rarely as the setting
-                # is usually set to >= 1000 requests in http2)
-                self.reconnect_to_server()
-                embeddings = self._send_to_server(
-                    batch, image_processed_callback
-                )
+        # repeat while all images has embeddings or
+        # while counter counts out (prevents cycling)
+        while len([el for el in all_embeddings if el is None]) > 0 and \
+            repeats_counter < self.MAX_REPEATS:
 
-            all_embeddings += embeddings
-            self.persist_cache()
+            # take all images without embeddings yet
+            selected_indices = [i for i, v in enumerate(all_embeddings)
+                                if v is None]
+            file_paths_wo_emb = [(file_paths[i], i) for i in selected_indices]
+
+            for batch in self._yield_in_batches(file_paths_wo_emb):
+                b_images, b_indices = zip(*batch)
+                try:
+                    embeddings = self._send_to_server(
+                        b_images, image_processed_callback
+                    )
+                except MaxNumberOfRequestsError:
+                    # maximum number of http2 requests through a single
+                    # connection is exceeded and a remote peer has closed
+                    # the connection so establish a new connection and retry
+                    # with the same batch (should happen rarely as the setting
+                    # is usually set to >= 1000 requests in http2)
+                    self.reconnect_to_server()
+                    embeddings = [None] * len(batch)
+
+                # insert embeddings into the list
+                for i, emb in zip(b_indices, embeddings):
+                    all_embeddings[i] = emb
+
+                self.persist_cache()
+            repeats_counter += 1
+
+        # change images that were not loaded from 'cannot loaded' to None
+        all_embeddings = \
+            [None if not isinstance(el, np.ndarray) and el == self.CANNOT_LOAD
+             else el for el in all_embeddings]
 
         return np.array(all_embeddings)
 
@@ -304,6 +348,15 @@ class ImageEmbedder(Http2Client):
             if self.cancelled:
                 raise EmbeddingCancelledException()
 
+            if not stream_id and not cache_key:
+                # when image cannot be loaded
+                embeddings.append(self.CANNOT_LOAD)
+
+                if image_processed_callback:
+                    image_processed_callback(success=False)
+                continue
+
+
             if not stream_id:
                 # skip rest of the waiting because image was either
                 # skipped at loading or is present in the local cache
@@ -311,7 +364,7 @@ class ImageEmbedder(Http2Client):
                 embeddings.append(embedding)
 
                 if image_processed_callback:
-                    image_processed_callback()
+                    image_processed_callback(success=embedding is not None)
                 continue
 
             try:
@@ -331,7 +384,7 @@ class ImageEmbedder(Http2Client):
                 self._cache_dict[cache_key] = embedding
 
             if image_processed_callback:
-                image_processed_callback()
+                image_processed_callback(embeddings[-1] is not None)
 
         return embeddings
 

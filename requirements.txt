@@ -1,4 +1,4 @@
-hyper==0.7.0
+hyper>=0.7.0
 numpy>=1.10.0
 Orange3>=3.3.5
 Pillow>=2.7.0

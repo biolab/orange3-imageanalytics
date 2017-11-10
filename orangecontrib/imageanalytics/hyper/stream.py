@@ -37,15 +37,16 @@ class Stream(object):
 
         # since we need to know when we have a last package we need to know
         # if there is another package in advance
-        cur_chunk = next(chunks)
-        while True:
-            try:
+        cur_chunk = None
+        try:
+            cur_chunk = next(chunks)
+            while True:
                 next_chunk = next(chunks)
                 self._send_chunk(cur_chunk, False)
-            except StopIteration:
+                cur_chunk = next_chunk
+        except StopIteration:
+            if cur_chunk is not None:  # cur_chunk none when no chunks to send
                 self._send_chunk(cur_chunk, final)
-                break
-            cur_chunk = next_chunk
 
 
     def _send_chunk(self, data, final):

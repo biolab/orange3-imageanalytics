@@ -1,10 +1,13 @@
 import ftplib
 import logging
+import random
+import uuid
 from io import BytesIO
 from itertools import islice
 from os.path import join, isfile
 from urllib.parse import urlparse
 from urllib.request import urlopen, URLError
+from AnyQt.QtCore import QSettings
 
 import cachecontrol.caches
 import numpy as np
@@ -113,6 +116,10 @@ class ImageEmbedder(Http2Client):
         # attribute that offers support for cancelling the embedding
         # if ran in another thread
         self.cancelled = False
+        self.machine_id = \
+            QSettings().value('error-reporting/machine-id', '', type=str)  \
+            or str(uuid.getnode())
+        self.session_id = None
 
     @staticmethod
     def _get_model_settings_confidently(model, layer):
@@ -188,6 +195,7 @@ class ImageEmbedder(Http2Client):
         if not self.is_connected_to_server():
             self.reconnect_to_server()
 
+        self.session_id = str(random.randint(1, 1e10))
         all_embeddings = [None] * len(file_paths)
         repeats_counter = 0
 
@@ -278,7 +286,8 @@ class ImageEmbedder(Http2Client):
                 }
                 stream_id = self._send_request(
                     method='POST',
-                    url='/image/' + self._model,
+                    url='/image/' + self._model + '?machine={}&session={}'
+                        .format(self.machine_id, self.session_id),
                     headers=headers,
                     body_bytes=image
                 )

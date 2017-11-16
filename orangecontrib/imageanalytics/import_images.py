@@ -63,7 +63,7 @@ class ImportImages:
         patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
                     for fmt in self.formats]
 
-        images = self.image_meta(scan(start_dir), patterns)
+        images = self.image_meta(scan(start_dir), patterns) or []
         categories = {}
         for imeta in images:
             # derive categories from the path relative to the starting dir

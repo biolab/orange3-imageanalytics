@@ -550,6 +550,8 @@ class OWImportImages(widget.OWWidget):
             self._n_image_data = len(data)
             self._n_image_categories = len(data.domain.class_var.values)\
                 if data.domain.class_var else 0
+        else:
+            self._n_image_data, self._n_image_categories = 0, 0
 
         self.data = data
         self._n_skipped = n_skipped

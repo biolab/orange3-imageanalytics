@@ -6,9 +6,12 @@
 Welcome to Orange3 Image Analytics documentation!
 =================================================
 
+
+Widgets
+-------
+
 .. toctree::
    :maxdepth: 1
-   :caption: Widgets
 
    widgets/imageembedding
    widgets/imageimport

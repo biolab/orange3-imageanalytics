@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to Orange3 Image Analytics documentation!
-=============================================
+=================================================
 
 .. toctree::
    :maxdepth: 1
@@ -12,6 +12,7 @@ Welcome to Orange3 Image Analytics documentation!
 
    widgets/imageembedding
    widgets/imageimport
+   widgets/imageviewer
 
 
 Indices and tables

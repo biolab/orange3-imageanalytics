@@ -1,4 +1,4 @@
-Import Embedding
+Image Embedding
 ================
 
 .. figure:: icons/imageembedding.png

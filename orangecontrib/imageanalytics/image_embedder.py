@@ -213,7 +213,7 @@ class ImageEmbedder(Http2Client):
                 b_images, b_indices = zip(*batch)
                 try:
                     embeddings = self._send_to_server(
-                        b_images, image_processed_callback
+                        b_images, image_processed_callback, repeats_counter
                     )
                 except MaxNumberOfRequestsError:
                     # maximum number of http2 requests through a single
@@ -253,7 +253,7 @@ class ImageEmbedder(Http2Client):
             if num_yielded == len(list_):
                 return
 
-    def _send_to_server(self, file_paths, image_processed_callback):
+    def _send_to_server(self, file_paths, image_processed_callback, retry_n):
         """ Load images and compute cache keys and send requests to
         an http2 server for valid ones.
         """
@@ -286,8 +286,9 @@ class ImageEmbedder(Http2Client):
                 }
                 stream_id = self._send_request(
                     method='POST',
-                    url='/image/' + self._model + '?machine={}&session={}'
-                        .format(self.machine_id, self.session_id),
+                    url='/image/' + self._model +
+                        '?machine={}&session={}&retry={}'
+                        .format(self.machine_id, self.session_id, retry_n),
                     headers=headers,
                     body_bytes=image
                 )

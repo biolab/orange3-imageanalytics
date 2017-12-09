@@ -863,7 +863,7 @@ class OWImageViewer(widget.OWWidget):
     name = "Image Viewer"
     description = "View images referred to in the data."
     icon = "icons/ImageViewer.svg"
-    priority = 105
+    priority = 130
     replaces = ["Orange.widgets.data.owimageviewer.OWImageViewer", ]
 
     class Inputs:

@@ -195,5 +195,23 @@ class ImageGrid:
         """
 
         image_list = Table.from_domain(images.domain)
-        image_list.extend([Instance(images.domain, None if i == -1 else images[i]) for i in self.grid_indices])
+        image_list.extend([Instance(images.domain, image) for image in self.order_to_grid(images)])
         return image_list
+
+    def order_to_grid(self, data):
+        """
+        Order the data to grid cells according to the grid indices.
+        If a grid cell does not contain data, put None in its place.
+
+        Parameters
+        ----------
+        data: array-like
+            The data to order.
+
+        Returns
+        -------
+        array-like
+            A list of the provided data in the grid, ordered by rows.
+        """
+
+        return [None if i == -1 else data[i] for i in self.grid_indices]

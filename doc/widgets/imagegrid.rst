@@ -14,6 +14,10 @@ Signals
 
    The image embeddings from Image Embedding.
 
+-  **Data Subset**
+
+    A subset of embeddings or images which are shown opaque while the rest are shown semi-transparent.
+
 **Outputs**:
 
 -  **Images**

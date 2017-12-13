@@ -1,7 +1,6 @@
 import enum
 import itertools
 import logging
-import os
 from collections import namedtuple
 from concurrent.futures import Future
 from itertools import zip_longest
@@ -21,12 +20,12 @@ from AnyQt.QtWidgets import (
     QGraphicsGridLayout, QSizePolicy, QApplication, QStyle, QShortcut,
     QFormLayout)
 from Orange.widgets import widget, gui, settings
-from Orange.widgets.data.owimageviewer import ImageLoader, Preview, GraphicsScene
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.overlay import proxydoc
-from Orange.widgets.widget import Input, Output
+from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
-from orangecontrib.prototypes.image_grid import ImageGrid
+from orangecontrib.imageanalytics.image_grid import ImageGrid
+from orangecontrib.imageanalytics.widgets.owimageviewer import ImageLoader, Preview, GraphicsScene
 
 _log = logging.getLogger(__name__)
 
@@ -49,8 +48,7 @@ class OWImageGrid(widget.OWWidget):
 
     class Inputs:
         data = Input("Embeddings", Orange.data.Table)
-        # TODO: implement data subset handling
-        # data_subset = Input("Embeddings Subset", Orange.data.Table)
+        data_subset = Input("Data Subset", Orange.data.Table)
 
     class Outputs:
         data = Output("Images", Orange.data.Table)
@@ -67,17 +65,24 @@ class OWImageGrid(widget.OWWidget):
     auto_update = settings.Setting(True)
     auto_commit = settings.Setting(True)
 
+    class Warning(OWWidget.Warning):
+        incompatible_subset = Msg("Data subset is incompatible with Data")
+        no_valid_data = Msg("No valid data")
+
     def __init__(self):
         super().__init__()
 
         self.grid = None
 
         self.data = None
+        self.data_subset = None
+
         self.allAttrs = []
         self.stringAttrs = []
         self.domainAttrs = []
 
-        self.selectedIndices = []
+        self.selected_indices = []
+        self.subset_indices = []
 
         #: List of _ImageItems
         self.items = []
@@ -152,6 +157,7 @@ class OWImageGrid(widget.OWWidget):
     def setData(self, data):
         self.closeContext()
         self.clear()
+        self.Warning.no_valid_data.clear()
 
         self.data = data
 
@@ -184,6 +190,11 @@ class OWImageGrid(widget.OWWidget):
                 self.setupScene()
         else:
             self.info.setText("Waiting for input.\n")
+            self.Warning.no_valid_data()
+
+    @Inputs.data_subset
+    def setDataSubset(self, data_subset):
+        self.data_subset = data_subset
 
     def clear(self):
         self.data = None
@@ -212,7 +223,6 @@ class OWImageGrid(widget.OWWidget):
             self.thumbnailView.setFixedRowCount(self.rows)
 
             for i, inst in enumerate(self.image_grid.image_list):
-
                 thumbnail = GraphicsThumbnailWidget(QPixmap(), crop=self.cell_fit == 1)
                 thumbnail.setThumbnailSize(size)
                 thumbnail.instance = inst
@@ -271,6 +281,22 @@ class OWImageGrid(widget.OWWidget):
                 self.info.setText("Retrieving...\n")
             else:
                 self._updateStatus()
+                self.applySubset()
+
+    def handleNewSignals(self):
+        self.Warning.incompatible_subset.clear()
+        self.subset_indices = []
+
+        if self.data and self.data_subset:
+            transformed = self.data_subset.transform(self.data.domain)
+            if np.all(self.data.domain.metas == self.data_subset.domain.metas):
+                indices = {e.id for e in transformed}
+                self.subset_indices = [ex.id in indices for ex in self.data]
+
+            else:
+                self.Warning.incompatible_subset()
+
+        self.applySubset()
 
     def urlFromValue(self, value):
         base = value.variable.attributes.get("origin", "")
@@ -331,16 +357,23 @@ class OWImageGrid(widget.OWWidget):
         if self.isValidData():
             self.setupScene()
 
+    def applySubset(self):
+        if self.image_grid:
+            subset_indices = self.subset_indices if self.subset_indices else [True] * len(self.items)
+            ordered_subset_indices = self.image_grid.order_to_grid(subset_indices)
+
+            for item, in_subset in zip(self.items, ordered_subset_indices):
+                item.widget.setSubset(in_subset)
+
     def onSelectionChanged(self):
         selected = [item for item in self.items if item.widget.isSelected() and item.url != ""]
-        self.selectedIndices = [item.index for item in selected]
+        self.selected_indices = [item.index for item in selected]
         self.commit()
 
     def commit(self):
         if self.data:
-            if self.selectedIndices:
-                indices = [i for i in self.selectedIndices]
-                selected = self.image_grid.image_list[indices]
+            if self.selected_indices:
+                selected = self.image_grid.image_list[self.selected_indices]
             else:
                 selected = None
             self.Outputs.data.send(selected)
@@ -418,6 +451,7 @@ class GraphicsPixmapWidget(QGraphicsWidget):
         self._pixmap = QPixmap(pixmap) if pixmap is not None else QPixmap()
         self._keepAspect = True
         self._crop = False
+        self._subset = True
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def setPixmap(self, pixmap):
@@ -442,6 +476,11 @@ class GraphicsPixmapWidget(QGraphicsWidget):
     def setCrop(self, crop):
         if self._crop != crop:
             self._crop = bool(crop)
+            self.update()
+
+    def setSubset(self, in_subset):
+        if self._subset != in_subset:
+            self._subset = bool(in_subset)
             self.update()
 
     def setGeometry(self, rect):
@@ -481,6 +520,11 @@ class GraphicsPixmapWidget(QGraphicsWidget):
             pixsize.scale(rect.size(), aspectmode)
             pixrect = QRectF(QPointF(0, 0), pixsize)
 
+        if self._subset:
+            painter.setOpacity(1.0)
+        else:
+            painter.setOpacity(0.5)
+
         pixrect.moveCenter(rect.center())
         painter.save()
         painter.setPen(QPen(QColor(0, 0, 0, 50), 3))
@@ -492,7 +536,7 @@ class GraphicsPixmapWidget(QGraphicsWidget):
 
 
 class GraphicsThumbnailWidget(QGraphicsWidget):
-    def __init__(self, pixmap, parentItem=None, crop=False, **kwargs):
+    def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True, **kwargs):
         super().__init__(parentItem, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
         self._size = QSizeF()
@@ -504,6 +548,7 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
 
         self.pixmapWidget = GraphicsPixmapWidget(pixmap, self)
         self.pixmapWidget.setCrop(crop)
+        self.pixmapWidget.setSubset(in_subset)
 
         layout.addItem(self.pixmapWidget)
         layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
@@ -523,6 +568,9 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
 
     def setCrop(self, crop):
         self.pixmapWidget.setCrop(crop)
+
+    def setSubset(self, in_subset):
+        self.pixmapWidget.setSubset(in_subset)
 
     def pixmap(self):
         return self.pixmapWidget.pixmap()

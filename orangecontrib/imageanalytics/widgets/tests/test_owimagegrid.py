@@ -44,3 +44,18 @@ class TestOWImageGrid(WidgetTest):
         table = Table("iris")[:0]
         self.send_signal("Embeddings", table)
         self.send_signal("Embeddings", None)
+
+    def test_subset_data(self):
+        table = Table("iris")
+        self.send_signal("Embeddings", table)
+        self.send_signal("Data Subset", table[:5])
+
+    def test_no_subset_data(self):
+        table = Table("iris")
+        self.send_signal("Embeddings", table)
+        self.send_signal("Data Subset", table[:0])
+        self.send_signal("Data Subset", None)
+
+    def test_different_subset_data(self):
+        self.send_signal("Embeddings", Table("iris"))
+        self.send_signal("Data Subset", Table("zoo-with-images"))

@@ -16,6 +16,7 @@ Widgets
    widgets/imageembedding
    widgets/imageimport
    widgets/imageviewer
+   widgets/imagegrid
 
 
 Indices and tables

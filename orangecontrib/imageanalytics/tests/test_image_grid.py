@@ -34,3 +34,4 @@ class ImageGridTest(unittest.TestCase):
 
         self.grid.process(20, 20)
         self.check_process()
+

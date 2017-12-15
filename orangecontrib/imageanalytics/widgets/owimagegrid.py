@@ -94,7 +94,7 @@ class OWImageGrid(widget.OWWidget):
             self.controlArea, self, "imageAttr",
             box="Image Filename Attribute",
             tooltip="Attribute with image filenames",
-            callback=[self.clearScene, self.setupScene],
+            callback=self.changeImageAttr,
             contentsLength=12,
             addSpace=True,
         )
@@ -158,7 +158,6 @@ class OWImageGrid(widget.OWWidget):
         self.closeContext()
         self.clear()
         self.Warning.no_valid_data.clear()
-
         self.data = data
 
         if data is not None:
@@ -188,9 +187,10 @@ class OWImageGrid(widget.OWWidget):
             if self.isValidData():
                 self.image_grid = ImageGrid(data)
                 self.setupScene()
+            else:
+                self.Warning.no_valid_data()
         else:
             self.info.setText("Waiting for input.\n")
-            self.Warning.no_valid_data()
 
     @Inputs.data_subset
     def setDataSubset(self, data_subset):
@@ -327,6 +327,11 @@ class OWImageGrid(widget.OWWidget):
         self.thumbnailView.clear()
         self._errcount = 0
         self._successcount = 0
+
+    def changeImageAttr(self):
+        self.clearScene()
+        if self.isValidData():
+            self.setupScene()
 
     def thumbnailItems(self):
         return [item.widget for item in self.items]

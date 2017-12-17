@@ -5,3 +5,4 @@ Pillow>=4.2.1
 requests
 cachecontrol
 lockfile
+lap==0.3.0

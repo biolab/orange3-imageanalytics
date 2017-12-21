@@ -1,7 +1,7 @@
 Image Viewer
 ============
 
-.. figure:: icons/image-viewer.png
+.. figure:: icons/ImageViewer.png
 
 Displays images that come with a data set.
 
@@ -24,7 +24,7 @@ Description
 -----------
 
 The **Image Viewer** widget can display images from a data set, which are
-stored locally or on the internet. It can be used for image comparison,
+stored locally or on the internet. The widget will look for an attribute with *type=image* in the third header row. It can be used for image comparison,
 while looking for similarities or discrepancies between selected data
 instances (e.g. bacterial growth or bitmap representations of
 handwriting).
@@ -43,8 +43,8 @@ handwriting).
 Examples
 --------
 
-A very simple way to use this widget is to connect the :doc:`File <../data/file>` widget with
-**Image Viewer** and see all the images that come with your data set.
+A very simple way to use this widget is to connect the **File** widget with
+**Image Viewer** and see all the images that come with your data set. You can also visualize images from :doc:`Import Images <../importimages>`.
 
 .. figure:: images/image-viewer-example1.png
 

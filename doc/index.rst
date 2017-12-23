@@ -13,9 +13,9 @@ Widgets
 .. toctree::
    :maxdepth: 1
 
-   widgets/imageembedding
-   widgets/imageimport
+   widgets/importimages
    widgets/imageviewer
+   widgets/imageembedding
    widgets/imagegrid
 
 

@@ -34,7 +34,7 @@ vector for each image. It returns an enhanced data table with additional columns
 Images can be imported with :doc:`Import Images <importimages>` widget or as paths to images in a spreadsheet. In this case the column with images paths needs a three-row header with *type=image* label in the third row.
 
 .. figure:: images/header-example.png
-   :scale: 50%
+   :width: 100%
 
 Image Embedding offers several embedders, each trained for a specific task. Images are sent to a server, where vectors representations are computed. Sent images are not stored anywhere. To use the widget, you will need internet connection.
 
@@ -63,9 +63,9 @@ Let us first import images from a folder with :doc:`Import Images <importimages>
 We will use the default embedder *Inception v3*. The widget will automatically start retrieving image vectors from the server.
 
 .. figure:: images/ImageEmbedding-Example1.png
-   :scale: 50%
+   :width: 100%
 
 Once the computation is done, you can observe the enhanced data in a **Data Table**. With the retrived embeddings, you can continue with any machine learning method Orange offers. Below is an example for clustering.
 
 .. figure:: images/ImageEmbedding-Example2.png
-   :scale: 50%
+   :width: 100%

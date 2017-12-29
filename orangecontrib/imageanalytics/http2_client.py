@@ -96,9 +96,9 @@ class Http2Client(object):
                 body=body_bytes,
                 headers=headers
             )
-        except ConnectionError as error:
+        except (ConnectionError, BrokenPipeError) as error:
             self.disconnect_from_server()
-            log.error("Request sending failed", exc_info=True)
+            log.error("Request sending failed")
             raise error
 
     def _get_json_response_or_none(self, stream_id):

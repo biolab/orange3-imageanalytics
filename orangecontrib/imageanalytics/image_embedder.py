@@ -293,7 +293,7 @@ class ImageEmbedder(Http2Client):
                     body_bytes=image
                 )
                 http_streams.append(stream_id)
-            except ConnectionError:
+            except (ConnectionError, BrokenPipeError):
                 self.persist_cache()
                 raise
 

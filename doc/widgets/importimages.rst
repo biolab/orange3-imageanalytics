@@ -46,7 +46,7 @@ Example
 
 We can observe the result in a **Data Table**. See how Orange added an extra class attribute with values Monet and Manet?
 
-Now we can proceed with standard machine learning methods. We will send images to :doc:`Image Embedding <../imageembedding>`, where we will use *Painters* embedder to retrieve image vectors.
+Now we can proceed with standard machine learning methods. We will send images to :doc:`Image Embedding <imageembedding>`, where we will use *Painters* embedder to retrieve image vectors.
 
 Then we will use **Test & Score** and **Logistic Regression**, to build a model for predicting the author of a painting. We get a perfect score? How come? It turns out, these were the images the *Painters* embedder was trained on, so a high accuracy is expected.
 

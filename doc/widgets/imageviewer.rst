@@ -44,7 +44,7 @@ Examples
 --------
 
 A very simple way to use this widget is to connect the **File** widget with
-**Image Viewer** and see all the images that come with your data set. You can also visualize images from :doc:`Import Images <../importimages>`.
+**Image Viewer** and see all the images that come with your data set. You can also visualize images from :doc:`Import Images <importimages>`.
 
 .. figure:: images/image-viewer-example1.png
 

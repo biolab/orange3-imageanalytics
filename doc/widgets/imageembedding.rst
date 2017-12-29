@@ -31,7 +31,7 @@ Description
 server. Remote server uses a deep learning model to calculate a feature 
 vector for each image. It returns an enhanced data table with additional columns (image descriptors).
 
-Images can be imported with :doc:`Import Images <../importimages>` widget or as paths to images in a spreadsheet. In this case the column with images paths needs a three-row header with *type=image* label in the third row.
+Images can be imported with :doc:`Import Images <importimages>` widget or as paths to images in a spreadsheet. In this case the column with images paths needs a three-row header with *type=image* label in the third row.
 
 .. figure:: images/header-example.png
    :scale: 50%
@@ -58,7 +58,7 @@ Image Embedding offers several embedders, each trained for a specific task. Imag
 Example
 -------
 
-Let us first import images from a folder with :doc:`Import Images <../importimages>`. We have three images of an orange, a banana and a strawberry in a folder called Fruits. From **Import Images** we will send a data table containing a column with image paths to **Image Embedding**.
+Let us first import images from a folder with :doc:`Import Images <importimages>`. We have three images of an orange, a banana and a strawberry in a folder called Fruits. From **Import Images** we will send a data table containing a column with image paths to **Image Embedding**.
 
 We will use the default embedder *Inception v3*. The widget will automatically start retrieving image vectors from the server.
 

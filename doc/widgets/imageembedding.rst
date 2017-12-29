@@ -1,7 +1,7 @@
 Image Embedding
 ================
 
-.. figure:: icons/ImageEmbedding.png
+.. figure:: icons/image-embedding.png
 
 Image embedding through deep neural networks.
 

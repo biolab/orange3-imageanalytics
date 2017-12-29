@@ -1,7 +1,7 @@
 Image Viewer
 ============
 
-.. figure:: icons/ImageViewer.png
+.. figure:: icons/image-viewer.png
 
 Displays images that come with a data set.
 

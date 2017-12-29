@@ -1,7 +1,7 @@
 Import Images
 =============
 
-.. figure:: icons/ImportImages.png
+.. figure:: icons/import-images.png
 
 Import images from a directory(s)
 

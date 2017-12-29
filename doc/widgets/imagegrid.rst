@@ -1,7 +1,7 @@
 Image Grid
 ==========
 
-.. figure:: icons/ImageGrid.png
+.. figure:: icons/image-grid.png
 
 Displays images in a similarity grid.
 

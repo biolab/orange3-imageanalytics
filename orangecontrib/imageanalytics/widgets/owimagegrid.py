@@ -84,6 +84,7 @@ class OWImageGrid(widget.OWWidget):
         self.data = None
         self.data_subset = None
         self.subset_indices = []
+        self.nonempty = []
 
         self.allAttrs = []
         self.stringAttrs = []
@@ -240,6 +241,7 @@ class OWImageGrid(widget.OWWidget):
                 else:
                     url = self.url_from_value(inst[attr])
                     thumbnail.setToolTip(url.toString())
+                    self.nonempty.append(i)
 
                     if url.isValid() and url.isLocalFile():
                         reader = QImageReader(url.toLocalFile())
@@ -332,6 +334,7 @@ class OWImageGrid(widget.OWWidget):
     def clear_scene(self):
         self.cancel_all_futures()
         self.items = []
+        self.nonempty = []
         self.selection = None
         self.thumbnailView.clear()
         self._errcount = 0
@@ -388,25 +391,19 @@ class OWImageGrid(widget.OWWidget):
 
         # Remove from selection
         if keys & Qt.AltModifier:
-            print('removing')
             self.selection[indices] = 0
         # Append to the last group
         elif keys & Qt.ShiftModifier and keys & Qt.ControlModifier:
-            print('appending')
             self.selection[indices] = np.max(self.selection)
         # Create a new group
         elif keys & Qt.ShiftModifier:
-            print('new group')
             self.selection[indices] = np.max(self.selection) + 1
         # No modifiers: new selection
         else:
-            print('new selection')
             self.selection = np.zeros(len(self.items), dtype=np.uint8)
             self.selection[indices] = 1
 
         self.update_selection()
-        print(indices, self.selection)
-
         self.commit()
 
     def commit(self):
@@ -416,13 +413,11 @@ class OWImageGrid(widget.OWWidget):
                 create_groups_table(self.image_grid.image_list, self.selection, False, "Group"))
 
             # filter out empty cells - keep only indices of cells that contain images
-            nonempty = [i for i in range(len(self.items)) if self.items[i].url is not None]
-
             # add Selected column (Yes/No if one group, else Unselected or group number)
             if self.selection is not None and np.max(self.selection) > 1:
-                out_data = create_groups_table(self.image_grid.image_list[nonempty], self.selection[nonempty])
+                out_data = create_groups_table(self.image_grid.image_list[self.nonempty], self.selection[self.nonempty])
             else:
-                out_data = create_annotated_table(self.image_grid.image_list[nonempty], self.selection[nonempty])
+                out_data = create_annotated_table(self.image_grid.image_list[self.nonempty], self.selection[self.nonempty])
             self.Outputs.data.send(out_data)
 
         else:
@@ -434,10 +429,10 @@ class OWImageGrid(widget.OWWidget):
             pen, brush = self.compute_colors()
 
             for s, item, p, b in zip(self.selection, self.items, pen, brush):
-                if s:
-                    item.widget.setSelectionColor(p, b)
-                    item.widget.setSelected(True)
+                item.widget.setSelected(s > 0)
+                item.widget.setSelectionColor(p, b)
 
+    # Adapted from Scatter Plot Graph (change brush instead of pen)
     def compute_colors(self):
         no_brush = DEFAULT_SELECTION_BRUSH
         sels = np.max(self.selection)
@@ -649,6 +644,7 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
     def setSelectionColor(self, pen, brush):
         self.selectionPen = pen
         self.selectionBrush = brush
+        self.update()
 
     def pixmap(self):
         return self.pixmapWidget.pixmap()
@@ -1041,16 +1037,6 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         assert newcurrent is self.__thumbnails[index]
 
         if newcurrent is not None:
-            # TODO check if it is possible to implement this
-            # Leaving this commented for now - the selection works differently
-            """
-            if not modifiers & (Qt.ShiftModifier | Qt.ControlModifier):
-                for item in self.__thumbnails:
-                    if item is not newcurrent:
-                        item.setSelected(False)
-
-            newcurrent.setSelected(True)
-            """
             newcurrent.setFocus(Qt.TabFocusReason)
             newcurrent.ensureVisible()
 
@@ -1233,6 +1219,7 @@ class GraphicsScene(QGraphicsScene):
         QGraphicsScene.__init__(self, *args)
         self.selectionRect = None
 
+    # TODO figure out how to keep items highlighted and prevent redrawing during selection without disabling this method
     def mousePressEvent(self, event):
         QGraphicsScene.mousePressEvent(self, event)
 
@@ -1244,24 +1231,27 @@ class GraphicsScene(QGraphicsScene):
                 self.updateSelectionRect(event)
         QGraphicsScene.mouseMoveEvent(self, event)
 
-    # TODO fix clicking (loading? + ctrl, shift...)
     def mouseReleaseEvent(self, event):
+        QGraphicsScene.mouseReleaseEvent(self, event)
+
         if event.button() == Qt.LeftButton:
             modifiers = event.modifiers()
+            path = QPainterPath()
 
+            # the mouse was moved
             if self.selectionRect:
-                path = QPainterPath()
                 path.addRect(self.selectionRect.rect())
-                self.setSelectionArea(path)
-
                 self.removeItem(self.selectionRect)
                 self.selectionRect = None
 
+            # the mouse was only clicked - create a selection area of 1x1 size
+            else:
+                rect = QRectF(event.buttonDownScenePos(Qt.LeftButton), QSizeF(1., 1.)).intersected(self.sceneRect())
+                path.addRect(rect)
+
+            self.setSelectionArea(path)
             self.selectionChanged.emit(set(self.selectedItems()), modifiers)
 
-        QGraphicsScene.mouseReleaseEvent(self, event)
-
-    # TODO keep displaying the outlines when selecting new items
     def updateSelectionRect(self, event):
         pos = event.scenePos()
         buttonDownPos = event.buttonDownScenePos(Qt.LeftButton)

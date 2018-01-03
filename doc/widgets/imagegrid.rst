@@ -22,7 +22,11 @@ Signals
 
 -  **Images**
 
-   Images from the dataset.
+   Images from the dataset with an additional column specifying if the image is selected or the group, if there are several.
+
+- **Selected Images**
+
+   Selected images with an additional column specifying the group.
 
 Description
 -----------

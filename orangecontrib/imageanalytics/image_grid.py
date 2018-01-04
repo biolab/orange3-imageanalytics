@@ -3,9 +3,14 @@ from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize
 from Orange.projection import MDS, PCA, TSNE
-from lap import lapjv
+
 from scipy.spatial.distance import cdist
 from scipy.stats import kurtosis
+
+try:
+    from lap import lapjv
+except ImportError:
+    raise RuntimeError("Image Grid: package lap not installed")
 
 
 class ImageGrid:

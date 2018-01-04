@@ -1,10 +1,17 @@
+import importlib
+import unittest
+
 from AnyQt.QtTest import QSignalSpy
 from Orange.data import Table
 from Orange.widgets.tests.base import WidgetTest
 
-from orangecontrib.imageanalytics.widgets.owimagegrid import OWImageGrid
+is_module_lap = importlib.util.find_spec("lap") is not None
+
+if is_module_lap:
+    from orangecontrib.imageanalytics.widgets.owimagegrid import OWImageGrid
 
 
+@unittest.skipIf(not is_module_lap, "Image Grid: Module lap is not installed.")
 class TestOWImageGrid(WidgetTest):
     @classmethod
     def setUpClass(cls):

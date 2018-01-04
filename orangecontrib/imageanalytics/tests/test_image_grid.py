@@ -1,11 +1,16 @@
+import importlib
 import logging
 import unittest
 
 from Orange.data import Table
 
-from orangecontrib.imageanalytics.image_grid import ImageGrid
+is_module_lap = importlib.util.find_spec("lap") is not None
+
+if is_module_lap:
+    from orangecontrib.imageanalytics.image_grid import ImageGrid
 
 
+@unittest.skipIf(not is_module_lap, "Image Grid: Module lap is not installed.")
 class ImageGridTest(unittest.TestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)

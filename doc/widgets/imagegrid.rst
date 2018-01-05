@@ -30,7 +30,7 @@ Description
 The **Image Grid** widget can display images from a dataset in a similarity grid - images with similar content are placed closer to each other. It can be used for image comparison, while looking for similarities or discrepancies between selected data instances (e.g. bacterial growth or bitmap representations of handwriting).
 
 .. figure:: images/ImageGrid-stamped.png
-   :width: 100%
+   :scale: 50%
 
 1. *Image Filename Attribute*: Attribute containing paths to images.
 2. *Image cell fit*: Resize scales the images to grid, while Crop crops them to squares.
@@ -49,4 +49,4 @@ We loaded the images with :doc:`Import Images <importimages>` and embedded them 
 Finally, we visualized the images in **Image Grid**. It is obvious that broccoli and cauliflower and much more alike than strawberry and banana.
 
 .. figure:: images/ImageGrid-Example.png
-   :width: 100%
+   :scale: 50%

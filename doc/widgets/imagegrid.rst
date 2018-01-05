@@ -1,7 +1,7 @@
 Image Grid
 ==========
 
-.. figure:: icons/ImageGrid.png
+.. figure:: icons/image-grid.png
 
 Displays images in a similarity grid.
 
@@ -48,7 +48,7 @@ Example
 
 **Image Grid** can be used to visualize similarity of images in a 2D projection. We have used 5 images of fruits and vegetables, namely orange, banana, strawberry, broccoli and cauliflower.
 
-We loaded the images with :doc:`Import Images <../importimages>` and embedded them with Inception v3 embedder in :doc:`Image Embedding <../imageembedding>`.
+We loaded the images with :doc:`Import Images <importimages>` and embedded them with Inception v3 embedder in :doc:`Image Embedding <imageembedding>`.
 
 Finally, we visualized the images in **Image Grid**. It is obvious that broccoli and cauliflower and much more alike than strawberry and banana.
 

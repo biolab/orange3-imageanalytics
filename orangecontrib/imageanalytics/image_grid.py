@@ -182,7 +182,7 @@ class ImageGrid:
         # Try to use lap if it is available - if not, use scipy's linear_sum_assignment.
         if importlib.util.find_spec("lap") is not None:
             res = lapjv(cost_matrix, extend_cost=True)
-            cost, grid_indices, assignments = res[0], res[1], res[2]
+            cost, grid_indices, assignments = res[0], res[1], grid[res[2]]
         else:
             row_indices, col_indices = linear_sum_assignment(cost_matrix)
             cost = cost_matrix[row_indices, col_indices].sum()

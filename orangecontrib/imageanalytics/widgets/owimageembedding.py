@@ -2,6 +2,7 @@ import logging
 import os.path
 import traceback
 from types import SimpleNamespace as namespace
+from urllib.parse import urlparse
 
 import numpy as np
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
@@ -206,7 +207,10 @@ class OWImageEmbedding(OWWidget):
 
         file_paths_mask = file_paths == file_paths_attr.Unknown
         file_paths_valid = file_paths[~file_paths_mask]
-        file_paths_valid = np.vectorize(os.path.join)(origin, file_paths_valid)
+        for i, a in enumerate(file_paths_valid):
+            urlparts = urlparse(a)
+            if urlparts.scheme not in ("http", "https", "ftp", "data"):
+                file_paths_valid[i] = os.path.join(origin, a)
 
         ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
         set_progress = qconcurrent.methodinvoke(

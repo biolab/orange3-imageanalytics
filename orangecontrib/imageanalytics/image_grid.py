@@ -1,11 +1,17 @@
+import importlib
+
 import numpy as np
 from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize
 from Orange.projection import MDS, PCA, TSNE
-from scipy.optimize import linear_sum_assignment
 from scipy.spatial.distance import cdist
 from scipy.stats import kurtosis
+
+try:
+    from lap import lapjv
+except ImportError:
+    from scipy.optimize import linear_sum_assignment
 
 
 class ImageGrid:
@@ -172,13 +178,20 @@ class ImageGrid:
         the algorithm works if we have less embeddings than there are grid cells (generalized LAP)
         -1 is returned if there is no matching embedding, i.e. no samples match the grid cell
         """
-        row_indices, col_indices = linear_sum_assignment(cost_matrix)
-        cost = cost_matrix[row_indices, col_indices].sum()
 
-        grid_indices = np.full((self.size_x * self.size_y), -1)
-        grid_indices[row_indices] = col_indices
+        # Try to use lap if it is available - if not, use scipy's linear_sum_assignment.
+        if importlib.util.find_spec("lap") is not None:
+            res = lapjv(cost_matrix, extend_cost=True)
+            cost, grid_indices, assignments = res[0], res[1], res[2]
+        else:
+            row_indices, col_indices = linear_sum_assignment(cost_matrix)
+            cost = cost_matrix[row_indices, col_indices].sum()
 
-        return cost, grid_indices, grid[row_indices]
+            grid_indices = np.full((self.size_x * self.size_y), -1)
+            grid_indices[row_indices] = col_indices
+            assignments = grid[row_indices]
+
+        return cost, grid_indices, assignments
 
     def _grid_indices_to_image_list(self, images):
         """

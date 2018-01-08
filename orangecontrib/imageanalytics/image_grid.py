@@ -1,15 +1,20 @@
+import importlib
+
 import numpy as np
 from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize
 from Orange.projection import MDS, PCA, TSNE
-from lap import lapjv
 from scipy.spatial.distance import cdist
 from scipy.stats import kurtosis
 
+try:
+    from lap import lapjv
+except ImportError:
+    from scipy.optimize import linear_sum_assignment
+
 
 class ImageGrid:
-
     def __init__(self, data):
         self.size_x, self.size_y = 0, 0
         self.cost, self.grid_indices, self.assignments, self.image_list = 0, [], [], []
@@ -25,7 +30,7 @@ class ImageGrid:
         """
         Process the data based on the provided grid size.
         If the desired grid size is not provided, it is calculated from the data.
-        
+
         This method is run every time the grid size changes.
 
         Parameters
@@ -71,7 +76,7 @@ class ImageGrid:
             The method to use (default MDS).
         use_cosine: bool
             Precompute cosine distances and pass them to MDS.
-        
+
         Returns
         -------
         array-like
@@ -99,7 +104,7 @@ class ImageGrid:
     def _get_grid_size(data, use_default_square=False):
         """
         Calculate the size of the grid.
-        
+
         Parameters
         ----------
         data: array-like
@@ -149,7 +154,7 @@ class ImageGrid:
         """
         Get the assignments of the 2D points to the regular grid by solving the linear assignment problem
         using the Jonker-Volgenant algorithm.
-        
+
         Parameters
         ----------
         data: np.ndarray
@@ -170,19 +175,29 @@ class ImageGrid:
 
         """
         calculate the linear assignment problem - find the assignments with minimal cost
-        extend_cost = True automatically extends cost_matrix to a square matrix by adding inf values
-        returns the cost and mapping indices (first grid->embeddings, then embeddings->grid)
-        the algorithm works if we have less embeddings than there are grid cells
+        the algorithm works if we have less embeddings than there are grid cells (generalized LAP)
         -1 is returned if there is no matching embedding, i.e. no samples match the grid cell
         """
-        res = lapjv(cost_matrix, extend_cost=True)
-        return res[0], res[1], np.array([grid[i] for i in res[2]])
+
+        # Try to use lap if it is available - if not, use scipy's linear_sum_assignment.
+        if importlib.util.find_spec("lap") is not None:
+            res = lapjv(cost_matrix, extend_cost=True)
+            cost, grid_indices, assignments = res[0], res[1], grid[res[2]]
+        else:
+            row_indices, col_indices = linear_sum_assignment(cost_matrix)
+            cost = cost_matrix[row_indices, col_indices].sum()
+
+            grid_indices = np.full((self.size_x * self.size_y), -1)
+            grid_indices[row_indices] = col_indices
+            assignments = grid[row_indices]
+
+        return cost, grid_indices, assignments
 
     def _grid_indices_to_image_list(self, images):
         """
         Return the image grid as a Table of images, ordered by rows. 
         If a grid cell does not contain an image, put None in its place.
-        
+
         Parameters
         ----------
         images: Orange.data.Table
@@ -213,5 +228,4 @@ class ImageGrid:
         array-like
             A list of the provided data in the grid, ordered by rows.
         """
-
         return [None if i == -1 else data[i] for i in self.grid_indices]

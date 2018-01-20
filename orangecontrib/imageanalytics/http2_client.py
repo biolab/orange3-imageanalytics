@@ -15,6 +15,7 @@ from hyper.http20.exceptions import StreamResetError
 
 import hyper.http20.stream
 from .hyper import stream as local_stream
+from ssl import SSLError
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class Http2Client(object):
         if self._server_connection:
             try:
                 self._server_connection.close()
-            except ConnectionError:
+            except (ConnectionError, SSLError):
                 log.error("Error when disconnecting from server", exc_info=True)
 
         self._server_connection = None

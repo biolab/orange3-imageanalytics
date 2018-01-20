@@ -215,7 +215,7 @@ class ImageEmbedder(Http2Client):
                     embeddings = self._send_to_server(
                         b_images, image_processed_callback, repeats_counter
                     )
-                except MaxNumberOfRequestsError:
+                except (MaxNumberOfRequestsError, BrokenPipeError):
                     # maximum number of http2 requests through a single
                     # connection is exceeded and a remote peer has closed
                     # the connection so establish a new connection and retry

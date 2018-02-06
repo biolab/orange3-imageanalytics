@@ -63,6 +63,13 @@ MODELS = {
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
         'order': 2
+    },
+    'openface': {
+        'name': 'openface',
+        'description': 'Face recognition model trained on FaceScrub and CASIA-WebFace datasets.',
+        'target_image_size': (256, 256),
+        'layers': ['penultimate'],
+        'order': 5
     }
 }
 

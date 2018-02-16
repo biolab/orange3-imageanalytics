@@ -2,7 +2,7 @@ import logging
 import os.path
 import traceback
 from types import SimpleNamespace as namespace
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 import numpy as np
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
@@ -10,7 +10,7 @@ from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtTest import QSignalSpy
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
-from Orange.data import Table, ContinuousVariable, Domain
+from Orange.data import Table
 from Orange.widgets.gui import hBox
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
@@ -201,6 +201,9 @@ class OWImageEmbedding(OWWidget):
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
         origin = file_paths_attr.attributes.get("origin", "")
+        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
+                origin[-1] != "/":
+            origin += "/"
 
         assert file_paths_attr.is_string
         assert file_paths.dtype == np.dtype('O')
@@ -210,7 +213,10 @@ class OWImageEmbedding(OWWidget):
         for i, a in enumerate(file_paths_valid):
             urlparts = urlparse(a)
             if urlparts.scheme not in ("http", "https", "ftp", "data"):
-                file_paths_valid[i] = os.path.join(origin, a)
+                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
+                    file_paths_valid[i] = urljoin(origin, a)
+                else:
+                    file_paths_valid[i] = os.path.join(origin, a)
 
         ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
         set_progress = qconcurrent.methodinvoke(

@@ -27,7 +27,7 @@ install:
     - pip install --only-binary numpy,scipy,scikit-learn numpy scipy scikit-learn
 
     - if [[ "${PYQT4}" == true ]]; then source $TRAVIS_BUILD_DIR/.travis/install_pyqt.sh; fi
-    - if [[ "${PYQT5}" == true ]]; then pip install PyQt5; fi
+    - if [[ "${PYQT5}" == true ]]; then pip install PyQt5!=5.10; fi
 
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .

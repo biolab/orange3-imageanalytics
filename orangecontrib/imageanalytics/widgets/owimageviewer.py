@@ -39,7 +39,8 @@ from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output
-
+from Orange.widgets.utils.annotated_data import (create_annotated_table,
+                                                 ANNOTATED_DATA_SIGNAL_NAME)
 
 from concurrent.futures import Future
 
@@ -870,6 +871,7 @@ class OWImageViewer(widget.OWWidget):
         data = Input("Data", Orange.data.Table)
 
     class Outputs:
+        selected_data = Output("Selected Images", Orange.data.Table)
         data = Output("Data", Orange.data.Table)
 
     settingsHandler = settings.DomainContextHandler()
@@ -985,6 +987,7 @@ class OWImageViewer(widget.OWWidget):
                 self.setupScene()
         else:
             self.info.setText("Waiting for input.\n")
+        self.commit()
 
     def clear(self):
         self.data = None
@@ -1126,8 +1129,11 @@ class OWImageViewer(widget.OWWidget):
                 selected = self.data[self.selectedIndices]
             else:
                 selected = None
-            self.Outputs.data.send(selected)
+            self.Outputs.selected_data.send(selected)
+            self.Outputs.data.send(create_annotated_table(
+                self.data, self.selectedIndices))
         else:
+            self.Outputs.selected_data.send(None)
             self.Outputs.data.send(None)
 
     def _noteCompleted(self, future):

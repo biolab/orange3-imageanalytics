@@ -20,6 +20,10 @@ Signals
 
    Images that come with the data.
 
+-  **Selected images**
+
+   Images selected in the widget.
+
 Description
 -----------
 

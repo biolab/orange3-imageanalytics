@@ -1249,6 +1249,12 @@ class ImageLoader(QObject):
             QNetworkRequest.PreferCache
         )
 
+        if QT_VERSION >= 0x50600:
+            request.setAttribute(
+                QNetworkRequest.FollowRedirectsAttribute, True
+            )
+            request.setMaximumRedirectsAllowed(5)
+
         # Future yielding a QNetworkReply when finished.
         reply = self._netmanager.get(request)
         future._reply = reply

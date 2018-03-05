@@ -9,17 +9,19 @@ import weakref
 import logging
 import enum
 import itertools
+import io
 from xml.sax.saxutils import escape
 from collections import namedtuple
 from functools import partial
 from itertools import zip_longest
+from typing import List, Optional
 
 import numpy
 
 from AnyQt.QtWidgets import (
     QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem,
     QGraphicsTextItem, QGraphicsRectItem, QGraphicsLinearLayout,
-    QGraphicsGridLayout, QSizePolicy, QApplication, QWidget, QLabel,
+    QGraphicsGridLayout, QSizePolicy, QApplication, QWidget,
     QStyle, QShortcut
 )
 from AnyQt.QtGui import (
@@ -27,11 +29,13 @@ from AnyQt.QtGui import (
 )
 from AnyQt.QtCore import (
     Qt, QObject, QEvent, QThread, QSize, QPoint, QRect,
-    QSizeF, QRectF, QPointF, QUrl, QDir, QMargins
+    QSizeF, QRectF, QPointF, QUrl, QDir, QMargins, QSettings,
+    QT_VERSION
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtNetwork import (
-    QNetworkAccessManager, QNetworkDiskCache, QNetworkRequest, QNetworkReply
+    QNetworkAccessManager, QNetworkDiskCache, QNetworkRequest, QNetworkReply,
+    QNetworkProxyFactory, QNetworkProxy, QNetworkProxyQuery
 )
 
 import Orange.data
@@ -1176,6 +1180,47 @@ class OWImageViewer(widget.OWWidget):
         self.clear()
 
 
+class ProxyFactory(QNetworkProxyFactory):
+    def queryProxy(self, query=QNetworkProxyQuery()):
+        query_url = query.url()
+        query_scheme = query_url.scheme().lower()
+        proxy = QNetworkProxy(QNetworkProxy.NoProxy)
+        settings = QSettings()
+        settings.beginGroup("network")
+        # TODO: Need also bypass proxy (no_proxy)
+        url = settings.value(
+            query_scheme + "-proxy", QUrl(), type=QUrl
+        )  # type: QUrl
+        if url.isValid():
+            proxy_scheme = url.scheme().lower()
+            if proxy_scheme in {"http", "https"} or \
+                    (proxy_scheme == "" and query_scheme in {"http", "https"}):
+                proxy_type = QNetworkProxy.HttpProxy
+                proxy_port = 8080
+            elif proxy_scheme in {"socks", "socks5"}:
+                proxy_type = QNetworkProxy.Socks5Proxy
+                proxy_port = 1080
+            else:
+                proxy_type = QNetworkProxy.NoProxy
+                proxy_port = 0
+
+            if proxy_type != QNetworkProxy.NoProxy:
+                proxy = QNetworkProxy(
+                    proxy_type, url.host(), url.port(proxy_port)
+                )
+                _log.debug("Proxy for '%s': '%s'",
+                           query_url.toString(), url.toString())
+            else:
+                proxy = QNetworkProxy(QNetworkProxy.NoProxy)
+                _log.debug("Proxy for '%s' - ignored")
+
+        if proxy.type() == QNetworkProxy.NoProxy:
+            proxies = self.systemProxyForQuery(query)
+        else:
+            proxies = [proxy]
+        return proxies
+
+
 class ImageLoader(QObject):
     #: A weakref to a QNetworkAccessManager used for image retrieval.
     #: (we can only have one QNetworkDiskCache opened on the same
@@ -1195,6 +1240,8 @@ class ImageLoader(QObject):
                              __name__ + ".ImageLoader.Cache")
             )
             netmanager.setCache(cache)
+            f = ProxyFactory()
+            netmanager.setProxyFactory(f)
             ImageLoader._NETMANAGER_REF = weakref.ref(netmanager)
         self._netmanager = netmanager
 
@@ -1207,6 +1254,12 @@ class ImageLoader(QObject):
             QNetworkRequest.CacheLoadControlAttribute,
             QNetworkRequest.PreferCache
         )
+
+        if QT_VERSION >= 0x50600:
+            request.setAttribute(
+                QNetworkRequest.FollowRedirectsAttribute, True
+            )
+            request.setMaximumRedirectsAllowed(5)
 
         # Future yielding a QNetworkReply when finished.
         reply = self._netmanager.get(request)
@@ -1221,6 +1274,7 @@ class ImageLoader(QObject):
         n_redir = 0
 
         def on_reply_ready(reply, future):
+            # type: (QNetworkReply, Future) -> None
             nonlocal n_redir
             # schedule deferred delete to ensure the reply is closed
             # otherwise we will leak file/socket descriptors
@@ -1231,6 +1285,16 @@ class ImageLoader(QObject):
                 reply.close()
                 future.cancel()
                 return
+
+            if _log.level <= logging.DEBUG:
+                s = io.StringIO()
+                print("\n", reply.url(), file=s)
+                if reply.attribute(QNetworkRequest.SourceIsFromCacheAttribute):
+                    print("  (served from cache)", file=s)
+                for name, val in reply.rawHeaderPairs():
+                    print(bytes(name).decode("latin-1"), ":",
+                          bytes(val).decode("latin-1"), file=s)
+                _log.debug(s.getvalue())
 
             if reply.error() != QNetworkReply.NoError:
                 # XXX Maybe convert the error into standard
@@ -1271,7 +1335,7 @@ class ImageLoader(QObject):
 
 def main(argv=sys.argv):
     import sip
-
+    logging.basicConfig(level=logging.DEBUG)
     app = QApplication(argv)
     argv = app.arguments()
     w = OWImageViewer()

@@ -12,8 +12,9 @@ from AnyQt.QtCore import QSettings
 import cachecontrol.caches
 import numpy as np
 import requests
+from scipy import sparse
 
-from Orange.data import ContinuousVariable, Domain, Table
+from Orange.data import ContinuousVariable, Domain, Table, util
 from Orange.misc.environ import cache_dir
 from PIL import ImageFile
 from PIL.Image import open as open_image, LANCZOS
@@ -425,7 +426,10 @@ class ImageEmbedder(Http2Client):
 
     @staticmethod
     def construct_output_data_table(embedded_images, embeddings):
-        X = np.hstack((embedded_images.X, embeddings))
+        if sparse.issparse(embedded_images.X):
+            X = util.hstack((embedded_images.X, embeddings))
+        else:
+            X = util.hstack((embedded_images.X, embeddings))
         Y = embedded_images.Y
 
         attributes = [ContinuousVariable.make('n{:d}'.format(d))

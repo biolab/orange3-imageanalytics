@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import numpy as np
 from h2.exceptions import TooManyStreamsError
-from hyper.http20.exceptions import StreamResetError
+from hypertemp.http20.exceptions import StreamResetError
 from numpy.testing import assert_array_equal
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder

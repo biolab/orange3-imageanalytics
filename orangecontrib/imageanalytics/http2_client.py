@@ -10,8 +10,8 @@ from os import getenv
 from socket import gaierror, timeout
 
 from h2.exceptions import ProtocolError
-from hyper import HTTP20Connection
-from hyper.http20.exceptions import StreamResetError
+from hypertemp import HTTP20Connection
+from hypertemp.http20.exceptions import StreamResetError
 
 from ssl import SSLError
 

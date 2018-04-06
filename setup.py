@@ -13,8 +13,8 @@ with io.open('about.md', 'r', encoding='utf-8') as f:
 NAME = 'Orange3-ImageAnalytics'
 
 MAJOR = 0
-MINOR = 1
-MICRO = 17
+MINOR = 2
+MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 
 AUTHOR = 'Bioinformatics Laboratory, FRI UL'

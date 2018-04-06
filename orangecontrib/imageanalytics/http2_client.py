@@ -13,16 +13,9 @@ from h2.exceptions import ProtocolError
 from hyper import HTTP20Connection
 from hyper.http20.exceptions import StreamResetError
 
-import hyper.http20.stream
-from .hyper import stream as local_stream
 from ssl import SSLError
 
 log = logging.getLogger(__name__)
-
-if hyper.__version__ < '0.7.1':  # TODO: remove when version > 0.7.0
-    hyper.http20.stream.Stream.send_data = local_stream.Stream.send_data
-    hyper.http20.stream.Stream._send_chunk = local_stream.Stream._send_chunk
-
 
 class MaxNumberOfRequestsError(Exception):
     """Thrown when remote peer closes the connection because

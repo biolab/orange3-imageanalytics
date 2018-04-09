@@ -1,24 +1,14 @@
-#!/usr/bin/env bash
+if [ $ORANGE == "release" ]; then
+    echo "Orange: Skipping separate Orange install"
+    return 0
+fi
 
-cd $TRAVIS_BUILD_DIR/orange
-# clone orange from git
+if [ $ORANGE == "master" ]; then
+    echo "Orange: from git master"
+    pip install https://github.com/biolab/orange3/archive/master.zip
+    return $?;
+fi
 
-rm -f -R orange3 # remove if exist
-git clone https://github.com/biolab/orange3.git
-
-cd orange3
-
-# install requirements
-pip install numpy
-pip install scipy
-pip install -r requirements-core.txt  # For Orange Python library
-pip install -r requirements-gui.txt   # For Orange GUI
-
-pip install -r requirements-sql.txt   # To use SQL support
-
-
-# install orange
-pip install -e .
-
-# go back to add-on dir
-cd $TRAVIS_BUILD_DIR
+PACKAGE="orange3==$ORANGE"
+echo "Orange: installing version $PACKAGE"
+pip install $PACKAGE

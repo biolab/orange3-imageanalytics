@@ -1,7 +1,7 @@
 # change when release >0.7.0 of hyper will be available
 hypertemp
 numpy>=1.10.0
-Orange3>=3.3.5
+Orange3>=3.6.0
 Pillow>=4.2.1
 requests
 cachecontrol

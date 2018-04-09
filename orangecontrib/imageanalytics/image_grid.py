@@ -187,7 +187,7 @@ class ImageGrid:
             row_indices, col_indices = linear_sum_assignment(cost_matrix)
             cost = cost_matrix[row_indices, col_indices].sum()
 
-            grid_indices = np.full((self.size_x * self.size_y), -1)
+            grid_indices = np.full((self.size_x * self.size_y), -1, dtype=np.int32)
             grid_indices[row_indices] = col_indices
             assignments = grid[row_indices]
 

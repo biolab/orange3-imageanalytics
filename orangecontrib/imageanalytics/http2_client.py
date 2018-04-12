@@ -1,4 +1,6 @@
 import json
+from urllib.parse import urlparse
+
 try:
     from json.decoder import JSONDecodeError
 except ImportError:
@@ -6,7 +8,7 @@ except ImportError:
     JSONDecodeError = ValueError
 import logging
 import sys
-from os import getenv
+from os import getenv, environ
 from socket import gaierror, timeout
 
 from h2.exceptions import ProtocolError
@@ -49,7 +51,17 @@ class Http2Client(object):
         self._max_concurrent_streams = None
 
     def _connect_to_server(self):
-        return HTTP20Connection(host=self._server_url, force_proto='h2')
+        host = port = proxy = None
+        if "http_proxy" in environ:
+            proxy = environ["http_proxy"]
+        elif "https_proxy" in environ:
+            proxy = environ["https_proxy"]
+        if proxy is not None:
+            url = urlparse(proxy)
+            host = url.hostname
+            port = url.port
+        return HTTP20Connection(host=self._server_url, force_proto='h2',
+                                proxy_host=host, proxy_port=port)
 
     def _read_max_concurrent_streams(self):
         if not self._server_ping_successful():

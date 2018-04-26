@@ -933,6 +933,8 @@ class OWImageViewer(widget.OWWidget):
             addSpace=True
         )
 
+        self.titleAttrCB.setStyleSheet("combobox-popup: 0;")
+
         gui.hSlider(
             self.controlArea, self, "imageSize",
             box="Image Size", minValue=32, maxValue=1024, step=16,

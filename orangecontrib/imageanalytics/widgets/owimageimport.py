@@ -600,6 +600,8 @@ class OWImportImages(widget.OWWidget):
             if len(urls) == 1:
                 url = urls[0]
                 path = url.toLocalFile()
+                if path.endswith("/"):
+                    path = path[:-1]  # remove last /
                 if os.path.isdir(path):
                     return path
             return None

@@ -387,9 +387,10 @@ class ImageEmbedder(Http2Client):
 
             try:
                 response = self._get_json_response_or_none(stream_id)
-            except ConnectionError:
+            except (ConnectionError, MaxNumberOfRequestsError):
                 self.persist_cache()
-                raise
+                self.reconnect_to_server()
+                return embeddings
 
             if not response or 'embedding' not in response:
                 # returned response is not a valid json response

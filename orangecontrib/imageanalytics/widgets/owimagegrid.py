@@ -440,7 +440,7 @@ class OWImageGrid(widget.OWWidget):
             brushes = [no_brush, no_brush]
         else:
             palette = ColorPaletteGenerator(number_of_colors=sels + 1)
-            brushes = [no_brush] + [QBrush(palette[i + 1]) for i in range(sels)]
+            brushes = [no_brush] + [QBrush(palette[i]) for i in range(sels)]
         brush = [brushes[a] for a in self.selection]
 
         pen = [DEFAULT_SELECTION_PEN] * len(self.items)

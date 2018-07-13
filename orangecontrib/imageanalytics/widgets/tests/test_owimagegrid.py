@@ -1,8 +1,9 @@
 from AnyQt.QtTest import QSignalSpy
-from Orange.data import Table
+from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.imageanalytics.widgets.owimagegrid import OWImageGrid
+import numpy as np
 
 
 class TestOWImageGrid(WidgetTest):
@@ -12,6 +13,18 @@ class TestOWImageGrid(WidgetTest):
 
         cls.signal_name = "Embeddings"
         cls.signal_data = Table("iris")
+
+        cls.zoo = Table("zoo-with-images.tab")
+
+        domain = Domain([
+            ContinuousVariable("emb1"), ContinuousVariable("emb2"),
+            ContinuousVariable("emb3")],
+            cls.zoo.domain.class_vars,
+            cls.zoo.domain.metas
+        )
+        data = np.random.random((len(cls.zoo), 3))
+        cls.fake_embeddings = Table(domain, data, cls.zoo.Y,
+                                    metas=cls.zoo.metas)
 
     def setUp(self):
         self.widget = self.create_widget(OWImageGrid)
@@ -59,3 +72,22 @@ class TestOWImageGrid(WidgetTest):
     def test_different_subset_data(self):
         self.send_signal("Embeddings", Table("iris"))
         self.send_signal("Data Subset", Table("zoo-with-images"))
+
+    def test_selection(self):
+        w = self.widget
+
+        self.send_signal("Embeddings", self.fake_embeddings[:12])
+
+        # all image spaces are full
+        w.colSpinner.setValue(4)
+        w.rowSpinner.setValue(3)
+
+        # TODO: try to select with clicking
+        w.on_selection_changed(
+            [w.items[0].widget, w.items[3].widget, w.items[4].widget], True)
+
+        im_out = self.get_output("Images")
+        self.assertEqual(sum(im_out.metas[:, 2]), 3)  # 3 selected elements
+
+        sel_out = self.get_output("Selected Images")
+        self.assertEqual(len(sel_out), 3)

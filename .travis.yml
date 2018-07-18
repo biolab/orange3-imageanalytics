@@ -6,10 +6,10 @@ dist: trusty
 matrix:
   include:
     - python: '3.4'
-      env: PYQT4=true ORANGE="3.6.0"
+      env: PYQT4=true ORANGE="3.7.0"
 
     - python: '3.5'
-      env: PYQT5=true ORANGE="3.6.0"
+      env: PYQT5=true ORANGE="3.7.0"
 
     - python: '3.5'
       env: PYQT5=true ORANGE="release"

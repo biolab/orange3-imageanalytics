@@ -57,8 +57,9 @@ class OWImageGrid(widget.OWWidget):
         data_subset = Input("Data Subset", Orange.data.Table)
 
     class Outputs:
+        selected_data = Output(
+            "Selected Images", Orange.data.Table, default=True)
         data = Output("Images", Orange.data.Table)
-        selected_data = Output("Selected Images", Orange.data.Table)
 
     settingsHandler = settings.DomainContextHandler()
 
@@ -410,14 +411,20 @@ class OWImageGrid(widget.OWWidget):
         if self.data:
             # add Group column (group number)
             self.Outputs.selected_data.send(
-                create_groups_table(self.image_grid.image_list, self.selection, False, "Group"))
+                create_groups_table(self.image_grid.image_list, self.selection,
+                                    False, "Group"))
 
-            # filter out empty cells - keep only indices of cells that contain images
-            # add Selected column (Yes/No if one group, else Unselected or group number)
+            # filter out empty cells - keep indices of cells that contain images
+            # add Selected column
+            # (Yes/No if one group, else Unselected or group number)
             if self.selection is not None and np.max(self.selection) > 1:
-                out_data = create_groups_table(self.image_grid.image_list[self.nonempty], self.selection[self.nonempty])
+                out_data = create_groups_table(
+                    self.image_grid.image_list[self.nonempty],
+                    self.selection[self.nonempty])
             else:
-                out_data = create_annotated_table(self.image_grid.image_list[self.nonempty], self.selection[self.nonempty])
+                out_data = create_annotated_table(
+                    self.image_grid.image_list[self.nonempty],
+                    np.nonzero(self.selection[self.nonempty]))
             self.Outputs.data.send(out_data)
 
         else:

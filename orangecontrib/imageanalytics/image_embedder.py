@@ -12,7 +12,6 @@ from AnyQt.QtCore import QSettings
 import cachecontrol.caches
 import numpy as np
 import requests
-from scipy import sparse
 
 from Orange.data import ContinuousVariable, Domain, Table, util
 from Orange.misc.environ import cache_dir

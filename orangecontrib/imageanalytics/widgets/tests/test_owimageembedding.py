@@ -34,14 +34,14 @@ class TestOWImageEmbedding(WidgetTest):
         GH-46
         """
         table = Table("iris")[:0]
-        self.send_signal("Images", table)
-        self.send_signal("Images", None)
+        self.send_signal(self.widget.Inputs.images, table)
+        self.send_signal(self.widget.Inputs.images, None)
 
     def test_data_corpus(self):
         table = DummyCorpus("zoo-with-images")[::3]
 
-        self.send_signal("Images", table)
-        results = self.get_output("Embeddings")
+        self.send_signal(self.widget.Inputs.images, table)
+        results = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertEqual(type(results), DummyCorpus)  # check if outputs type
         self.assertEqual(len(results), len(table))
@@ -49,8 +49,8 @@ class TestOWImageEmbedding(WidgetTest):
     def test_data_regular_table(self):
         table = Table("zoo-with-images")[::3]
 
-        self.send_signal("Images", table)
-        results = self.get_output("Embeddings")
+        self.send_signal(self.widget.Inputs.images, table)
+        results = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertEqual(type(results), Table)  # check if output right type
 

@@ -427,23 +427,20 @@ class ImageEmbedder(Http2Client):
 
     @staticmethod
     def construct_output_data_table(embedded_images, embeddings):
-        if sparse.issparse(embedded_images.X):
-            X = util.hstack((embedded_images.X, embeddings))
-        else:
-            X = util.hstack((embedded_images.X, embeddings))
-        Y = embedded_images.Y
+        # X = util.hstack((embedded_images.X, embeddings))
+        # embedded_images.X = X
 
-        attributes = [ContinuousVariable.make('n{:d}'.format(d))
+        new_attributes = [ContinuousVariable.make('n{:d}'.format(d))
                       for d in range(embeddings.shape[1])]
-        attributes = list(embedded_images.domain.attributes) + attributes
 
-        domain = Domain(
-            attributes=attributes,
-            class_vars=embedded_images.domain.class_vars,
-            metas=embedded_images.domain.metas
-        )
 
-        return Table(domain, X, Y, embedded_images.metas)
+        domain_new = Domain(list(embedded_images.domain.attributes) + new_attributes,
+                        embedded_images.domain.class_vars,
+                        embedded_images.domain.metas)
+        table = embedded_images.transform(domain_new)
+        table[:, new_attributes] = embeddings
+
+        return table
 
     @staticmethod
     def prepare_output_data(input_data, embeddings):

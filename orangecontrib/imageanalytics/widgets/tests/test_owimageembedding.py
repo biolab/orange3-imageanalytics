@@ -1,15 +1,7 @@
-import os
-import tempfile
-import unittest
-
-from AnyQt.QtCore import Qt, QUrl, QMimeData
-from AnyQt.QtGui import QDropEvent, QDragEnterEvent
-from AnyQt.QtWidgets import QApplication
-from AnyQt.QtTest import QTest, QSignalSpy
-
-from Orange.data import Table, Domain
-from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin
-from orangecontrib.imageanalytics.widgets.owimageembedding import OWImageEmbedding
+from Orange.data import Table
+from Orange.widgets.tests.base import WidgetTest
+from orangecontrib.imageanalytics.widgets.owimageembedding \
+    import OWImageEmbedding
 
 
 class DummyCorpus(Table):
@@ -51,7 +43,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal("Images", table)
         results = self.get_output("Embeddings")
 
-        self.assertEqual(type(results), DummyCorpus)  # check if output right type
+        self.assertEqual(type(results), DummyCorpus)  # check if outputs type
         self.assertEqual(len(results), len(table))
 
     def test_data_regular_table(self):

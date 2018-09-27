@@ -292,7 +292,8 @@ class OWImageEmbedding(OWWidget):
             return
         except Exception as err:
             self._log.exception("Error", exc_info=True)
-            self.error("\n".join(traceback.format_exception_only(type(err), err)))
+            self.error(
+                "\n".join(traceback.format_exception_only(type(err), err)))
             self.send(_Output.EMBEDDINGS, None)
             self.send(_Output.SKIPPED_IMAGES, None)
             return

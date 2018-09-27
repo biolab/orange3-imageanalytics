@@ -448,8 +448,7 @@ class ImageEmbedder(Http2Client):
 
         if np.any(skipped_images_bool):
             skipped_images = input_data[skipped_images_bool]
-            skipped_images = Table(skipped_images)
-            skipped_images.ids = input_data.ids[skipped_images_bool]
+            skipped_images = skipped_images.copy()
             num_skipped = len(skipped_images)
         else:
             num_skipped = 0

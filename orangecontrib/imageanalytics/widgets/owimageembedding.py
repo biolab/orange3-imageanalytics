@@ -16,19 +16,11 @@ from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils import concurrent as qconcurrent
 from Orange.widgets.utils.itemmodels import VariableListModel
-from Orange.widgets.widget import OWWidget, Default
+from Orange.widgets.widget import Input, Output
+from Orange.widgets.widget import OWWidget
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 from orangecontrib.imageanalytics.image_embedder import MODELS as EMBEDDERS_INFO
-
-
-class _Input:
-    IMAGES = 'Images'
-
-
-class _Output:
-    EMBEDDINGS = 'Embeddings'
-    SKIPPED_IMAGES = 'Skipped Images'
 
 
 class OWImageEmbedding(OWWidget):
@@ -40,11 +32,12 @@ class OWImageEmbedding(OWWidget):
     want_main_area = False
     _auto_apply = Setting(default=True)
 
-    inputs = [(_Input.IMAGES, Table, 'set_data')]
-    outputs = [
-        (_Output.EMBEDDINGS, Table, Default),
-        (_Output.SKIPPED_IMAGES, Table)
-    ]
+    class Inputs:
+        images = Input('Images', Table)
+
+    class Outputs:
+        embeddings = Output('Embeddings', Table, default=True)
+        skipped_images = Output('Skipped Images', Table)
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
@@ -132,11 +125,12 @@ class OWImageEmbedding(OWWidget):
             self._image_embedder.is_connected_to_server()
         )
 
+    @Inputs.images
     def set_data(self, data):
         if not data:
             self._input_data = None
-            self.send(_Output.EMBEDDINGS, None)
-            self.send(_Output.SKIPPED_IMAGES, None)
+            self.Outputs.embeddings.send(None)
+            self.Outputs.skipped_images.send(None)
             self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
             return
 
@@ -189,8 +183,8 @@ class OWImageEmbedding(OWWidget):
             return
 
         if not self._image_attributes or self._input_data is None:
-            self.send(_Output.EMBEDDINGS, None)
-            self.send(_Output.SKIPPED_IMAGES, None)
+            self.Outputs.embeddings.send(None)
+            self.Outputs.skipped_images.send(None)
             return
 
         self._set_server_info(connected=True)
@@ -286,15 +280,16 @@ class OWImageEmbedding(OWWidget):
             embeddings = f.result()
         except ConnectionError:
             self._log.exception("Error", exc_info=True)
-            self.send(_Output.EMBEDDINGS, None)
-            self.send(_Output.SKIPPED_IMAGES, None)
+            self.Outputs.embeddings.send(None)
+            self.Outputs.skipped_images.send(None)
             self._set_server_info(connected=False)
             return
         except Exception as err:
             self._log.exception("Error", exc_info=True)
-            self.error("\n".join(traceback.format_exception_only(type(err), err)))
-            self.send(_Output.EMBEDDINGS, None)
-            self.send(_Output.SKIPPED_IMAGES, None)
+            self.error(
+                "\n".join(traceback.format_exception_only(type(err), err)))
+            self.Outputs.embeddings.send(None)
+            self.Outputs.skipped_images.send(None)
             return
 
         assert self._input_data is not None
@@ -312,8 +307,8 @@ class OWImageEmbedding(OWWidget):
     def _send_output_signals(self, embeddings):
         embedded_images, skipped_images, num_skipped =\
             ImageEmbedder.prepare_output_data(self._input_data, embeddings)
-        self.send(_Output.SKIPPED_IMAGES, skipped_images)
-        self.send(_Output.EMBEDDINGS, embedded_images)
+        self.Outputs.embeddings.send(embedded_images)
+        self.Outputs.skipped_images.send(skipped_images)
         if num_skipped is not 0:
             self.input_data_info.setText(
                 "Data with {:d} instances, {:d} images skipped.".format(

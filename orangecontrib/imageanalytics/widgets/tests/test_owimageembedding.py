@@ -1,15 +1,11 @@
-import os
-import tempfile
-import unittest
-
-from AnyQt.QtCore import Qt, QUrl, QMimeData
-from AnyQt.QtGui import QDropEvent, QDragEnterEvent
-from AnyQt.QtWidgets import QApplication
-from AnyQt.QtTest import QTest, QSignalSpy
-
 from Orange.data import Table
-from Orange.widgets.tests.base import WidgetTest, WidgetOutputsTestMixin
-from orangecontrib.imageanalytics.widgets.owimageembedding import OWImageEmbedding
+from Orange.widgets.tests.base import WidgetTest
+from orangecontrib.imageanalytics.widgets.owimageembedding \
+    import OWImageEmbedding
+
+
+class DummyCorpus(Table):
+    pass
 
 
 class TestOWImageEmbedding(WidgetTest):
@@ -38,5 +34,44 @@ class TestOWImageEmbedding(WidgetTest):
         GH-46
         """
         table = Table("iris")[:0]
-        self.send_signal("Images", table)
-        self.send_signal("Images", None)
+        self.send_signal(self.widget.Inputs.images, table)
+        self.send_signal(self.widget.Inputs.images, None)
+
+    def test_data_corpus(self):
+        table = DummyCorpus("zoo-with-images")[::3]
+
+        self.send_signal(self.widget.Inputs.images, table)
+        results = self.get_output(self.widget.Outputs.embeddings)
+
+        self.assertEqual(type(results), DummyCorpus)  # check if outputs type
+        self.assertEqual(len(results), len(table))
+
+    def test_data_regular_table(self):
+        table = Table("zoo-with-images")[::3]
+
+        self.send_signal(self.widget.Inputs.images, table)
+        results = self.get_output(self.widget.Outputs.embeddings)
+
+        self.assertEqual(type(results), Table)  # check if output right type
+
+        # true for zoo since no images are skipped
+        self.assertEqual(len(results), len(table))
+
+    def test_skipped_images(self):
+        table = DummyCorpus("zoo-with-images")[::3]
+
+        self.send_signal(self.widget.Inputs.images, table)
+        results = self.get_output(self.widget.Outputs.skipped_images)
+
+        # in case of zoo where all images are present
+        self.assertEqual(results, None)
+
+        # all skipped
+        table[:, "images"] = "http://www.none.com/image.jpg"
+
+        self.send_signal(self.widget.Inputs.images, table)
+        skipped = self.get_output(self.widget.Outputs.skipped_images)
+
+        self.assertEqual(type(skipped), DummyCorpus)
+        self.assertEqual(len(skipped), len(table))
+

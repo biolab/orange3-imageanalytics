@@ -231,6 +231,8 @@ class OWImportImages(widget.OWWidget):
                 recent_paths.append(item)
         recent_paths = recent_paths[:OWImportImages.MaxRecentItems]
         recent_model = self.recent_cb.model()
+        recent_model.clear()
+
         for pathitem in recent_paths:
             item = RecentPath_asqstandarditem(pathitem)
             recent_model.appendRow(item)
@@ -382,6 +384,12 @@ class OWImportImages(widget.OWWidget):
 
         return success
 
+    def _search_paths(self):
+        basedir = self.workflowEnv().get("basedir", None)
+        if basedir is None:
+            return []
+        return [("basedir", basedir)]
+
     def addRecentPath(self, path):
         """
         Prepend a path entry to the list of recent paths
@@ -413,7 +421,7 @@ class OWImportImages(widget.OWWidget):
             self.recent_paths.insert(0, existing)
             model.insertRow(0, row)
         else:
-            item = RecentPath(path, None, None)
+            item = RecentPath.create(path, self._search_paths())
             self.recent_paths.insert(0, item)
             model.insertRow(0, RecentPath_asqstandarditem(item))
         return 0
@@ -622,6 +630,31 @@ class OWImportImages(widget.OWWidget):
             return True
 
         return super().eventFilter(receiver, event)
+
+    def _relocate_recent_files(self):
+        search_paths = self._search_paths()
+        rec = []
+        for recent in self.recent_paths:
+            kwargs = dict(
+                title=recent.title, sheet=recent.sheet,
+                file_format=recent.file_format)
+            resolved = recent.resolve(search_paths)
+            if resolved is not None:
+                rec.append(
+                    RecentPath.create(resolved.abspath, search_paths, **kwargs))
+            else:
+                rec.append(recent)
+        # change the list in-place for the case the widgets wraps this list
+        self.recent_paths[:] = rec
+
+    def workflowEnvChanged(self, key, value, oldvalue):
+        """
+        Function called when environment changes (e.g. while saving the scheme)
+        It make sure that all environment connected values are modified
+        (e.g. relative file paths are changed)
+        """
+        self._relocate_recent_files()
+        self.__initRecentItemsModel()
 
 
 class UserInterruptError(BaseException):

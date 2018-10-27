@@ -76,6 +76,7 @@ class TestOWImageImport(unittest.TestCase):
             assert QApplication.sendEvent(widget.recent_cb, ev)
             self.assertTrue(ev.isAccepted())
             del ev
-            self.assertEqual(widget.currentPath, urlpath.toLocalFile())
+            self.assertEqual(widget.recent_paths[0].abspath,
+                             urlpath.toLocalFile())
             self._startandwait(widget)
             self.widget.commit()

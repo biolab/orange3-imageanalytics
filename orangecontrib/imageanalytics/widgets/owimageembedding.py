@@ -318,8 +318,10 @@ class OWImageEmbedding(OWWidget):
         self.clear_messages()
         if connected:
             self.connection_info.setText("Connected to server.")
+        elif self._image_embedder.is_local_embedder():
+            self.connection_info.setText("Using local embedder.")
         else:
-            self.connection_info.setText("No connection with server.")
+            self.connection_info.setText("Not connected to server.")
             self.warning("Click Apply to try again.")
 
     def onDeleteWidget(self):

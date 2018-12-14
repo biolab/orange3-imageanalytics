@@ -24,6 +24,8 @@ cache:
         - $TRAVIS_BUILD_DIR/pyqt
 
 before_install:
+    - sudo apt-get install libtcmalloc-minimal4
+    - export LD_PRELOAD="/usr/lib/libtcmalloc_minimal.so.4"
     - pip install -U pip wheel setuptools
     - pip install codecov
 

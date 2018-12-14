@@ -50,10 +50,10 @@ MODELS = {
         'layers': ['penultimate'],
         'order': 5
     },
-    'sqeezenet': {
+    'squeezenet': {
         'name': 'SqueezeNet',
-        'description': 'Deep model for image recognition that achieves '
-                       'AlexNet-level accuracy on ImageNet with '
+        'description': 'Deep model for image recognition that achieves \n'
+                       'AlexNet-level accuracy on ImageNet with \n'
                        '50x fewer parameters.',
         'target_image_size': (227, 227),
         'layers': ['penultimate'],
@@ -194,3 +194,14 @@ class ImageEmbedder:
             return self._embedder.is_connected_to_server()
         else:
             return False
+
+    def clear_cache(self):
+        self._embedder._cache.clear_cache()
+
+    def reconnect_to_server(self):
+        if not self.is_local_embedder():
+            return self._embedder.reconnect_to_server()
+        return False
+
+    def set_canceled(self, canceled):
+        self._embedder.cancelled = canceled

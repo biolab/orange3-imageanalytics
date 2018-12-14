@@ -1,20 +1,20 @@
 import time
+from os.path import join
 
 import tensorflow as tf
 import numpy as np
 import logging
 import requests
-
-from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
-    EmbedderCache
-
 import cachecontrol.caches
-from os.path import join
 
 from Orange.misc.environ import cache_dir
-from orangecontrib.imageanalytics.utils.embedder_utils import EmbeddingCancelledException
+from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
+    EmbedderCache
+from orangecontrib.imageanalytics.utils.embedder_utils import \
+    EmbeddingCancelledException
 
 log = logging.getLogger(__name__)
+
 
 class LocalEmbedder:
 
@@ -36,9 +36,12 @@ class LocalEmbedder:
                 join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
         )
         self.tf_session = tf.Session(graph=self.tf_graph)
-        self.output_t = self.tf_session.graph.get_tensor_by_name("avg_pool:0")
-        self.input_t = self.tf_session.graph.get_tensor_by_name("image_placeholder:0")
-        self.keep_prob = self.tf_session.graph.get_tensor_by_name("Placeholder:0")
+        self.output_t = self.tf_session.graph.get_tensor_by_name(
+            "avg_pool:0")
+        self.input_t = self.tf_session.graph.get_tensor_by_name(
+            "image_placeholder:0")
+        self.keep_prob = self.tf_session.graph.get_tensor_by_name(
+            "Placeholder:0")
 
         self.cancelled = False
 
@@ -73,7 +76,8 @@ class LocalEmbedder:
         if self.cancelled:
             raise EmbeddingCancelledException()
 
-        image = self._image_loader.load_image_or_none(file_path, self._target_image_size)
+        image = self._image_loader.load_image_or_none(
+            file_path, self._target_image_size)
         image = self._image_loader.preprocess_squeezenet(image)
 
         cache_key = self._cache.md5_hash(image)

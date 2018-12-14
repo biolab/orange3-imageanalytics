@@ -3,7 +3,7 @@ import hashlib
 import pickle
 import ftplib
 from io import BytesIO
-from os.path import join
+from os.path import join, isfile
 
 import cachecontrol.caches
 import requests
@@ -63,7 +63,6 @@ class ImageLoader:
         image_bytes_io.close()
         return image_bytes
 
-
     def _load_image_from_url_or_local_path(self, file_path):
         urlparts = urlparse(file_path)
         if urlparts.scheme in ('http', 'https'):
@@ -100,17 +99,56 @@ class ImageLoader:
         return img_out - mean_pixel
 
 
-def save_pickle(obj, file_name):
-    with open(file_name, 'wb') as f:
-        pickle.dump(obj, f)
+class EmbedderCache:
 
+    _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
 
-def load_pickle(file_name):
-    with open(file_name, 'rb') as f:
-        return pickle.load(f)
+    def __init__(self, model, layer):
+        # init the cache
 
+        cache_file_path = self._cache_file_blueprint.format(model, layer)
+        self._cache_file_path = join(cache_dir(), cache_file_path)
+        self._cache_dict = self._init_cache()
+        print(self._cache_file_path)
 
-def md5_hash(bytes_):
-    md5 = hashlib.md5()
-    md5.update(bytes_)
-    return md5.hexdigest()
+    def _init_cache(self):
+        if isfile(self._cache_file_path):
+            try:
+                return self.load_pickle(self._cache_file_path)
+            except EOFError:
+                return {}
+        return {}
+
+    @staticmethod
+    def save_pickle(obj, file_name):
+        with open(file_name, 'wb') as f:
+            pickle.dump(obj, f)
+
+    @staticmethod
+    def load_pickle(file_name):
+        with open(file_name, 'rb') as f:
+            return pickle.load(f)
+
+    @staticmethod
+    def md5_hash(bytes_):
+        md5 = hashlib.md5()
+        md5.update(bytes_)
+        return md5.hexdigest()
+
+    def clear_cache(self):
+        self._cache_dict = {}
+        self.persist_cache()
+
+    def persist_cache(self):
+        self.save_pickle(self._cache_dict, self._cache_file_path)
+
+    def get_cached_result_or_none(self, cache_key):
+        if cache_key in self._cache_dict:
+            return self._cache_dict[cache_key]
+        return None
+
+    def add(self, cache_key, value):
+        self._cache_dict[cache_key] = value
+
+    def exist_in_cache(self, cache_key):
+        return cache_key in self._cache_dict

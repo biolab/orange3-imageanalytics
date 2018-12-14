@@ -2,26 +2,19 @@ import logging
 import random
 import uuid
 from itertools import islice
-from os.path import join, isfile
 
 import numpy as np
-import cachecontrol.caches
-import requests
 from AnyQt.QtCore import QSettings
-
-from Orange.misc.environ import cache_dir
 
 from orangecontrib.imageanalytics.http2_client import Http2Client
 from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
-from orangecontrib.imageanalytics.utils.embedder_utils import md5_hash
-from orangecontrib.imageanalytics.utils.embedder_utils import save_pickle, load_pickle
-from orangecontrib.imageanalytics.utils.embedder_utils import EmbeddingCancelledException, ImageLoader
-
+from orangecontrib.imageanalytics.utils.embedder_utils import \
+    EmbeddingCancelledException, ImageLoader, EmbedderCache
 
 log = logging.getLogger(__name__)
 
+
 class ServerEmbedder(Http2Client):
-    _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
     MAX_REPEATS = 4
     CANNOT_LOAD = "cannot load"
 
@@ -30,18 +23,7 @@ class ServerEmbedder(Http2Client):
         self._model = model
         self._layer = layer
 
-        # init the cache
         self._target_image_size = model_settings['target_image_size']
-        cache_file_path = self._cache_file_blueprint.format(self._model, layer)
-        self._cache_file_path = join(cache_dir(), cache_file_path)
-        self._cache_dict = self._init_cache()
-
-        self._session = cachecontrol.CacheControl(
-            requests.session(),
-            cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
-        )
-
         # attribute that offers support for cancelling the embedding
         # if ran in another thread
         self.cancelled = False
@@ -51,15 +33,7 @@ class ServerEmbedder(Http2Client):
         self.session_id = None
 
         self._image_loader = ImageLoader()
-
-    def _init_cache(self):
-        if isfile(self._cache_file_path):
-            try:
-                return load_pickle(self._cache_file_path)
-            except EOFError:
-                return {}
-
-        return {}
+        self._cache = EmbedderCache(model, layer)
 
     def from_file_paths(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
@@ -100,7 +74,7 @@ class ServerEmbedder(Http2Client):
         # repeat while all images has embeddings or
         # while counter counts out (prevents cycling)
         while len([el for el in all_embeddings if el is None]) > 0 and \
-            repeats_counter < self.MAX_REPEATS:
+                repeats_counter < self.MAX_REPEATS:
 
             # take all images without embeddings yet
             selected_indices = [i for i, v in enumerate(all_embeddings)
@@ -126,7 +100,7 @@ class ServerEmbedder(Http2Client):
                 for i, emb in zip(b_indices, embeddings):
                     all_embeddings[i] = emb
 
-                self.persist_cache()
+                self._cache.persist_cache()
             repeats_counter += 1
 
         # change images that were not loaded from 'cannot loaded' to None
@@ -170,9 +144,9 @@ class ServerEmbedder(Http2Client):
                 cache_keys.append(None)
                 continue
 
-            cache_key = md5_hash(image)
+            cache_key = self._cache.md5_hash(image)
             cache_keys.append(cache_key)
-            if cache_key in self._cache_dict:
+            if self._cache.exist_in_cache(cache_key):
                 # skip the sending because image is present in the
                 # local cache
                 http_streams.append(None)
@@ -193,7 +167,7 @@ class ServerEmbedder(Http2Client):
                 )
                 http_streams.append(stream_id)
             except (ConnectionError, BrokenPipeError):
-                self.persist_cache()
+                self._cache.persist_cache()
                 raise
 
         # wait for the responses in a blocking manner
@@ -220,11 +194,10 @@ class ServerEmbedder(Http2Client):
                     image_processed_callback(success=False)
                 continue
 
-
             if not stream_id:
                 # skip rest of the waiting because image was either
                 # skipped at loading or is present in the local cache
-                embedding = self._get_cached_result_or_none(cache_key)
+                embedding = self._cache.get_cached_result_or_none(cache_key)
                 embeddings.append(embedding)
 
                 if image_processed_callback:
@@ -234,7 +207,7 @@ class ServerEmbedder(Http2Client):
             try:
                 response = self._get_json_response_or_none(stream_id)
             except (ConnectionError, MaxNumberOfRequestsError):
-                self.persist_cache()
+                self._cache.persist_cache()
                 self.reconnect_to_server()
                 return embeddings
 
@@ -246,21 +219,9 @@ class ServerEmbedder(Http2Client):
                 # successful response
                 embedding = np.array(response['embedding'], dtype=np.float16)
                 embeddings.append(embedding)
-                self._cache_dict[cache_key] = embedding
+                self._cache.add(cache_key, embedding)
 
             if image_processed_callback:
                 image_processed_callback(embeddings[-1] is not None)
 
         return embeddings
-
-    def clear_cache(self):
-        self._cache_dict = {}
-        self.persist_cache()
-
-    def persist_cache(self):
-        save_pickle(self._cache_dict, self._cache_file_path)
-
-    def _get_cached_result_or_none(self, cache_key):
-        if cache_key in self._cache_dict:
-            return self._cache_dict[cache_key]
-        return None

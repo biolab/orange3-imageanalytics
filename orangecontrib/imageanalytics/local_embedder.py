@@ -61,10 +61,10 @@ class LocalEmbedder:
         for i, image in enumerate(file_paths):
             embeddings = self._embed(image)
             all_embeddings[i] = embeddings
-            image_processed_callback(success=True)
+            if image_processed_callback:
+                image_processed_callback(success=True)
 
         time_t = time.time() - t
-        print(time_t, time_t / len(file_paths))
         self._cache.persist_cache()
 
         return np.array(all_embeddings)

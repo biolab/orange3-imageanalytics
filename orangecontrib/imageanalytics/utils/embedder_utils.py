@@ -53,6 +53,8 @@ class ImageLoader:
 
     def load_image_bytes(self, file_path, target_size):
         image = self.load_image_or_none(file_path, target_size)
+        if image is None:
+            return None
 
         image_bytes_io = BytesIO()
         image.save(image_bytes_io, format="JPEG")
@@ -109,7 +111,6 @@ class EmbedderCache:
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
-        print(self._cache_file_path)
 
     def _init_cache(self):
         if isfile(self._cache_file_path):

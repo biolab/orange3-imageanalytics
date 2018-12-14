@@ -1,9 +1,9 @@
+from io import BytesIO
+from os.path import join, isfile
 import logging
 import hashlib
 import pickle
 import ftplib
-from io import BytesIO
-from os.path import join, isfile
 
 import cachecontrol.caches
 import requests

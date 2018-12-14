@@ -44,14 +44,17 @@ MODELS = {
     },
     'openface': {
         'name': 'openface',
-        'description': 'Face recognition model trained on FaceScrub and CASIA-WebFace datasets.',
+        'description': 'Face recognition model trained on FaceScrub and '
+                       'CASIA-WebFace datasets.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
         'order': 5
     },
     'sqeezenet': {
         'name': 'SqueezeNet',
-        'description': 'todo.',
+        'description': 'Deep model for image recognition that achieves '
+                       'AlexNet-level accuracy on ImageNet with '
+                       '50x fewer parameters.',
         'target_image_size': (227, 227),
         'layers': ['penultimate'],
         'order': 6,
@@ -86,7 +89,8 @@ class ImageEmbedder:
         if self.is_local_embedder():
             self._embedder = LocalEmbedder(model, self._model_settings, layer)
         else:
-            self._embedder = ServerEmbedder(model, self._model_settings, layer, server_url)
+            self._embedder = ServerEmbedder(
+                model, self._model_settings, layer, server_url)
 
     def is_local_embedder(self):
         return self._model_settings.get("is_local") or False
@@ -114,14 +118,16 @@ class ImageEmbedder:
                 ("data" in kwargs and isinstance(kwargs["data"], Table)):
             return self.from_table(*args, **kwargs)
         elif (len(args) and isinstance(args[0], (np.ndarray, list))) or \
-                ("file_paths" in kwargs and isinstance(kwargs["file_paths"], (np.ndarray, list))):
+                ("file_paths" in kwargs and isinstance(kwargs["file_paths"],
+                                                       (np.ndarray, list))):
             return self._embedder.from_file_paths(*args, **kwargs)
         else:
             raise TypeError
 
     def from_table(self, data, col="image", image_processed_callback=None):
         file_paths = data[:, col].metas.flatten()
-        embeddings = self._embedder.from_file_paths(file_paths, image_processed_callback)
+        embeddings = self._embedder.from_file_paths(
+            file_paths, image_processed_callback)
         return ImageEmbedder.prepare_output_data(data, embeddings)
 
     def __enter__(self):
@@ -137,12 +143,12 @@ class ImageEmbedder:
         # embedded_images.X = X
 
         new_attributes = [ContinuousVariable.make('n{:d}'.format(d))
-                      for d in range(embeddings.shape[1])]
+                          for d in range(embeddings.shape[1])]
 
-
-        domain_new = Domain(list(embedded_images.domain.attributes) + new_attributes,
-                        embedded_images.domain.class_vars,
-                        embedded_images.domain.metas)
+        domain_new = Domain(
+            list(embedded_images.domain.attributes) + new_attributes,
+            embedded_images.domain.class_vars,
+            embedded_images.domain.metas)
         table = embedded_images.transform(domain_new)
         table[:, new_attributes] = embeddings
 

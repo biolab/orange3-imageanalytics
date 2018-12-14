@@ -48,6 +48,7 @@ class OWImageEmbedding(OWWidget):
         super().__init__()
         self.embedders = sorted(list(EMBEDDERS_INFO),
                                 key=lambda k: EMBEDDERS_INFO[k]['order'])
+        print(self.embedders)
         self._image_attributes = None
         self._input_data = None
         self._log = logging.getLogger(__name__)
@@ -86,8 +87,10 @@ class OWImageEmbedding(OWWidget):
             orientation=Qt.Horizontal,
             callback=self._cb_embedder_changed
         )
-        self.cb_embedder.setModel(VariableListModel(
-            [EMBEDDERS_INFO[e]['name'] for e in self.embedders]))
+        names = [EMBEDDERS_INFO[e]['name'] +
+                 (" (local)" if EMBEDDERS_INFO[e].get("is_local") else "")
+                 for e in self.embedders]
+        self.cb_embedder.setModel(VariableListModel(names))
         if not self.cb_embedder_current_id < len(self.embedders):
             self.cb_embedder_current_id = 0
         self.cb_embedder.setCurrentIndex(self.cb_embedder_current_id)

@@ -226,7 +226,7 @@ class OWImageEmbedding(OWWidget):
         def cancel():
             task.future.cancel()
             task.cancelled = True
-            task.embedder.cancelled = True
+            task.embedder.set_canceled(True)
 
         embedder = self._image_embedder
 
@@ -349,7 +349,7 @@ class OWImageEmbedding(OWWidget):
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)
             self.cb_embedder.setDisabled(False)
-            self._image_embedder.cancelled = False
+            self._image_embedder.set_canceled(False)
             # reset the connection.
             connected = self._image_embedder.reconnect_to_server()
             self._set_server_info(connected=connected)

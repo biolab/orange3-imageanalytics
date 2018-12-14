@@ -1,30 +1,20 @@
 import time
-from io import BytesIO
-import os
 
 import tensorflow as tf
 import numpy as np
 import logging
-import ftplib
 import requests
 
-from urllib.parse import urlparse
-from urllib.request import urlopen, URLError
+from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
+    EmbedderCache
 
-from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
-
-log = logging.getLogger(__name__)
-from PIL.Image import open as open_image, LANCZOS
 import cachecontrol.caches
 from os.path import join
 
 from Orange.misc.environ import cache_dir
+from orangecontrib.imageanalytics.utils.embedder_utils import EmbeddingCancelledException
 
-
-class EmbeddingCancelledException(Exception):
-    """Thrown when the embedding task is cancelled from another thread.
-    (i.e. ImageEmbedder.cancelled attribute is set to True).
-    """
+log = logging.getLogger(__name__)
 
 class LocalEmbedder:
 
@@ -53,6 +43,7 @@ class LocalEmbedder:
         self.cancelled = False
 
         self._image_loader = ImageLoader()
+        self._cache = EmbedderCache(model, layer)
 
     def _import_tf_graph(self):
         with tf.gfile.FastGFile(self._model_file, 'rb') as f:
@@ -65,13 +56,17 @@ class LocalEmbedder:
         all_embeddings = [None] * len(file_paths)
 
         for i, image in enumerate(file_paths):
-            embeddings = self._embed(image, image_processed_callback)
+            embeddings = self._embed(image)
             all_embeddings[i] = embeddings
+            image_processed_callback(success=True)
 
-        print(time.time() - t)
+        time_t = time.time() - t
+        print(time_t, time_t / len(file_paths))
+        self._cache.persist_cache()
+
         return np.array(all_embeddings)
 
-    def _embed(self, file_path, image_processed_callback):
+    def _embed(self, file_path):
         """ Load images and compute cache keys and send requests to
         an http2 server for valid ones.
         """
@@ -81,8 +76,13 @@ class LocalEmbedder:
         image = self._image_loader.load_image_or_none(file_path, self._target_image_size)
         image = self._image_loader.preprocess_squeezenet(image)
 
+        cache_key = self._cache.md5_hash(image)
+        cached_im = self._cache.get_cached_result_or_none(cache_key)
+        if cached_im is not None:
+            return cached_im
+
         output = self.tf_session.run(
             self.output_t, feed_dict={self.input_t: image, self.keep_prob: 1.})
-
-        image_processed_callback(success=True)
-        return output[0, 0, 0, :]
+        embedded_image = output[0, 0, 0, :]
+        self._cache.add(cache_key, embedded_image)
+        return embedded_image

@@ -27,11 +27,11 @@ before_install:
     - pip install codecov
 
 install:
-    # - pip install --only-binary numpy,scipy,scikit-learn numpy scipy scikit-learn
+    - apt-get -y install python3-pyqt5.qtwebkit libqt5webkit5-dev
     - pip install PyQt5!=5.10
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install .
-    # todo: orange cache dir doesn't get created at installation
+
     - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
 
 script:

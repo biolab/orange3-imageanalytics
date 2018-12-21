@@ -27,7 +27,7 @@ before_install:
     - pip install codecov
 
 install:
-    - apt-get -y install python3-pyqt5.qtwebkit libqt5webkit5-dev
+    - sudo apt-get -y install python3-pyqt5.qtwebkit libqt5webkit5-dev
     - pip install PyQt5!=5.10
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install .

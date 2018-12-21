@@ -5,9 +5,6 @@ from orangecontrib.imageanalytics.widgets.owimageviewer import OWImageViewer
 
 
 class TestOWImageViewer(WidgetTest):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
 
     def setUp(self):
         self.widget = self.create_widget(OWImageViewer)

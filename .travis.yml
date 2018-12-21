@@ -1,6 +1,6 @@
 language: python
 
-sudo: false   # use container-based infrastructure
+sudo: false
 dist: trusty
 
 matrix:
@@ -27,7 +27,6 @@ before_install:
     - pip install codecov
 
 install:
-    - sudo apt-get -y install python3-pyqt5.qtwebkit libqt5webkit5-dev
     - pip install PyQt5!=5.10
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install .
@@ -36,8 +35,7 @@ install:
 
 script:
     # Screen must be at least 24bpp (see https://github.com/pytest-dev/pytest-qt/issues/35)
-    - XVFBARGS="-screen 0 1280x1024x24"
-    - catchsegv xvfb-run -a -s "$XVFBARGS" coverage run setup.py test
+    - catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" coverage run setup.py test
 
 after_success:
     - codecov

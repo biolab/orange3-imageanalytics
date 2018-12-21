@@ -38,7 +38,7 @@ install:
 script:
     # Screen must be at least 24bpp (see https://github.com/pytest-dev/pytest-qt/issues/35)
     - XVFBARGS="-screen 0 1280x1024x24"
-    - catchsegv xvfb-run -a -s "$XVFBARGS" coverage run -m unittest discover -v
+    - catchsegv xvfb-run -a -s "$XVFBARGS" coverage run setup.py test
 
 after_success:
     - codecov

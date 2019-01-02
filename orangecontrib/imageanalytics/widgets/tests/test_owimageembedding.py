@@ -9,15 +9,11 @@ class DummyCorpus(Table):
 
 
 class TestOWImageEmbedding(WidgetTest):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-
-        cls.signal_name = "Images"
-        cls.signal_data = Table("iris")
 
     def setUp(self):
         self.widget = self.create_widget(OWImageEmbedding)
+        self.signal_name = "Images"
+        self.signal_data = Table("iris")
 
     def test_not_image_data(self):
         """

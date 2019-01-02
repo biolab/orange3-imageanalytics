@@ -34,7 +34,6 @@ install:
     - mkdir -p $(python -c 'from Orange.misc.environ import cache_dir; print(cache_dir())')
 
 script:
-    # Screen must be at least 24bpp (see https://github.com/pytest-dev/pytest-qt/issues/35)
     - catchsegv xvfb-run -a -s "-screen 0 1280x1024x24" coverage run setup.py test
 
 after_success:

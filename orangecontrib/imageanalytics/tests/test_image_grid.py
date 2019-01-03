@@ -2,12 +2,13 @@ import unittest
 
 from Orange.data import Table
 
-from orangecontrib.imageanalytics.image_grid import ImageGrid
+#from orangecontrib.imageanalytics.image_grid import ImageGrid
 
 
 class ImageGridTest(unittest.TestCase):
     def setUp(self):
-        self.grid = ImageGrid(Table("wine"))
+        # self.grid = ImageGrid(Table("wine"))
+        print('LALA')
 
     # def test_init(self):
     #     s = self.grid.norm_data.shape

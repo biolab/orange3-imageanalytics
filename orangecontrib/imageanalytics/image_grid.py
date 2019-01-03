@@ -4,7 +4,7 @@
 from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize
-# from Orange.projection import MDS, PCA, TSNE
+from Orange.projection import MDS, PCA
 # from scipy.spatial.distance import cdist
 # from scipy.stats import kurtosis
 

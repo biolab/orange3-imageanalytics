@@ -77,6 +77,14 @@ def include_documentation(local_dir, install_dir):
                           [path.join(dirpath, f) for f in files]))
     DATA_FILES.extend(doc_files)
 
+def _discover_tests():
+    import unittest
+    return unittest.defaultTestLoader.discover('orangecontrib.educational',
+                                               pattern='test_*.py',
+                                               top_level_dir='.')
+
+TEST_SUITE = "setup._discover_tests"
+
 
 if __name__ == '__main__':
     include_documentation('doc/_build/htmlhelp', 'help/orange3-imageanalytics')
@@ -97,5 +105,5 @@ if __name__ == '__main__':
         install_requires=INSTALL_REQUIRES,
         namespace_packages=['orangecontrib'],
         entry_points=ENTRY_POINTS,
-        test_suite='orangecontrib.imageanalytics.tests.suite'
+        test_suite=TEST_SUITE
     )

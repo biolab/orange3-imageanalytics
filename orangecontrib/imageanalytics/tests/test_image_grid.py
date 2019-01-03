@@ -2,7 +2,7 @@ import unittest
 
 from Orange.data import Table
 
-#from orangecontrib.imageanalytics.image_grid import ImageGrid
+from orangecontrib.imageanalytics.image_grid import ImageGrid
 
 
 class ImageGridTest(unittest.TestCase):

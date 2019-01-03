@@ -1,4 +1,4 @@
-import importlib
+# import importlib
 
 import numpy as np
 from Orange.data import Table, Instance
@@ -180,16 +180,16 @@ class ImageGrid:
         """
 
         # Try to use lap if it is available - if not, use scipy's linear_sum_assignment.
-        if importlib.util.find_spec("lap") is not None:
-            res = lapjv(cost_matrix, extend_cost=True)
-            cost, grid_indices, assignments = res[0], res[1], grid[res[2]]
-        else:
-            row_indices, col_indices = linear_sum_assignment(cost_matrix)
-            cost = cost_matrix[row_indices, col_indices].sum()
+        # if importlib.util.find_spec("lap") is not None:
+        #     res = lapjv(cost_matrix, extend_cost=True)
+        #     cost, grid_indices, assignments = res[0], res[1], grid[res[2]]
+        # else:
+        row_indices, col_indices = linear_sum_assignment(cost_matrix)
+        cost = cost_matrix[row_indices, col_indices].sum()
 
-            grid_indices = np.full((self.size_x * self.size_y), -1, dtype=np.int32)
-            grid_indices[row_indices] = col_indices
-            assignments = grid[row_indices]
+        grid_indices = np.full((self.size_x * self.size_y), -1, dtype=np.int32)
+        grid_indices[row_indices] = col_indices
+        assignments = grid[row_indices]
 
         return cost, grid_indices, assignments
 

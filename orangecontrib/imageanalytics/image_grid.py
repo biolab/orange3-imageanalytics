@@ -16,15 +16,16 @@ from Orange.projection import MDS, PCA, TSNE
 
 class ImageGrid:
     def __init__(self, data):
-        self.size_x, self.size_y = 0, 0
-        self.cost, self.grid_indices, self.assignments, self.image_list = 0, [], [], []
-        self.data = data
-
-        # reduce dimensions
-        data_2dim = Table(self._reduce_dimensions(data))
-
-        # normalize the data
-        self.norm_data = np.array(self._normalize_data(data_2dim))
+        pass
+        # self.size_x, self.size_y = 0, 0
+        # self.cost, self.grid_indices, self.assignments, self.image_list = 0, [], [], []
+        # self.data = data
+        #
+        # # reduce dimensions
+        # data_2dim = Table(self._reduce_dimensions(data))
+        #
+        # # normalize the data
+        # self.norm_data = np.array(self._normalize_data(data_2dim))
 
     # def process(self, size_x=0, size_y=0):
     #     """
@@ -63,42 +64,42 @@ class ImageGrid:
     #
     #     self.image_list = self._grid_indices_to_image_list(self.data)
 
-    @staticmethod
-    def _reduce_dimensions(data, method="MDS", use_cosine=False):
-        """
-        Reduce the dimensionality of the data to 2D.
-
-        Parameters
-        ----------
-        data: Orange.data.Table
-            The image embeddings (vectors of length 2048).
-        method: string
-            The method to use (default MDS).
-        use_cosine: bool
-            Precompute cosine distances and pass them to MDS.
-
-        Returns
-        -------
-        array-like
-            The data, reduced to 2 dimensions.
-
-        """
-        if method == "MDS":
-            if use_cosine:
-                mds = MDS(n_init=1, dissimilarity="precomputed")
-                dist_matrix = Cosine(data)
-                return mds(dist_matrix).embedding_
-            else:
-                mds = MDS(n_init=1, init_type="PCA")
-                return mds(data).embedding_
-
-        elif method == "PCA":
-            pca = PCA(n_components=2)
-            return pca(data)(data)
-
-        elif method == "TSNE":
-            tsne = TSNE(init="pca")
-            return tsne(data).embedding_
+    # @staticmethod
+    # def _reduce_dimensions(data, method="MDS", use_cosine=False):
+    #     """
+    #     Reduce the dimensionality of the data to 2D.
+    #
+    #     Parameters
+    #     ----------
+    #     data: Orange.data.Table
+    #         The image embeddings (vectors of length 2048).
+    #     method: string
+    #         The method to use (default MDS).
+    #     use_cosine: bool
+    #         Precompute cosine distances and pass them to MDS.
+    #
+    #     Returns
+    #     -------
+    #     array-like
+    #         The data, reduced to 2 dimensions.
+    #
+    #     """
+    #     if method == "MDS":
+    #         if use_cosine:
+    #             mds = MDS(n_init=1, dissimilarity="precomputed")
+    #             dist_matrix = Cosine(data)
+    #             return mds(dist_matrix).embedding_
+    #         else:
+    #             mds = MDS(n_init=1, init_type="PCA")
+    #             return mds(data).embedding_
+    #
+    #     elif method == "PCA":
+    #         pca = PCA(n_components=2)
+    #         return pca(data)(data)
+    #
+    #     elif method == "TSNE":
+    #         tsne = TSNE(init="pca")
+    #         return tsne(data).embedding_
 
     # @staticmethod
     # def _get_grid_size(data, use_default_square=False):
@@ -131,24 +132,24 @@ class ImageGrid:
     #
     #     return size_x, size_y
 
-    @staticmethod
-    def _normalize_data(data):
-        """
-         Normalize the data (a series of 2D coordinates) to the interval [0, 1].
-
-        Parameters
-        ----------
-        data: Orange.data.Table
-            The data to be normalized.
-
-        Returns
-        -------
-        Orange.data.Table
-            The normalized data constrained to [0, 1].
-        """
-
-        normalizer = Normalize(norm_type=Normalize.NormalizeBySpan)
-        return normalizer(data)
+    # @staticmethod
+    # def _normalize_data(data):
+    #     """
+    #      Normalize the data (a series of 2D coordinates) to the interval [0, 1].
+    #
+    #     Parameters
+    #     ----------
+    #     data: Orange.data.Table
+    #         The data to be normalized.
+    #
+    #     Returns
+    #     -------
+    #     Orange.data.Table
+    #         The normalized data constrained to [0, 1].
+    #     """
+    #
+    #     normalizer = Normalize(norm_type=Normalize.NormalizeBySpan)
+    #     return normalizer(data)
 
     # def _get_assignments(self, data):
     #     """

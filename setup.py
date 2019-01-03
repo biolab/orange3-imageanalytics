@@ -79,7 +79,7 @@ def include_documentation(local_dir, install_dir):
 
 def _discover_tests():
     import unittest
-    return unittest.defaultTestLoader.discover('orangecontrib.educational',
+    return unittest.defaultTestLoader.discover('orangecontrib.imageanalytics',
                                                pattern='test_*.py',
                                                top_level_dir='.')
 

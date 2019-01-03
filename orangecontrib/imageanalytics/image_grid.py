@@ -1,6 +1,6 @@
 # import importlib
 
-import numpy as np
+# import numpy as np
 from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize

@@ -1,4 +1,3 @@
-import logging
 import unittest
 
 from Orange.data import Table
@@ -8,11 +7,7 @@ from orangecontrib.imageanalytics.image_grid import ImageGrid
 
 class ImageGridTest(unittest.TestCase):
     def setUp(self):
-        logging.disable(logging.CRITICAL)
         self.grid = ImageGrid(Table("wine"))
-
-    def tearDown(self):
-        logging.disable(logging.NOTSET)
 
     def test_init(self):
         s = self.grid.norm_data.shape

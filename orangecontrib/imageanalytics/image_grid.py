@@ -8,10 +8,10 @@ from Orange.projection import MDS, PCA, TSNE
 from scipy.spatial.distance import cdist
 from scipy.stats import kurtosis
 
-try:
-    from lap import lapjv
-except ImportError:
-    from scipy.optimize import linear_sum_assignment
+# try:
+#     from lap import lapjv
+# except ImportError:
+from scipy.optimize import linear_sum_assignment
 
 
 class ImageGrid:

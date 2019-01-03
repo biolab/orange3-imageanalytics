@@ -5,13 +5,13 @@ from Orange.data import Table, Instance
 from Orange.distance import Cosine
 from Orange.preprocess import Normalize
 from Orange.projection import MDS, PCA, TSNE
-from scipy.spatial.distance import cdist
-from scipy.stats import kurtosis
+# from scipy.spatial.distance import cdist
+# from scipy.stats import kurtosis
 
 # try:
 #     from lap import lapjv
 # except ImportError:
-from scipy.optimize import linear_sum_assignment
+# from scipy.optimize import linear_sum_assignment
 
 
 class ImageGrid:

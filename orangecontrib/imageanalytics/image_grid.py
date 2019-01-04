@@ -208,9 +208,9 @@ class ImageGrid:
         Orange.data.Table
             A Table of images in the grid, ordered by rows.
         """
-
-        image_list = Table.from_domain(images.domain)
-        image_list.extend([Instance(images.domain, image) for image in self.order_to_grid(images)])
+        image_list = [Instance(images.domain, image)
+                      for image in self.order_to_grid(images)]
+        image_list = Table.from_list(images.domain, image_list)
         return image_list
 
     def order_to_grid(self, data):

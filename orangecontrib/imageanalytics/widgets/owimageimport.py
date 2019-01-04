@@ -104,7 +104,6 @@ class OWImportImages(widget.OWWidget):
 
     #: list of recent paths
     recent_paths = settings.Setting([])  # type: List[RecentPath]
-    currentPath = settings.Setting(None)
 
     want_main_area = False
     resizing_enabled = False
@@ -221,30 +220,26 @@ class OWImportImages(widget.OWWidget):
         QApplication.postEvent(self, QEvent(RuntimeEvent.Init))
 
     def __initRecentItemsModel(self):
-        if self.currentPath is not None and \
-                not os.path.isdir(self.currentPath):
-            self.currentPath = None
-
+        self._relocate_recent_files()
         recent_paths = []
         for item in self.recent_paths:
-            if os.path.isdir(item.abspath):
-                recent_paths.append(item)
+            recent_paths.append(item)
         recent_paths = recent_paths[:OWImportImages.MaxRecentItems]
         recent_model = self.recent_cb.model()
+        recent_model.clear()
+
         for pathitem in recent_paths:
             item = RecentPath_asqstandarditem(pathitem)
             recent_model.appendRow(item)
 
         self.recent_paths = recent_paths
 
-        if self.currentPath is not None and \
-                os.path.isdir(self.currentPath) and self.recent_paths and \
-                os.path.samefile(self.currentPath, self.recent_paths[0].abspath):
+        if self.recent_paths and os.path.isdir(self.recent_paths[0].abspath):
             self.recent_cb.setCurrentIndex(0)
+            self.__actions.reload.setEnabled(True)
         else:
-            self.currentPath = None
             self.recent_cb.setCurrentIndex(-1)
-        self.__actions.reload.setEnabled(self.currentPath is not None)
+            self.__actions.reload.setEnabled(False)
 
     def customEvent(self, event):
         """Reimplemented."""
@@ -343,9 +338,9 @@ class OWImportImages(widget.OWWidget):
             True if the current root import path was successfully
             changed to path.
         """
-        if self.currentPath is not None and path is not None and \
-                os.path.isdir(self.currentPath) and os.path.isdir(path) and \
-                os.path.samefile(self.currentPath, path):
+        if self.recent_paths and path is not None and \
+                os.path.isdir(self.recent_paths[0].abspath) and os.path.isdir(path) \
+                and os.path.samefile(os.path.isdir(self.recent_paths[0].abspath), path):
             return True
 
         success = True
@@ -369,18 +364,19 @@ class OWImportImages(widget.OWWidget):
         if path is not None:
             newindex = self.addRecentPath(path)
             self.recent_cb.setCurrentIndex(newindex)
-            if newindex >= 0:
-                self.currentPath = path
-            else:
-                self.currentPath = None
-        else:
-            self.currentPath = None
-        self.__actions.reload.setEnabled(self.currentPath is not None)
+
+        self.__actions.reload.setEnabled(len(self.recent_paths) > 0)
 
         if self.__state == State.Processing:
             self.cancel()
 
         return success
+
+    def _search_paths(self):
+        basedir = self.workflowEnv().get("basedir", None)
+        if basedir is None:
+            return []
+        return [("basedir", basedir)]
 
     def addRecentPath(self, path):
         """
@@ -413,7 +409,7 @@ class OWImportImages(widget.OWWidget):
             self.recent_paths.insert(0, existing)
             model.insertRow(0, row)
         else:
-            item = RecentPath(path, None, None)
+            item = RecentPath.create(path, self._search_paths())
             self.recent_paths.insert(0, item)
             model.insertRow(0, RecentPath_asqstandarditem(item))
         return 0
@@ -467,7 +463,7 @@ class OWImportImages(widget.OWWidget):
         self.error()
 
         self.__invalidated = False
-        if self.currentPath is None:
+        if not self.recent_paths:
             return
 
         if self.__state == State.Processing:
@@ -477,7 +473,7 @@ class OWImportImages(widget.OWWidget):
                      .format(self.__pendingTask.startdir))
             self.cancel()
 
-        startdir = self.currentPath
+        startdir = self.recent_paths[0].abspath
 
         self.__setRuntimeState(State.Processing)
 
@@ -622,6 +618,30 @@ class OWImportImages(widget.OWWidget):
             return True
 
         return super().eventFilter(receiver, event)
+
+    def _relocate_recent_files(self):
+        search_paths = self._search_paths()
+        rec = []
+        for recent in self.recent_paths:
+            kwargs = dict(
+                title=recent.title, sheet=recent.sheet,
+                file_format=recent.file_format)
+            resolved = recent.resolve(search_paths)
+            if resolved is not None:
+                rec.append(
+                    RecentPath.create(resolved.abspath, search_paths, **kwargs))
+            else:
+                rec.append(recent)
+        # change the list in-place for the case the widgets wraps this list
+        self.recent_paths[:] = rec
+
+    def workflowEnvChanged(self, key, value, oldvalue):
+        """
+        Function called when environment changes (e.g. while saving the scheme)
+        It make sure that all environment connected values are modified
+        (e.g. relative file paths are changed)
+        """
+        self.__initRecentItemsModel()
 
 
 class UserInterruptError(BaseException):

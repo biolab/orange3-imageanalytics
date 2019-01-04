@@ -7,27 +7,25 @@ import numpy as np
 
 
 class TestOWImageGrid(WidgetTest):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
 
-        cls.signal_name = "Embeddings"
-        cls.signal_data = Table("iris")
+    def setUp(self):
+        self.widget = self.create_widget(OWImageGrid)
 
-        cls.zoo = Table("zoo-with-images.tab")
+        self.signal_name = "Embeddings"
+        self.signal_data = Table("iris")
+
+        self.zoo = Table("zoo-with-images.tab")
 
         domain = Domain([
             ContinuousVariable("emb1"), ContinuousVariable("emb2"),
             ContinuousVariable("emb3")],
-            cls.zoo.domain.class_vars,
-            cls.zoo.domain.metas
+            self.zoo.domain.class_vars,
+            self.zoo.domain.metas
         )
-        data = np.random.random((len(cls.zoo), 3))
-        cls.fake_embeddings = Table(domain, data, cls.zoo.Y,
-                                    metas=cls.zoo.metas)
+        data = np.random.random((len(self.zoo), 3))
 
-    def setUp(self):
-        self.widget = self.create_widget(OWImageGrid)
+        self.fake_embeddings = Table(domain, data, self.zoo.Y,
+                                    metas=self.zoo.metas)
 
     def tearDown(self):
         self.widget.onDeleteWidget()

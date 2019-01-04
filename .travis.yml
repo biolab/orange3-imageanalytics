@@ -6,13 +6,16 @@ dist: xenial
 matrix:
   include:
 
-    - python: '3.6'
+    - python: '3.7'
       env: ORANGE="3.16.0"
 
     - python: '3.6'
       env: ORANGE="release"
 
-    - python: '3.6'
+    - python: '3.7'
+      env: ORANGE="release"
+
+    - python: '3.7'
       env: ORANGE="master"
 
 

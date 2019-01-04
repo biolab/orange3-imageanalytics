@@ -1,7 +1,7 @@
 language: python
 
 sudo: false   # use container-based infrastructure
-dist: trusty
+dist: xenial
 
 matrix:
   include:

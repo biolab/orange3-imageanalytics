@@ -4,7 +4,7 @@ from Orange.widgets.tests.base import WidgetTest
 from orangecontrib.imageanalytics.widgets.owimageviewer import OWImageViewer
 
 
-class TestOWImageEmbedding(WidgetTest):
+class TestOWImageViewer(WidgetTest):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()

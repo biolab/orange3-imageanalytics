@@ -27,16 +27,21 @@ Signals
 Description
 -----------
 
-**Image Embedding** reads images and uploads them to a remote 
-server. Remote server uses a deep learning model to calculate a feature 
-vector for each image. It returns an enhanced data table with additional columns (image descriptors).
+**Image Embedding** reads images and uploads them to a remote server or evaluate them locally.
+Deep learning models are used to calculate a feature vector for each image.
+It returns an enhanced data table with additional columns (image descriptors).
 
-Images can be imported with :doc:`Import Images <importimages>` widget or as paths to images in a spreadsheet. In this case the column with images paths needs a three-row header with *type=image* label in the third row.
+Images can be imported with :doc:`Import Images <importimages>` widget or as paths to images in a spreadsheet.
+In this case the column with images paths needs a three-row header with *type=image* label in the third row.
 
 .. figure:: images/header-example.png
    :scale: 50%
 
-Image Embedding offers several embedders, each trained for a specific task. Images are sent to a server, where vectors representations are computed. Sent images are not stored anywhere. To use the widget, you will need internet connection.
+Image Embedding offers several embedders, each trained for a specific task.
+Images are sent to a server or they are evaluated locally on the user's computer, where vectors representations are computed.
+SqueezeNet embedder offers a fast evaluation on users computer which does not require an internet connection.
+If you decide to use other embedders than SqueezeNet, you will need an internet connection.
+Images sent to the server are not stored anywhere.
 
 .. figure:: images/ImageEmbedding-stamped.png
    :scale: 50%
@@ -47,6 +52,7 @@ Image Embedding offers several embedders, each trained for a specific task. Imag
    - *Image attribute*: attribute containing images you wish to embed
    - *Embedder*:
 
+       - SqueezeNet: `Small and fast <https://arxiv.org/abs/1602.07360>`_ model for image recognition trained on ImageNet.
        - Inception v3: `Google's Inception v3 <https://arxiv.org/abs/1512.00567>`_  model trained on ImageNet.
        - VGG-16: `16-layer image recognition model <https://arxiv.org/abs/1409.1556>`_ trained on ImageNet.
        - VGG-19: `19-layer image recognition model <https://arxiv.org/abs/1409.1556>`_ trained on ImageNet.
@@ -58,14 +64,19 @@ Image Embedding offers several embedders, each trained for a specific task. Imag
 Example
 -------
 
-Let us first import images from a folder with :doc:`Import Images <importimages>`. We have three images of an orange, a banana and a strawberry in a folder called Fruits. From **Import Images** we will send a data table containing a column with image paths to **Image Embedding**.
+Let us first import images from a folder with :doc:`Import Images <importimages>`.
+We have three images of an orange, a banana and a strawberry in a folder called Fruits.
+From **Import Images** we will send a data table containing a column with image paths
+to **Image Embedding**.
 
-We will use the default embedder *Inception v3*. The widget will automatically start retrieving image vectors from the server.
+We will use the default embedder *SqueezeNet*.
+The widget will automatically start retrieving image vectors from the server.
 
 .. figure:: images/ImageEmbedding-Example1.png
    :scale: 50%
 
-Once the computation is done, you can observe the enhanced data in a **Data Table**. With the retrived embeddings, you can continue with any machine learning method Orange offers. Below is an example for clustering.
+Once the computation is done, you can observe the enhanced data in a **Data Table**.
+With the retrived embeddings, you can continue with any machine learning method Orange offers. Below is an example for clustering.
 
 .. figure:: images/ImageEmbedding-Example2.png
    :scale: 50%

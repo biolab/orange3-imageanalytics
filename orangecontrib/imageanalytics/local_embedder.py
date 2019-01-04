@@ -55,7 +55,6 @@ class LocalEmbedder:
             tf.import_graph_def(graph_def, name='')
 
     def from_file_paths(self, file_paths, image_processed_callback=None):
-        t = time.time()
         all_embeddings = [None] * len(file_paths)
 
         for i, image in enumerate(file_paths):
@@ -64,7 +63,6 @@ class LocalEmbedder:
             if image_processed_callback:
                 image_processed_callback(success=True)
 
-        time_t = time.time() - t
         self._cache.persist_cache()
 
         return np.array(all_embeddings)
@@ -78,6 +76,8 @@ class LocalEmbedder:
 
         image = self._image_loader.load_image_or_none(
             file_path, self._target_image_size)
+        if image is None:
+            return None
         image = self._image_loader.preprocess_squeezenet(image)
 
         cache_key = self._cache.md5_hash(image)

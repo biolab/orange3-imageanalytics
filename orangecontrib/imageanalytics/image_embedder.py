@@ -11,7 +11,7 @@ MODELS = {
         'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
         'layers': ['penultimate'],
-        'order': 0
+        'order': 1
     },
     'painters': {
         'name': 'Painters',
@@ -19,28 +19,28 @@ MODELS = {
             'A model trained to predict painters from artwork images.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
-        'order': 3
+        'order': 4
     },
     'deeploc': {
         'name': 'DeepLoc',
         'description': 'A model trained to analyze yeast cell images.',
         'target_image_size': (64, 64),
         'layers': ['penultimate'],
-        'order': 4
+        'order': 5
     },
     'vgg16': {
         'name': 'VGG-16',
         'description': '16-layer image recognition model trained on ImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
-        'order': 1
+        'order': 2
     },
     'vgg19': {
         'name': 'VGG-19',
         'description': '19-layer image recognition model trained on ImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
-        'order': 2
+        'order': 3
     },
     'openface': {
         'name': 'openface',
@@ -48,7 +48,7 @@ MODELS = {
                        'CASIA-WebFace datasets.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
-        'order': 5
+        'order': 6
     },
     'squeezenet': {
         'name': 'SqueezeNet',
@@ -57,7 +57,7 @@ MODELS = {
                        '50x fewer parameters.',
         'target_image_size': (227, 227),
         'layers': ['penultimate'],
-        'order': 6,
+        'order': 0,
         'is_local': True,
         'batch_size': 16,
         'model_file': os.path.join(

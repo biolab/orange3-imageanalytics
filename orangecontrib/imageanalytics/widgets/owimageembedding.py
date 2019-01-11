@@ -175,6 +175,7 @@ class OWImageEmbedding(OWWidget):
             self.commit()
         else:
             self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
+        self._set_server_info(self._image_embedder.is_connected_to_server())
 
     def commit(self):
         if self._task is not None:

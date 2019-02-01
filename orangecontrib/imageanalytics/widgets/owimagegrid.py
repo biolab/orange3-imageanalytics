@@ -15,15 +15,17 @@ from AnyQt.QtGui import (
     QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader
 )
 from AnyQt.QtWidgets import (
-    QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem, QGraphicsRectItem,
+    QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem,
+    QGraphicsRectItem,
     QGraphicsLinearLayout,
     QGraphicsGridLayout, QSizePolicy, QApplication, QStyle, QShortcut,
-    QFormLayout)
+    QFormLayout, QLabel)
 from Orange.widgets import widget, gui, settings
+from Orange.widgets.settings import ContextSetting
 from Orange.widgets.utils.annotated_data import (
     create_annotated_table, create_groups_table)
 from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
-from Orange.widgets.utils.itemmodels import VariableListModel
+from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
@@ -69,6 +71,8 @@ class OWImageGrid(widget.OWWidget):
 
     imageAttr = settings.ContextSetting(0)
     imageSize = settings.Setting(100)
+    label_attr = settings.ContextSetting(None, required=ContextSetting.OPTIONAL)
+    label_selected = settings.Setting(True)
 
     auto_update = settings.Setting(True)
     auto_commit = settings.Setting(True)
@@ -90,6 +94,7 @@ class OWImageGrid(widget.OWWidget):
         self.allAttrs = []
         self.stringAttrs = []
         self.domainAttrs = []
+        self.label_model = DomainModel(placeholder="(No labels)")
 
         self.selection = None
 
@@ -131,6 +136,23 @@ class OWImageGrid(widget.OWWidget):
         self.gridSizeBox.layout().addLayout(form)
 
         gui.button(self.gridSizeBox, self, "Set size automatically", callback=self.auto_set_size)
+
+        self.label_box = gui.vBox(self.controlArea, "Labels")
+
+        # labels control
+        self.label_attr_cb = gui.comboBox(
+            self.label_box, self, "label_attr",
+            tooltip="Show labels",
+            callback=self.setup_scene,
+            addSpace=True,
+            model=self.label_model
+        )
+        gui.checkBox(
+            self.label_box, self,
+            value="label_selected",
+            label="Label only selection and subset",
+            callback=self.setup_scene,
+            tooltip="Add labels to selected images only.")
 
         gui.rubber(self.controlArea)
 
@@ -189,6 +211,9 @@ class OWImageGrid(widget.OWWidget):
 
             self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
 
+            # set label combo labels
+            self.label_model.set_domain(domain)
+
             self.openContext(data)
 
             self.imageAttr = max(min(self.imageAttr, len(self.stringAttrs) - 1), 0)
@@ -217,6 +242,7 @@ class OWImageGrid(widget.OWWidget):
 
     # loads the images and places them into the viewing area
     def setup_scene(self, process_grid=True):
+        self.clear_scene()
         self.error()
         if self.data:
             attr = self.stringAttrs[self.imageAttr]
@@ -232,7 +258,14 @@ class OWImageGrid(widget.OWWidget):
             self.thumbnailView.setFixedRowCount(self.rows)
 
             for i, inst in enumerate(self.image_grid.image_list):
-                thumbnail = GraphicsThumbnailWidget(QPixmap(), crop=self.cell_fit == 1)
+                label_text = str(inst[self.label_attr]) \
+                    if self.label_attr is not None else ""
+                if label_text == "?": label_text = ""
+
+                thumbnail = GraphicsThumbnailWidget(
+                    QPixmap(), crop=self.cell_fit == 1,
+                    add_label=self.label_selected and
+                              self.label_attr is not None, text=label_text)
                 thumbnail.setThumbnailSize(size)
                 thumbnail.instance = inst
                 self.thumbnailView.addThumbnail(thumbnail)
@@ -345,6 +378,9 @@ class OWImageGrid(widget.OWWidget):
         self.clear_scene()
         if self.is_valid_data():
             self.setup_scene()
+
+    def change_label_attr(self):
+        pass
 
     def thumbnail_items(self):
         return [item.widget for item in self.items]
@@ -610,7 +646,8 @@ class GraphicsPixmapWidget(QGraphicsWidget):
 
 
 class GraphicsThumbnailWidget(QGraphicsWidget):
-    def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True, **kwargs):
+    def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True,
+                 add_label=False, text="", **kwargs):
         super().__init__(parentItem, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
         self._size = QSizeF()
@@ -627,8 +664,17 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         self.selectionPen = DEFAULT_SELECTION_PEN
 
         layout.addItem(self.pixmapWidget)
-        layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
 
+        if add_label:
+            l1 = QLabel(text)
+            l1.setStyleSheet("background-color: rgba(255, 255, 255, 10);")
+            l1.setAlignment(Qt.AlignCenter)
+
+            sc = QGraphicsScene()
+            w = sc.addWidget(l1)
+            layout.addItem(w)
+
+        layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
         self.setLayout(layout)
 
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)

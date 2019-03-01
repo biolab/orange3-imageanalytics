@@ -6,4 +6,4 @@ Pillow>=4.2.1,!=5.1.0
 requests
 cachecontrol
 lockfile
-tensorflow
+git+https://github.com/PrimozGodec/ndf.git

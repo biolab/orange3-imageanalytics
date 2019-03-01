@@ -59,9 +59,7 @@ MODELS = {
         'layers': ['penultimate'],
         'order': 0,
         'is_local': True,
-        'batch_size': 16,
-        'model_file': os.path.join(
-            os.path.dirname(__file__), 'models/squeezenet.pb')
+        'batch_size': 16
     }
 }
 

@@ -27,6 +27,7 @@ cache:
         - $TRAVIS_BUILD_DIR/pyqt
 
 before_install:
+    - sudo apt-get install -qq libegl1-mesa
     - pip install -U pip wheel setuptools
     - pip install codecov
 

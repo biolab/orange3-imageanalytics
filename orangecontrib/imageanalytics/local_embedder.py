@@ -1,12 +1,12 @@
+import multiprocessing
 import time
 from os.path import join
-import sys
 import logging
 import requests
 
 import numpy as np
 import cachecontrol.caches
-from ndf.example_models import *
+from ndf.example_models import squeezenet
 
 from Orange.misc.environ import cache_dir
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
@@ -40,20 +40,15 @@ class LocalEmbedder:
         self._cache = EmbedderCache(model, layer)
 
     def _load_model(self):
-        # prepared if we will have more local embedders in future
-        embedder_function = globals()[self.model]
-        # call embedder function to initiate
-        self.embedder = embedder_function(include_softmax=False)
+        self.embedder = squeezenet(include_softmax=False)
 
     def from_file_paths(self, file_paths, image_processed_callback=None):
-        all_embeddings = [None] * len(file_paths)
-        t = time.time()
-        for i, image in enumerate(file_paths):
-            embeddings = self._embed(image)
-            all_embeddings[i] = embeddings
-            if image_processed_callback:
-                image_processed_callback(success=True)
-        print((time.time() - t) / len(file_paths))
+        all_embeddings = []
+
+        for image in file_paths:
+            all_embeddings.append(self._embed(image))
+            image_processed_callback(success=True)
+
         self._cache.persist_cache()
 
         return np.array(all_embeddings)
@@ -76,7 +71,8 @@ class LocalEmbedder:
         if cached_im is not None:
             return cached_im
 
-        embedded_image = self.embedder.predict(image[None, ...])
+        embedded_image = self.embedder.predict([image])
         embedded_image = embedded_image[0][0]
+
         self._cache.add(cache_key, embedded_image)
         return embedded_image

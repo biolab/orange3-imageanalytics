@@ -47,7 +47,8 @@ class LocalEmbedder:
 
         for image in file_paths:
             all_embeddings.append(self._embed(image))
-            image_processed_callback(success=True)
+            if image_processed_callback:
+                image_processed_callback(success=True)
 
         self._cache.persist_cache()
 

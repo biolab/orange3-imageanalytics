@@ -1,5 +1,4 @@
 import numpy as np
-import os
 
 from Orange.data import ContinuousVariable, Domain, Table
 from orangecontrib.imageanalytics.local_embedder import LocalEmbedder

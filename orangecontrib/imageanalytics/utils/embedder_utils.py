@@ -110,7 +110,6 @@ class EmbedderCache:
 
         cache_file_path = self._cache_file_blueprint.format(model, layer)
         self._cache_file_path = join(cache_dir(), cache_file_path)
-        print(self._cache_file_path)
         self._cache_dict = self._init_cache()
 
     def _init_cache(self):

@@ -1,5 +1,3 @@
-import multiprocessing
-import time
 from os.path import join
 import logging
 import requests

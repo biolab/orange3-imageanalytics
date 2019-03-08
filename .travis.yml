@@ -27,13 +27,12 @@ cache:
         - $TRAVIS_BUILD_DIR/pyqt
 
 before_install:
-    - sudo apt-get install -qq libegl1-mesa
     - pip install -U pip wheel setuptools
     - pip install codecov
 
 install:
     - pip install --only-binary numpy,scipy,scikit-learn numpy scipy scikit-learn
-    - pip install PyQt5!=5.10
+    - pip install sip pyqt5==5.11.*
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .
     # todo: orange cache dir doesn't get created at installation

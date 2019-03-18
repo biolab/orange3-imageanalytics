@@ -319,6 +319,9 @@ class OWImageEmbedding(OWWidget):
 
     def _set_server_info(self, connected):
         self.clear_messages()
+        if self._image_embedder is None:
+            return
+
         if connected:
             self.connection_info.setText("Connected to server.")
         elif self._image_embedder.is_local_embedder():

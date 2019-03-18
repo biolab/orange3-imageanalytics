@@ -6,4 +6,4 @@ Pillow>=4.2.1,!=5.1.0
 requests
 cachecontrol
 lockfile
-ndf
+ndf>=0.1.1  # lower version do not limit numpy version and causes sigbus error

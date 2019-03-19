@@ -3,6 +3,7 @@ import os.path
 import traceback
 from types import SimpleNamespace as namespace
 from urllib.parse import urlparse, urljoin
+import concurrent.futures
 
 import numpy as np
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
@@ -54,9 +55,7 @@ class OWImageEmbedding(OWWidget):
         self._task = None
         self._setup_layout()
         self._image_embedder = None
-        self._executor = qconcurrent.ThreadExecutor(
-            self, threadPool=QThreadPool(maxThreadCount=1)
-        )
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.setBlocking(True)
         QTimer.singleShot(0, self._init_server_connection)
 

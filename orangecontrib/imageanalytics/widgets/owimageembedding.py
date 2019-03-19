@@ -3,6 +3,7 @@ import os.path
 import traceback
 from types import SimpleNamespace as namespace
 from urllib.parse import urlparse, urljoin
+import concurrent.futures
 
 import numpy as np
 from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
@@ -54,9 +55,7 @@ class OWImageEmbedding(OWWidget):
         self._task = None
         self._setup_layout()
         self._image_embedder = None
-        self._executor = qconcurrent.ThreadExecutor(
-            self, threadPool=QThreadPool(maxThreadCount=1)
-        )
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.setBlocking(True)
         QTimer.singleShot(0, self._init_server_connection)
 
@@ -86,8 +85,10 @@ class OWImageEmbedding(OWWidget):
             orientation=Qt.Horizontal,
             callback=self._cb_embedder_changed
         )
-        self.cb_embedder.setModel(VariableListModel(
-            [EMBEDDERS_INFO[e]['name'] for e in self.embedders]))
+        names = [EMBEDDERS_INFO[e]['name'] +
+                 (" (local)" if EMBEDDERS_INFO[e].get("is_local") else "")
+                 for e in self.embedders]
+        self.cb_embedder.setModel(VariableListModel(names))
         if not self.cb_embedder_current_id < len(self.embedders):
             self.cb_embedder_current_id = 0
         self.cb_embedder.setCurrentIndex(self.cb_embedder_current_id)
@@ -173,6 +174,7 @@ class OWImageEmbedding(OWWidget):
             self.commit()
         else:
             self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
+        self._set_server_info(self._image_embedder.is_connected_to_server())
 
     def commit(self):
         if self._task is not None:
@@ -223,7 +225,7 @@ class OWImageEmbedding(OWWidget):
         def cancel():
             task.future.cancel()
             task.cancelled = True
-            task.embedder.cancelled = True
+            task.embedder.set_canceled(True)
 
         embedder = self._image_embedder
 
@@ -316,10 +318,15 @@ class OWImageEmbedding(OWWidget):
 
     def _set_server_info(self, connected):
         self.clear_messages()
+        if self._image_embedder is None:
+            return
+
         if connected:
             self.connection_info.setText("Connected to server.")
+        elif self._image_embedder.is_local_embedder():
+            self.connection_info.setText("Using local embedder.")
         else:
-            self.connection_info.setText("No connection with server.")
+            self.connection_info.setText("Not connected to server.")
             self.warning("Click Apply to try again.")
 
     def onDeleteWidget(self):
@@ -344,7 +351,7 @@ class OWImageEmbedding(OWWidget):
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)
             self.cb_embedder.setDisabled(False)
-            self._image_embedder.cancelled = False
+            self._image_embedder.set_canceled(False)
             # reset the connection.
             connected = self._image_embedder.reconnect_to_server()
             self._set_server_info(connected=connected)

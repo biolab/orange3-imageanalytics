@@ -17,7 +17,7 @@ from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils import concurrent as qconcurrent
 from Orange.widgets.utils.itemmodels import VariableListModel
-from Orange.widgets.widget import Input, Output
+from Orange.widgets.widget import Input, Output, Msg
 from Orange.widgets.widget import OWWidget
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
@@ -39,6 +39,11 @@ class OWImageEmbedding(OWWidget):
     class Outputs:
         embeddings = Output('Embeddings', Table, default=True)
         skipped_images = Output('Skipped Images', Table)
+
+    class Warning(OWWidget.Warning):
+        switched_local_embedder = Msg(
+            "No internet connection: switched to local embedder")
+        reapply = Msg("Click Apply to try again.")
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
@@ -155,10 +160,24 @@ class OWImageEmbedding(OWWidget):
         self.input_data_info.setText(
             "Data with {:d} instances.".format(len(data)))
 
+        self.check_connection()
         self._cb_image_attr_changed()
 
     def _cb_image_attr_changed(self):
         self.commit()
+
+    def check_connection(self):
+        """
+        The method check if it is possible to send images to embedder
+        if not embedder is switched to local
+        """
+        self.Warning.switched_local_embedder.clear()
+        if not self._image_embedder.is_local_embedder() and \
+            not self._image_embedder.is_connected_to_server():
+            # switching to local embedder
+            self.Warning.switched_local_embedder()
+            self.cb_embedder_current_id = self.embedders.index("squeezenet")
+            self._init_server_connection()
 
     def _cb_embedder_changed(self):
         current_embedder = self.embedders[self.cb_embedder_current_id]
@@ -317,7 +336,7 @@ class OWImageEmbedding(OWWidget):
                     len(self._input_data), num_skipped))
 
     def _set_server_info(self, connected):
-        self.clear_messages()
+        self.Warning.reapply.clear()
         if self._image_embedder is None:
             return
 
@@ -327,7 +346,7 @@ class OWImageEmbedding(OWWidget):
             self.connection_info.setText("Using local embedder.")
         else:
             self.connection_info.setText("Not connected to server.")
-            self.warning("Click Apply to try again.")
+            self.Warning.reapply()
 
     def onDeleteWidget(self):
         self.cancel()

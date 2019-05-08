@@ -341,7 +341,7 @@ class OWImportImages(widget.OWWidget):
         """
         if self.recent_paths and path is not None and \
                 os.path.isdir(self.recent_paths[0].abspath) and os.path.isdir(path) \
-                and os.path.samefile(os.path.isdir(self.recent_paths[0].abspath), path):
+                and os.path.samefile(self.recent_paths[0].abspath, path):
             return True
 
         success = True

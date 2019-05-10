@@ -29,8 +29,7 @@ from AnyQt.QtWidgets import (
     QVBoxLayout, QLabel
 )
 
-import Orange.data
-
+from Orange.data import Table
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.filedialogs import RecentPath
 from Orange.widgets.utils.concurrent import (
@@ -38,6 +37,7 @@ from Orange.widgets.utils.concurrent import (
 )
 
 from Orange.canvas.preview.previewbrowser import TextLabel
+from Orange.widgets.utils.signals import Output
 
 from orangecontrib.imageanalytics.import_images import ImportImages
 
@@ -100,7 +100,8 @@ class OWImportImages(widget.OWWidget):
     icon = "icons/ImportImages.svg"
     priority = 110
 
-    outputs = [("Data", Orange.data.Table)]
+    class Outputs:
+        data = Output('Data', Table, default=True)
 
     #: list of recent paths
     recent_paths = settings.Setting([])  # type: List[RecentPath]
@@ -577,7 +578,7 @@ class OWImportImages(widget.OWWidget):
         """
         Commit a Table from the collected image meta data.
         """
-        self.send("Data", self.data)
+        self.Outputs.data.send(self.data)
 
     def onDeleteWidget(self):
         self.cancel()

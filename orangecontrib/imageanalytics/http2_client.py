@@ -1,5 +1,6 @@
 import json
 from urllib.parse import urlparse
+import os
 
 try:
     from json.decoder import JSONDecodeError
@@ -104,7 +105,10 @@ class Http2Client(object):
         """
         url = self._server_url.split(":")[0]
         if url is not None:
-            response = system("ping -c 1 " + url)
+            if os.name == 'nt':
+                response = system("ping %s -n 2" % url)
+            else:
+                response = system("ping -c 2 " + url)
             return response == 0
         else:
             return False

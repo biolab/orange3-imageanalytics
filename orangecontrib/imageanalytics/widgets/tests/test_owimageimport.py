@@ -1,31 +1,18 @@
 import os
 import tempfile
-import unittest
 
 from AnyQt.QtCore import Qt, QUrl, QMimeData
 from AnyQt.QtGui import QDropEvent, QDragEnterEvent
 from AnyQt.QtWidgets import QApplication
 from AnyQt.QtTest import QTest, QSignalSpy
+from Orange.widgets.tests.base import WidgetTest
 
-from orangecontrib.imageanalytics.widgets import owimageimport
+from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
 
 
-class TestOWImageImport(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        app = QApplication.instance()
-        if app is None:
-            app = QApplication([])
-        cls.app = app
-
-    @classmethod
-    def tearDownClass(cls):
-        QTest.qWait(40)
-        cls.app = None
-
+class TestOWImageImport(WidgetTest):
     def setUp(self):
-        self.widget = owimageimport.OWImportImages()
+        self.widget = self.create_widget(OWImportImages)
 
     def tearDown(self):
         self.widget.onDeleteWidget()
@@ -80,3 +67,15 @@ class TestOWImageImport(unittest.TestCase):
                              urlpath.toLocalFile())
             self._startandwait(widget)
             self.widget.commit()
+
+    def test_image_dir(self):
+        widget = self.widget
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                            "test_images")
+        widget.setCurrentPath(path)
+        self._startandwait(widget)
+        widget.commit()
+        output = self.get_output(widget.Outputs.data)
+
+        self.assertIsNotNone(output)
+        self.assertEqual(len(output), 4)  # 4 images in the target dir

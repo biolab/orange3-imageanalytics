@@ -5,6 +5,8 @@ from Orange.widgets.tests.base import WidgetTest
 from orangecontrib.imageanalytics.widgets.owimagegrid import OWImageGrid
 import numpy as np
 
+from orangecontrib.imageanalytics.widgets.tests.utils import load_images
+
 
 class TestOWImageGrid(WidgetTest):
     @classmethod
@@ -14,17 +16,17 @@ class TestOWImageGrid(WidgetTest):
         cls.signal_name = "Embeddings"
         cls.signal_data = Table("iris")
 
-        cls.zoo = Table("zoo-with-images.tab")
+        cls.test_images = load_images()
 
         domain = Domain([
             ContinuousVariable("emb1"), ContinuousVariable("emb2"),
             ContinuousVariable("emb3")],
-            cls.zoo.domain.class_vars,
-            cls.zoo.domain.metas
+            cls.test_images.domain.class_vars,
+            cls.test_images.domain.metas
         )
-        data = np.random.random((len(cls.zoo), 3))
-        cls.fake_embeddings = Table(domain, data, cls.zoo.Y,
-                                    metas=cls.zoo.metas)
+        data = np.random.random((len(cls.test_images), 3))
+        cls.fake_embeddings = Table(domain, data, cls.test_images.Y,
+                                    metas=cls.test_images.metas)
 
     def setUp(self):
         self.widget = self.create_widget(OWImageGrid)
@@ -71,23 +73,22 @@ class TestOWImageGrid(WidgetTest):
 
     def test_different_subset_data(self):
         self.send_signal("Embeddings", Table("iris"))
-        self.send_signal("Data Subset", Table("zoo-with-images"))
+        self.send_signal("Data Subset", self.test_images)
 
     def test_selection(self):
         w = self.widget
 
-        self.send_signal("Embeddings", self.fake_embeddings[:12])
+        self.send_signal("Embeddings", self.fake_embeddings)
 
         # all image spaces are full
-        w.colSpinner.setValue(4)
-        w.rowSpinner.setValue(3)
+        w.colSpinner.setValue(2)
+        w.rowSpinner.setValue(2)
 
-        # TODO: try to select with clicking
         w.on_selection_changed(
-            [w.items[0].widget, w.items[3].widget, w.items[4].widget], True)
+            [w.items[0].widget, w.items[3].widget, w.items[2].widget], True)
 
         im_out = self.get_output("Images")
-        self.assertEqual(sum(im_out.metas[:, 2]), 3)  # 3 selected elements
+        self.assertEqual(sum(im_out.Y), 3)  # 3 selected elements
 
         sel_out = self.get_output("Selected Images")
         self.assertEqual(len(sel_out), 3)

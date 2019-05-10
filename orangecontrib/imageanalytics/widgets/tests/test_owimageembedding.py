@@ -1,7 +1,8 @@
-from Orange.data import Table
+from Orange.data import Table, Domain, StringVariable
 from Orange.widgets.tests.base import WidgetTest
 from orangecontrib.imageanalytics.widgets.owimageembedding \
     import OWImageEmbedding
+from orangecontrib.imageanalytics.widgets.tests.utils import load_images
 
 
 class DummyCorpus(Table):
@@ -31,7 +32,8 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, None)
 
     def test_data_corpus(self):
-        table = DummyCorpus("zoo-with-images")[::3]
+        table = load_images()
+        table = DummyCorpus(table)
 
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.embeddings)
@@ -40,7 +42,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertEqual(len(results), len(table))
 
     def test_data_regular_table(self):
-        table = Table("zoo-with-images")[::3]
+        table = load_images()
 
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.embeddings)
@@ -51,20 +53,21 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertEqual(len(results), len(table))
 
     def test_skipped_images(self):
-        table = DummyCorpus("zoo-with-images")[::3]
+        table = load_images()
 
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.skipped_images)
 
+        print(table)
         # in case of zoo where all images are present
         self.assertEqual(results, None)
 
         # all skipped
-        table[:, "images"] = "http://www.none.com/image.jpg"
+        del table.domain.metas[0].attributes["origin"]
+        table[:, "Images"] = "http://www.none.com/image.jpg"
 
         self.send_signal(self.widget.Inputs.images, table)
         skipped = self.get_output(self.widget.Outputs.skipped_images)
 
-        self.assertEqual(type(skipped), DummyCorpus)
+        self.assertEqual(type(skipped), Table)
         self.assertEqual(len(skipped), len(table))
-

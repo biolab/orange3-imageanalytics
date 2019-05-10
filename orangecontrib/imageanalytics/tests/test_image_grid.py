@@ -9,7 +9,7 @@ from orangecontrib.imageanalytics.image_grid import ImageGrid
 class ImageGridTest(unittest.TestCase):
     def setUp(self):
         logging.disable(logging.CRITICAL)
-        self.grid = ImageGrid(Table("wine"))
+        self.grid = ImageGrid(Table("iris"))
 
     def tearDown(self):
         logging.disable(logging.NOTSET)

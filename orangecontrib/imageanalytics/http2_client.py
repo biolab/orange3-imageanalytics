@@ -8,7 +8,7 @@ except ImportError:
     JSONDecodeError = ValueError
 import logging
 import sys
-from os import getenv, environ
+from os import getenv, environ, system
 from socket import gaierror, timeout
 
 from h2.exceptions import ProtocolError
@@ -85,12 +85,30 @@ class Http2Client(object):
         return self._server_ping_successful()
 
     def _server_ping_successful(self):
+        """
+        Ping server and also check whether connection is still active
+        """
         try:
             self._server_connection.ping(bytes(8))
         except (OSError, TimeoutError, ConnectionError, gaierror, timeout):
             log.error("Remote server not reachable", exc_info=True)
             return False
         return True
+
+    def ping_server(self):
+        """
+        Ping server to find out whether still connected to internet
+        The reason for separate function is that ping function provided
+        by hyper does not work correctly when embedder lose connection after
+        already connected.
+        """
+        url = self._server_url.split(":")[0]
+        if url is not None:
+            response = system("ping -c 1 " + url)
+            return response == 0
+        else:
+            return False
+
 
     def _send_request(self, method, url, headers, body_bytes):
         if not self._server_connection or not self._max_concurrent_streams:

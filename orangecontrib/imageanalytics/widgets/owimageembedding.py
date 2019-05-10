@@ -173,7 +173,7 @@ class OWImageEmbedding(OWWidget):
         """
         self.Warning.switched_local_embedder.clear()
         if not self._image_embedder.is_local_embedder() and \
-            not self._image_embedder.is_connected_to_server():
+            not self._image_embedder.is_connected_to_server(use_hyper=False):
             # switching to local embedder
             self.Warning.switched_local_embedder()
             self.cb_embedder_current_id = self.embedders.index("squeezenet")

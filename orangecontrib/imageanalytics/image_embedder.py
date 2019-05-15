@@ -10,7 +10,7 @@ MODELS = {
         'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
         'layers': ['penultimate'],
-        'order': 1
+        'order': 0
     },
     'painters': {
         'name': 'Painters',
@@ -56,7 +56,7 @@ MODELS = {
                        '50x fewer parameters.',
         'target_image_size': (227, 227),
         'layers': ['penultimate'],
-        'order': 0,
+        'order': 1,
         'is_local': True,
         'batch_size': 16
     }
@@ -186,9 +186,10 @@ class ImageEmbedder:
         metas = data.domain.metas
         return [m for m in metas if m.attributes.get('type') == 'image']
 
-    def is_connected_to_server(self):
+    def is_connected_to_server(self, use_hyper=True):
         if not self.is_local_embedder():
-            return self._embedder.is_connected_to_server()
+            return self._embedder.is_connected_to_server() if use_hyper else \
+                self._embedder.ping_server()
         else:
             return False
 

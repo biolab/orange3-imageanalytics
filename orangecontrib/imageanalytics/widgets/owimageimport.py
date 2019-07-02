@@ -35,13 +35,8 @@ from Orange.widgets.utils.filedialogs import RecentPath
 from Orange.widgets.utils.concurrent import (
     ThreadExecutor, FutureWatcher, methodinvoke
 )
-
-try:
-    from orangecanvas.preview.previewbrowser import TextLabel
-except ImportError:
-    from Orange.canvas.preview.previewbrowser import TextLabel
-
 from Orange.widgets.utils.signals import Output
+from orangecanvas.preview.previewbrowser import TextLabel
 
 from orangecontrib.imageanalytics.import_images import ImportImages
 

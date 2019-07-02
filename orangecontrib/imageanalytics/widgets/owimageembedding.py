@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urljoin
 import concurrent.futures
 
 import numpy as np
-from AnyQt.QtCore import Qt, QTimer, QThread, QThreadPool
+from AnyQt.QtCore import Qt, QTimer, QThread
 from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtTest import QSignalSpy
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle

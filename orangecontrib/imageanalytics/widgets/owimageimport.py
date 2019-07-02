@@ -36,7 +36,11 @@ from Orange.widgets.utils.concurrent import (
     ThreadExecutor, FutureWatcher, methodinvoke
 )
 
-from Orange.canvas.preview.previewbrowser import TextLabel
+try:
+    from orangecanvas.preview.previewbrowser import TextLabel
+except ImportError:
+    from Orange.canvas.preview.previewbrowser import TextLabel
+
 from Orange.widgets.utils.signals import Output
 
 from orangecontrib.imageanalytics.import_images import ImportImages

@@ -48,7 +48,8 @@ class ImageLoader:
             except ValueError:
                 return None
 
-        image = image.resize(target_size, LANCZOS)
+        if target_size is not None:
+            image = image.resize(target_size, LANCZOS)
         return image
 
     def load_image_bytes(self, file_path, target_size):

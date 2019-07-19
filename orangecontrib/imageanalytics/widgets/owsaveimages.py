@@ -1,16 +1,21 @@
 import os.path
 import shutil
+from collections import deque
+from os.path import join, isdir
 from urllib.parse import urlparse, urljoin
+from types import SimpleNamespace as namespace
+
 
 from AnyQt.QtWidgets import QFileDialog, QGridLayout, QMessageBox
 from AnyQt.QtCore import Qt
 
 from Orange.data.table import Table
 from Orange.widgets import gui, widget
+from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.widgetpreview import WidgetPreview
-from Orange.widgets.widget import Input
+from Orange.widgets.widget import Input, OWWidget
 
 from orangecontrib.imageanalytics.image_embedder import MODELS, ImageEmbedder
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
@@ -19,7 +24,77 @@ SUPPORTED_FILE_FORMATS = ["png", "jpeg", "gif", "tiff", "pdf", "bmp", "eps",
                           "ico"]
 
 
-class OWSaveImages(widget.OWWidget):
+class Result(namespace):
+    paths = None
+
+
+def _get_classes(data):
+    """
+    Function retrieve classes for each image or return None if no classes.
+    """
+    # get classes
+    return list(map(data.domain.class_var.repr_val, data.Y)) \
+        if data.domain.class_var else None
+
+
+def _clean_dir(dir_name):
+    """
+    Function removes the directory if it already exist.
+    """
+    if isdir(dir_name):
+        shutil.rmtree(dir_name)
+
+
+def _create_dir(path):
+    """
+    Function checks if dir exist and creates it if it is required.
+    """
+    dir_path = os.path.dirname(path)
+    if not isdir(dir_path):
+        os.makedirs(dir_path)
+
+
+def _save_an_image(loader, origin, save_path, target_size):
+    """
+    This function loads and saves a separate image.
+    """
+    _create_dir(save_path)
+    image = loader.load_image_or_none(origin, target_size)
+    if image is not None:
+        image.save(save_path)
+
+
+def _prepare_dir_and_save_images(
+        paths_queue, dir_name, target_size, previously_saved, state: TaskState):
+    """
+    This function prepares a directory structure and calls function
+    that saves images.
+
+    Parameters
+    ----------
+    previously_saved : int
+        Number of saved images in the previous process. If the process is
+        resumed it is non-zero.
+    """
+    res = Result(paths=paths_queue)
+    if previously_saved == 0:
+        _clean_dir(dir_name)
+
+    steps = len(paths_queue) + previously_saved
+    loader = ImageLoader()
+    while res.paths:
+        from_path, to_path = res.paths.popleft()
+        _save_an_image(loader, from_path, to_path, target_size)
+
+        state.set_progress_value((1 - len(res.paths) / steps) * 100)
+        state.set_partial_result(res)
+        if state.is_interruption_requested():
+            return res
+
+    return res
+
+
+class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     name = "Save Images"
     description = "Save images in the directory structure."
     icon = "icons/SaveImages.svg"
@@ -49,9 +124,14 @@ class OWSaveImages(widget.OWWidget):
 
     image_attributes = None
     data = None
+    paths_queue = None
+    # number of images saved in the previous iteration if process was
+    # interrupted
+    previously_saved = 0
 
     def __init__(self):
-        super().__init__()
+        OWWidget.__init__(self)
+        ConcurrentWidgetMixin.__init__(self)
 
         self.available_scales = sorted(
             MODELS.values(), key=lambda x: x["order"])
@@ -133,25 +213,91 @@ class OWSaveImages(widget.OWWidget):
         When any setting changes save files if auto_save.
         """
         self.scale_combo.setEnabled(self.use_scale)
+        self.reset_queue()
         if self.auto_save:
             self.save_file()
+
+    def gather_paths(self):
+        classes = _get_classes(self.data)
+        file_paths_attr = self.image_attributes[self.image_attr_current_index]
+        file_paths = self.data[:, file_paths_attr].metas.flatten()
+        origin = file_paths_attr.attributes.get("origin", "")
+        file_paths_mask = file_paths == file_paths_attr.Unknown
+        file_paths_valid = file_paths[~file_paths_mask]
+
+        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
+                origin[-1] != "/":
+            origin += "/"
+
+        from_paths = []
+        to_paths = []
+        for i, a in enumerate(file_paths_valid):
+            urlparts = urlparse(a)
+            path = a
+            if urlparts.scheme not in ("http", "https", "ftp", "data"):
+                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
+                    path = urljoin(origin, a)
+                else:
+                    path = os.path.join(origin, a)
+            from_paths.append(path)
+
+            file_format = SUPPORTED_FILE_FORMATS[self.file_format_index]
+            filename = os.path.basename(path)
+            if "." in filename:
+                filename = filename.rsplit(".")[0]  # remove file ending
+            to_paths.append(join(join(self.dirname, classes[i])
+                                 if classes is not None else self.dirname,
+                                 "{}.{}".format(filename, file_format)))
+        return from_paths, to_paths
+
+    def save_images(self):
+        if self.paths_queue is None:
+            from_path, to_path = self.gather_paths()
+            self.paths_queue = deque(list(zip(from_path, to_path)))
+        image_size = \
+            self.available_scales[self.scale_index]["target_image_size"]\
+            if self.use_scale else None
+        self.bt_save.setText("Stop")
+        self.start(_prepare_dir_and_save_images, self.paths_queue,
+                   self.dirname, image_size, self.previously_saved)
+
+    def on_partial_result(self, result: Result):
+        self.paths_queue = result.paths
+        self.previously_saved += 1
+
+    def on_done(self, result: Result):
+        assert len(result.paths) == 0
+        self.bt_save.setText("Save")
+        self.reset_queue()
+
+    def on_exception(self, ex: Exception):
+        self.Error.general_error(ex)
+        self.bt_save.setText("Save")
+        self.reset_queue()
+
+    def reset_queue(self):
+        self.paths_queue = None
+        self.previously_saved = 0
 
     def save_file(self):
         """
         This function is called when save button is pressed.
         """
-        if not self.dirname:
-            self.save_file_as()
-            return
+        # if task already running interrupt it
+        if self.task is not None:
+            self.cancel()
+            self.bt_save.setText("Resume save")
+        # when task not running start/restart it
+        else:
+            if not self.dirname:
+                self.save_file_as()
+                return
 
-        self.Error.general_error.clear()
-        if self.data is None or self.image_attributes is None \
-                or not self.dirname:
-            return
-        try:
-            self._prepare_dir_and_save_images()
-        except IOError as err_value:
-            self.Error.general_error(str(err_value))
+            self.Error.general_error.clear()
+            if self.data is None or self.image_attributes is None \
+                    or not self.dirname:
+                return
+            self.save_images()
 
     def save_file_as(self):
         """
@@ -165,84 +311,8 @@ class OWSaveImages(widget.OWWidget):
         self.last_dir = os.path.split(self.dirname)[0]
         self.bt_save.setText(f"Save as {os.path.basename(dirname)}")
         self._update_messages()
+        self.reset_queue()
         self.save_file()
-
-    def _prepare_dir_and_save_images(self):
-        """
-        This function prepares a directory structure and calls function
-        that saves images.
-        """
-        # remove the dir if already exist
-        if os.path.isdir(self.dirname):
-            shutil.rmtree(self.dirname)
-
-        # get_classes
-        classes = self._get_classes()
-        classes_unique = set(classes) if classes is not None else None
-
-        # create dirs
-        os.mkdir(self.dirname)
-        if classes_unique is not None:
-            for c in classes_unique:
-                os.makedirs(os.path.join(self.dirname, c))
-
-        # save images
-        self._save_images()
-
-    def _save_images(self):
-        """
-        Function extracts paths and classes and calls the function that loads
-        and save separate images.
-        """
-        classes = self._get_classes()
-        file_paths_attr = self.image_attributes[self.image_attr_current_index]
-        file_paths = self.data[:, file_paths_attr].metas.flatten()
-        origin = file_paths_attr.attributes.get("origin", "")
-        file_paths_mask = file_paths == file_paths_attr.Unknown
-        file_paths_valid = file_paths[~file_paths_mask]
-
-        loader = ImageLoader()
-
-        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
-                origin[-1] != "/":
-            origin += "/"
-        for i, a in enumerate(file_paths_valid):
-            urlparts = urlparse(a)
-            path = a
-            if urlparts.scheme not in ("http", "https", "ftp", "data"):
-                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
-                    path = urljoin(origin, a)
-                else:
-                    path = os.path.join(origin, a)
-            self._save_an_image(
-                loader, path, os.path.join(self.dirname, classes[i])
-                if classes is not None else self.dirname)
-
-    def _save_an_image(self, loader, origin, save_path):
-        """
-        This function saves a separate image.
-        """
-        file_format = SUPPORTED_FILE_FORMATS[self.file_format_index]
-        filename = os.path.basename(origin)
-        if "." in filename:
-            filename = ".".join(filename.split("."))
-
-        image = loader.load_image_or_none(
-            origin,
-            (self.available_scales[self.scale_index]["target_image_size"]
-             if self.use_scale else None))
-        if image is not None:
-            image.save(
-                "{}.{}".format(os.path.join(save_path, filename), file_format),
-                format=file_format)
-
-    def _get_classes(self):
-        """
-        Function retrieve classes for each image or return None if no classes.
-        """
-        # get classes
-        return list(map(self.data.domain.class_var.repr_val, self.data.Y)) \
-            if self.data.domain.class_var else None
 
     @Inputs.data
     def dataset(self, data):
@@ -317,6 +387,14 @@ class OWSaveImages(widget.OWWidget):
                     f"Folder {os.path.split(filename)[1]} already exists.\n"
                     "Overwrite?") == QMessageBox.Yes:
                 return filename
+
+    def clear(self):
+        super().clear()
+        self.cancel()
+
+    def onDeleteWidget(self):
+        self.shutdown()
+        super().onDeleteWidget()
 
 
 if __name__ == "__main__":  # pragma: no cover

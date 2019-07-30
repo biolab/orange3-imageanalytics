@@ -2,7 +2,6 @@
 branch = True
 source = orangecontrib
 omit =
-    orangecontrib/imageanalytics/widgets/*
     orangecontrib/imageanalytics/tests/*
 
 [report]

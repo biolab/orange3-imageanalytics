@@ -3,6 +3,7 @@ branch = True
 source = orangecontrib
 omit =
     orangecontrib/imageanalytics/tests/*
+    orangecontrib/imageanalytics/widgets/tests/*
 
 [report]
 exclude_lines =

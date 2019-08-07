@@ -186,10 +186,9 @@ class ImageEmbedder:
         metas = data.domain.metas
         return [m for m in metas if m.attributes.get('type') == 'image']
 
-    def is_connected_to_server(self, use_hyper=True):
+    def is_connected_to_server(self):
         if not self.is_local_embedder():
-            return self._embedder.is_connected_to_server() if use_hyper else \
-                self._embedder.ping_server()
+            return self._embedder.is_connected_to_server()
         else:
             return False
 

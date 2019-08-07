@@ -1,6 +1,11 @@
 import json
+import uuid
 from urllib.parse import urlparse
 import os
+
+from PyQt5.QtCore import QSettings
+
+from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
 
 try:
     from json.decoder import JSONDecodeError
@@ -31,9 +36,15 @@ class Http2Client(object):
     """Base class for an http2 client."""
     _no_conn_err = "No connection with server, call reconnect_to_server()"
 
-    def __init__(self, server_url):
+    def __init__(self, server_url, target_size, model):
         self._server_url = getenv('ORANGE_EMBEDDING_API_URL', server_url)
         self._server_connection = self._connect_to_server()
+        self._target_image_size = target_size
+        self._image_loader = ImageLoader()
+        self._model = model
+        self.machine_id = \
+            QSettings().value('error-reporting/machine-id', '', type=str) \
+            or str(uuid.getnode())
         self._max_concurrent_streams = self._read_max_concurrent_streams()
 
     def reconnect_to_server(self):
@@ -66,9 +77,6 @@ class Http2Client(object):
                                 proxy_host=host, proxy_port=port)
 
     def _read_max_concurrent_streams(self):
-        if not self._server_ping_successful():
-            return None
-
         # pylint: disable=protected-access
         max_concurrent_streams = (self._server_connection._conn._obj
                                   .remote_settings.max_concurrent_streams)
@@ -83,36 +91,7 @@ class Http2Client(object):
             return False
         if not self._max_concurrent_streams:
             return False
-        return self._server_ping_successful()
-
-    def _server_ping_successful(self):
-        """
-        Ping server and also check whether connection is still active
-        """
-        try:
-            self._server_connection.ping(bytes(8))
-        except (OSError, TimeoutError, ConnectionError, gaierror, timeout):
-            log.error("Remote server not reachable", exc_info=True)
-            return False
-        return True
-
-    def ping_server(self):
-        """
-        Ping server to find out whether still connected to internet
-        The reason for separate function is that ping function provided
-        by hyper does not work correctly when embedder lose connection after
-        already connected.
-        """
-        url = self._server_url.split(":")[0]
-        if url is not None:
-            if os.name == 'nt':
-                response = system("ping %s -n 2" % url)
-            else:
-                response = system("ping -c 2 " + url)
-            return response == 0
-        else:
-            return False
-
+        return self.ping_server()
 
     def _send_request(self, method, url, headers, body_bytes):
         if not self._server_connection or not self._max_concurrent_streams:
@@ -162,3 +141,35 @@ class Http2Client(object):
             error = ConnectionError("Response receiving failed")
             log.error(error, exc_info=True)
             raise error
+
+    def ping_server(self):
+        """
+        This function ping server with sending the image to the embedder,
+        if response will be the embedded image it is successful.
+
+        Returns
+        -------
+        bool
+            This bool tells whether ping is successful whether not.
+        """
+        file_path = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(file_path, "widgets/images/face_test_image.png")
+        image = self._image_loader.load_image_bytes(
+            path, self._target_image_size)
+        headers = {
+            'Content-Type': 'image/jpeg',
+            'Content-Length': str(len(image))
+        }
+        try:
+            stream_id = self._send_request(
+                method='POST',
+                url='/image/' + self._model +
+                    '?machine={}&session={}&retry={}'
+                    .format(self.machine_id, "ping", 0),
+                headers=headers,
+                body_bytes=image
+            )
+            response = self._get_json_response_or_none(stream_id)
+        except (ConnectionError, MaxNumberOfRequestsError, BrokenPipeError):
+            return False
+        return response and 'embedding' in response

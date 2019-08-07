@@ -173,7 +173,7 @@ class OWImageEmbedding(OWWidget):
         """
         self.Warning.switched_local_embedder.clear()
         if not self._image_embedder.is_local_embedder() and \
-            not self._image_embedder.is_connected_to_server(use_hyper=False):
+            not self._image_embedder.is_connected_to_server():
             # switching to local embedder
             self.Warning.switched_local_embedder()
             self.cb_embedder_current_id = self.embedders.index("squeezenet")
@@ -378,14 +378,11 @@ class OWImageEmbedding(OWWidget):
 
 def main(argv=None):
     from AnyQt.QtWidgets import QApplication
+    from orangecontrib.imageanalytics.widgets.tests.utils import load_images
     logging.basicConfig(level=logging.DEBUG)
     app = QApplication(list(argv) if argv else [])
-    argv = app.arguments()
-    if len(argv) > 1:
-        filename = argv[1]
-    else:
-        filename = "zoo-with-images"
-    data = Table(filename)
+
+    data = load_images()
     widget = OWImageEmbedding()
     widget.show()
     assert QSignalSpy(widget.blockingStateChanged).wait()

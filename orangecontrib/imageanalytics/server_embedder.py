@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 import uuid
 from itertools import islice
@@ -19,20 +20,15 @@ class ServerEmbedder(Http2Client):
     CANNOT_LOAD = "cannot load"
 
     def __init__(self, model, model_settings, layer, server_url):
-        super().__init__(server_url)
-        self._model = model
+        target_size = model_settings['target_image_size']
+        super().__init__(server_url, target_size, model)
         self._layer = layer
 
-        self._target_image_size = model_settings['target_image_size']
         # attribute that offers support for cancelling the embedding
         # if ran in another thread
         self.cancelled = False
-        self.machine_id = \
-            QSettings().value('error-reporting/machine-id', '', type=str) \
-            or str(uuid.getnode())
         self.session_id = None
 
-        self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model, layer)
 
     def from_file_paths(self, file_paths, image_processed_callback=None):

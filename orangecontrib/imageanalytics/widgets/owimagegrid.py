@@ -215,9 +215,8 @@ class OWImageGrid(widget.OWWidget):
 
             # set label combo labels
             self.label_model.set_domain(domain)
-
             self.openContext(data)
-
+            self.label_attr = self.label_model[0]
             self.imageAttr = max(
                 min(self.imageAttr, len(self.stringAttrs) - 1), 0)
 
@@ -236,6 +235,7 @@ class OWImageGrid(widget.OWWidget):
         self.image_grid = None
         self.error()
         self.imageAttrCB.clear()
+        self.label_attr_cb.clear()
         self.clear_scene()
 
     def is_valid_data(self):
@@ -381,9 +381,6 @@ class OWImageGrid(widget.OWWidget):
         self.clear_scene()
         if self.is_valid_data():
             self.setup_scene()
-
-    def change_label_attr(self):
-        pass
 
     def thumbnail_items(self):
         return [item.widget for item in self.items]
@@ -768,6 +765,10 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         self.__layout.setSpacing(0)
         self.setLayout(self.__layout)
 
+    @property
+    def thumbnails(self):
+        return self.__thumbnails
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
 
@@ -1148,6 +1149,10 @@ class ThumbnailView(QGraphicsView):
     @proxydoc(GraphicsThumbnailGrid.addThumbnail)
     def addThumbnail(self, thumbnail):
         self.__grid.addThumbnail(thumbnail)
+
+    @property
+    def grid(self):
+        return self.__grid
 
     @proxydoc(GraphicsThumbnailGrid.insertThumbnail)
     def insertThumbnail(self, index, thumbnail):

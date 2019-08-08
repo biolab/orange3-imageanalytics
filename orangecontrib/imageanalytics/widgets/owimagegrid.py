@@ -12,7 +12,8 @@ from AnyQt.QtCore import (
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtGui import (
-    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader
+    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader,
+    QFontMetrics
 )
 from AnyQt.QtWidgets import (
     QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem,
@@ -151,16 +152,10 @@ class OWImageGrid(widget.OWWidget):
         self.label_attr_cb = gui.comboBox(
             self.label_box, self, "label_attr",
             tooltip="Show labels",
-            callback=self.setup_scene,
+            callback=self.update_size,
             addSpace=True,
             model=self.label_model
         )
-        gui.checkBox(
-            self.label_box, self,
-            value="label_selected",
-            label="Label only selection and subset",
-            callback=self.setup_scene,
-            tooltip="Add labels to selected images only.")
 
         gui.rubber(self.controlArea)
 
@@ -266,12 +261,13 @@ class OWImageGrid(widget.OWWidget):
             for i, inst in enumerate(self.image_grid.image_list):
                 label_text = (str(inst[self.label_attr])
                     if self.label_attr is not None else "")
-                if label_text == "?": label_text = ""
+                if label_text == "?":
+                    label_text = ""
 
                 thumbnail = GraphicsThumbnailWidget(
                     QPixmap(), crop=self.cell_fit == 1,
                     add_label=self.label_selected and
-                              self.label_attr is not None, text=label_text)
+                    self.label_attr is not None, text=label_text)
                 thumbnail.setThumbnailSize(size)
                 thumbnail.instance = inst
                 self.thumbnailView.addThumbnail(thumbnail)
@@ -531,6 +527,7 @@ class OWImageGrid(widget.OWWidget):
         self.cancel_all_futures()
         self.clear()
 
+
 """
 Classes from Image Viewer, slightly adapted.
 Unfortunately, these classes had to be modified with ImageGrid-specific
@@ -642,6 +639,16 @@ class GraphicsPixmapWidget(QGraphicsWidget):
         painter.restore()
 
 
+class ElidedLabel(QLabel):
+    def paintEvent( self, event ):
+        painter = QPainter(self)
+
+        metrics = QFontMetrics(self.font())
+        elided = metrics.elidedText(self.text(), Qt.ElideRight, self.width())
+
+        painter.drawText(self.rect(), self.alignment(), elided)
+
+
 class GraphicsThumbnailWidget(QGraphicsWidget):
     def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True,
                  add_label=False, text="", **kwargs):
@@ -662,13 +669,16 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
 
         layout.addItem(self.pixmapWidget)
 
+        self.label = None
         if add_label:
-            l1 = QLabel(text)
+            l1 = ElidedLabel(text)
             l1.setStyleSheet("background-color: rgba(255, 255, 255, 10);")
             l1.setAlignment(Qt.AlignCenter)
+            l1.setFixedHeight(16)
 
-            sc = QGraphicsScene()
-            w = sc.addWidget(l1)
+            self.label = l1
+            gs = QGraphicsScene()
+            w = gs.addWidget(l1)
             layout.addItem(w)
 
         layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
@@ -702,6 +712,8 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
     def setThumbnailSize(self, size):
         if self._size != size:
             self._size = QSizeF(size)
+            if self.label is not None:
+                self.label.setFixedWidth(size.width())
             self._updatePixmapSize()
 
     def paint(self, painter, option, widget=0):
@@ -977,12 +989,14 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         width = ((self.size().width() - self.__columnCount * 10) /
                 self.__columnCount)
         height = (self.size().height() - self.__rowCount * 10) / self.__rowCount
-        item_size = min(width, height)
 
         for item in self.__thumbnails:
+            label_size = item.label.height() + 1 if item.label is not None else 0
+            item_size = min(width, height - label_size)
             item.setThumbnailSize(QSizeF(item_size, item_size))
 
         self.__relayoutGrid(self.__columnCount)
+
 
     def __relayoutGrid(self, columnCount):
         layout = self.__layout

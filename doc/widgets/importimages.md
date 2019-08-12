@@ -1,32 +1,15 @@
 Import Images
 =============
 
-.. figure:: icons/import-images.png
+Import images from a directory(s).
 
-Import images from a directory(s)
+**Outputs**
 
-Signals
--------
+- Data: Dataset describing one image in each row.
 
-**Inputs**:
+**Import Images** walks through a directory and returs one row per located image. Columns include image name, path to image, width, height and image size. Column with image path is later used as an attribute for image visualization and embedding.
 
--  (None)
-
-**Outputs**:
-
--  **Data**
-
-   Dataset describing one image in each row.
-
-Description
------------
-
-**Import Images** walks through a directory and returs one row per 
-located image. Columns include image name, path to image, width, height 
-and image size. Column with image path is later used as an attribute for image visualization and embedding.
-
-.. figure:: images/ImportImages-stamped.png
-   :scale: 50%
+![](images/ImportImages-stamped.png)
 
 1. Currently loaded folder.
 2. Select the folder to load.
@@ -34,8 +17,7 @@ and image size. Column with image path is later used as an attribute for image v
 4. Information on the input.
 5. Access help.
 
-.. figure:: images/ImportImages-class.png
-   :scale: 50%
+![](images/ImportImages-class.png)
 
 You can load a folder containing subfolders. In this case Orange will consider each folder as a class value. In the example above, **Import Images** loaded 26 images belonging to two categories. These two categories will be used as class values.
 
@@ -46,10 +28,8 @@ Example
 
 We can observe the result in a **Data Table**. See how Orange added an extra class attribute with values Monet and Manet?
 
-Now we can proceed with standard machine learning methods. We will send images to :doc:`Image Embedding <imageembedding>`, where we will use *Painters* embedder to retrieve image vectors.
+Now we can proceed with standard machine learning methods. We will send images to [Image Embedding](imageembedding.md), where we will use *Painters* embedder to retrieve image vectors.
 
 Then we will use **Test & Score** and **Logistic Regression**, to build a model for predicting the author of a painting. We get a perfect score? How come? It turns out, these were the images the *Painters* embedder was trained on, so a high accuracy is expected.
 
-.. figure:: images/ImportImages-Example.png
-   :scale: 50%
-
+![](images/ImportImages-Example.png)

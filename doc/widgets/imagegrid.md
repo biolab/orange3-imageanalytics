@@ -1,40 +1,21 @@
 Image Grid
 ==========
 
-.. figure:: icons/image-grid.png
-
 Displays images in a similarity grid.
 
-Signals
--------
+**Inputs**
 
-**Inputs**:
+- Embeddings: Image embeddings from Image Embedding widget.
+- Data Subset: A subset of embeddings or images.
 
--  **Embeddings**
+**Outputs**
 
-   Image embeddings from Image Embedding widget.
-
--  **Data Subset**
-
-   A subset of embeddings or images.
-
-**Outputs**:
-
--  **Images**
-
-   Images from the dataset with an additional column specifying if the image is selected or the group, if there are several.
-
-- **Selected Images**
-
-   Selected images with an additional column specifying the group.
-
-Description
------------
+- Images: Images from the dataset with an additional column specifying if the image is selected or the group, if there are several.
+- Selected Images: Selected images with an additional column specifying the group.
 
 The **Image Grid** widget can display images from a dataset in a similarity grid - images with similar content are placed closer to each other. It can be used for image comparison, while looking for similarities or discrepancies between selected data instances (e.g. bacterial growth or bitmap representations of handwriting).
 
-.. figure:: images/ImageGrid-stamped.png
-   :scale: 50%
+![](images/ImageGrid-stamped.png)
 
 1. *Image Filename Attribute*: Attribute containing paths to images.
 2. *Image cell fit*: Resize scales the images to grid, while Crop crops them to squares.
@@ -48,9 +29,8 @@ Example
 
 **Image Grid** can be used to visualize similarity of images in a 2D projection. We have used 5 images of fruits and vegetables, namely orange, banana, strawberry, broccoli and cauliflower.
 
-We loaded the images with :doc:`Import Images <importimages>` and embedded them with Inception v3 embedder in :doc:`Image Embedding <imageembedding>`.
+We loaded the images with [Import Images](importimages.md) and embedded them with Inception v3 embedder in [Image Embedding](imageembedding.md).
 
 Finally, we visualized the images in **Image Grid**. It is obvious that broccoli and cauliflower and much more alike than strawberry and banana.
 
-.. figure:: images/ImageGrid-Example.png
-   :scale: 50%
+![](images/ImageGrid-Example.png)

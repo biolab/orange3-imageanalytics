@@ -131,8 +131,12 @@ class ImageEmbedder:
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
+        self.set_canceled(True)
         if isinstance(self._embedder, ServerEmbedder):
             self._embedder.disconnect_from_server()
+
+    def __del__(self):
+        self.__exit__(None, None, None)
 
     @staticmethod
     def construct_output_data_table(embedded_images, embeddings):

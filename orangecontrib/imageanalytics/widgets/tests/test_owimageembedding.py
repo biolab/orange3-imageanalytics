@@ -58,7 +58,6 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.skipped_images)
 
-        print(table)
         # in case of zoo where all images are present
         self.assertEqual(results, None)
 
@@ -71,3 +70,4 @@ class TestOWImageEmbedding(WidgetTest):
 
         self.assertEqual(type(skipped), Table)
         self.assertEqual(len(skipped), len(table))
+        self.assertTrue(self.widget.Warning.active)

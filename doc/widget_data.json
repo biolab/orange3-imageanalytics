@@ -1,0 +1,30 @@
+{
+"Image Embedding": {
+"title": "Image Embedding",
+"file": "widgets/imageembedding.md",
+"icon": "widgets/icons/image-embedding.png",
+"keywords": [],
+"category": "Image Analytics"
+},
+"Image Grid": {
+"title": "Image Grid",
+"file": "widgets/imagegrid.md",
+"icon": "widgets/icons/image-grid.png",
+"keywords": [],
+"category": "Image Analytics"
+},
+"Image Viewer": {
+"title": "Image Viewer",
+"file": "widgets/imageviewer.md",
+"icon": "widgets/icons/image-viewer.png",
+"keywords": [],
+"category": "Image Analytics"
+},
+"Import Images": {
+"title": "Import Images",
+"file": "widgets/importimages.md",
+"icon": "widgets/icons/import-images.png",
+"keywords": [],
+"category": "Image Analytics"
+}
+}

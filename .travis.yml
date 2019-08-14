@@ -31,7 +31,10 @@ before_install:
     - pip install codecov
 
 install:
-    - pip install --only-binary numpy,scipy,scikit-learn numpy scipy scikit-learn
+    # todo: numpy limited to 1.16 since there is an issue with version 1.17.*
+    # and 1.15.* remove this limitation after while, also remove the limitation
+    # requirements
+    - pip install --only-binary numpy,scipy,scikit-learn numpy==1.16.* scipy scikit-learn
     - pip install sip pyqt5==5.11.*
     - source $TRAVIS_BUILD_DIR/.travis/install_orange.sh
     - pip install -e .

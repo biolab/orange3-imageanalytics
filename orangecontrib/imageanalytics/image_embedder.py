@@ -15,7 +15,7 @@ MODELS = {
     'painters': {
         'name': 'Painters',
         'description':
-            'A model trained to predict painters from artwork images.',
+            'A model trained to predict painters from artwork\nimages.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
         'order': 4
@@ -29,21 +29,21 @@ MODELS = {
     },
     'vgg16': {
         'name': 'VGG-16',
-        'description': '16-layer image recognition model trained on ImageNet.',
+        'description': '16-layer image recognition model trained on\nImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
         'order': 2
     },
     'vgg19': {
         'name': 'VGG-19',
-        'description': '19-layer image recognition model trained on ImageNet.',
+        'description': '19-layer image recognition model trained on\nImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
         'order': 3
     },
     'openface': {
         'name': 'openface',
-        'description': 'Face recognition model trained on FaceScrub and '
+        'description': 'Face recognition model trained on FaceScrub and\n'
                        'CASIA-WebFace datasets.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],

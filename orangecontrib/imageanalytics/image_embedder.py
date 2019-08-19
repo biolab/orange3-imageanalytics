@@ -136,11 +136,11 @@ class ImageEmbedder:
 
     @staticmethod
     def construct_output_data_table(embedded_images, embeddings):
-        # X = util.hstack((embedded_images.X, embeddings))
-        # embedded_images.X = X
-
-        new_attributes = [ContinuousVariable.make('n{:d}'.format(d))
+        new_attributes = [ContinuousVariable('n{:d}'.format(d))
                           for d in range(embeddings.shape[1])]
+        # prevent embeddings to be shown in long drop-downs in e.g. scatterplot
+        for a in new_attributes:
+            a.attributes['hidden'] = True
 
         domain_new = Domain(
             list(embedded_images.domain.attributes) + new_attributes,

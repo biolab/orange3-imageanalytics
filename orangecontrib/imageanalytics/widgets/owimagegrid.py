@@ -12,23 +12,27 @@ from AnyQt.QtCore import (
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtGui import (
-    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader
+    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader,
+    QFontMetrics
 )
 from AnyQt.QtWidgets import (
-    QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem, QGraphicsRectItem,
+    QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem,
+    QGraphicsRectItem,
     QGraphicsLinearLayout,
     QGraphicsGridLayout, QSizePolicy, QApplication, QStyle, QShortcut,
-    QFormLayout)
+    QFormLayout, QLabel)
 from Orange.widgets import widget, gui, settings
+from Orange.widgets.settings import ContextSetting
 from Orange.widgets.utils.annotated_data import (
     create_annotated_table, create_groups_table)
 from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
-from Orange.widgets.utils.itemmodels import VariableListModel
+from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
 from orangecontrib.imageanalytics.image_grid import ImageGrid
-from orangecontrib.imageanalytics.widgets.owimageviewer import ImageLoader, Preview
+from orangecontrib.imageanalytics.widgets.owimageviewer import (
+    ImageLoader, Preview)
 
 _log = logging.getLogger(__name__)
 
@@ -69,6 +73,8 @@ class OWImageGrid(widget.OWWidget):
 
     imageAttr = settings.ContextSetting(0)
     imageSize = settings.Setting(100)
+    label_attr = settings.ContextSetting(None, required=ContextSetting.OPTIONAL)
+    label_selected = settings.Setting(True)
 
     auto_update = settings.Setting(True)
     auto_commit = settings.Setting(True)
@@ -90,6 +96,7 @@ class OWImageGrid(widget.OWWidget):
         self.allAttrs = []
         self.stringAttrs = []
         self.domainAttrs = []
+        self.label_model = DomainModel(placeholder="(No labels)")
 
         self.selection = None
 
@@ -109,8 +116,9 @@ class OWImageGrid(widget.OWWidget):
         )
 
         # cell fit (resize or crop)
-        self.cellFitRB = gui.radioButtons(self.controlArea, self, "cell_fit", ["Resize", "Crop"],
-                                          box="Image cell fit", callback=self.set_crop)
+        self.cellFitRB = gui.radioButtons(
+            self.controlArea, self, "cell_fit", ["Resize", "Crop"],
+            box="Image cell fit", callback=self.set_crop)
 
         self.gridSizeBox = gui.vBox(self.controlArea, "Grid size")
 
@@ -121,8 +129,12 @@ class OWImageGrid(widget.OWWidget):
             verticalSpacing=10
         )
 
-        self.colSpinner = gui.spin(self.gridSizeBox, self, "columns", minv=2, maxv=40, callback=self.update_size)
-        self.rowSpinner = gui.spin(self.gridSizeBox, self, "rows", minv=2, maxv=40, callback=self.update_size)
+        self.colSpinner = gui.spin(
+            self.gridSizeBox, self, "columns", minv=2, maxv=40,
+            callback=self.update_size)
+        self.rowSpinner = gui.spin(
+            self.gridSizeBox, self, "rows", minv=2, maxv=40,
+            callback=self.update_size)
 
         form.addRow("Columns:", self.colSpinner)
         form.addRow("Rows:", self.rowSpinner)
@@ -130,15 +142,27 @@ class OWImageGrid(widget.OWWidget):
         gui.separator(self.gridSizeBox, 10)
         self.gridSizeBox.layout().addLayout(form)
 
-        gui.button(self.gridSizeBox, self, "Set size automatically", callback=self.auto_set_size)
+        gui.button(
+            self.gridSizeBox, self, "Set size automatically",
+            callback=self.auto_set_size)
+
+        self.label_box = gui.vBox(self.controlArea, "Labels")
+
+        # labels control
+        self.label_attr_cb = gui.comboBox(
+            self.label_box, self, "label_attr",
+            tooltip="Show labels",
+            callback=self.update_size,
+            addSpace=True,
+            model=self.label_model
+        )
 
         gui.rubber(self.controlArea)
 
         # auto commit
-        self.autoCommitBox = gui.auto_commit(self.controlArea, self, "auto_commit", "Apply",
-                                             checkbox_label="Apply automatically")
-
-        self.info = gui.widgetLabel(gui.vBox(self.controlArea, "Info"), "Waiting for input.\n")
+        self.autoCommitBox = gui.auto_commit(
+            self.controlArea, self, "auto_commit", "Apply",
+            checkbox_label="Apply automatically")
 
         self.image_grid = None
         self.cell_fit = 0
@@ -161,7 +185,7 @@ class OWImageGrid(widget.OWWidget):
     def sizeHint(self):
         return QSize(600, 600)
 
-    # checks the input data for the right meta-attributes and finds the image filename.
+    # checks the input data for the right meta-attributes and finds images
     @Inputs.data
     def set_data(self, data):
         self.closeContext()
@@ -189,17 +213,18 @@ class OWImageGrid(widget.OWWidget):
 
             self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
 
+            # set label combo labels
+            self.label_model.set_domain(domain)
             self.openContext(data)
-
-            self.imageAttr = max(min(self.imageAttr, len(self.stringAttrs) - 1), 0)
+            self.label_attr = self.label_model[0]
+            self.imageAttr = max(
+                min(self.imageAttr, len(self.stringAttrs) - 1), 0)
 
             if self.is_valid_data():
                 self.image_grid = ImageGrid(data)
                 self.setup_scene()
             else:
                 self.Warning.no_valid_data()
-        else:
-            self.info.setText("Waiting for input.\n")
 
     @Inputs.data_subset
     def set_data_subset(self, data_subset):
@@ -210,6 +235,7 @@ class OWImageGrid(widget.OWWidget):
         self.image_grid = None
         self.error()
         self.imageAttrCB.clear()
+        self.label_attr_cb.clear()
         self.clear_scene()
 
     def is_valid_data(self):
@@ -217,6 +243,7 @@ class OWImageGrid(widget.OWWidget):
 
     # loads the images and places them into the viewing area
     def setup_scene(self, process_grid=True):
+        self.clear_scene()
         self.error()
         if self.data:
             attr = self.stringAttrs[self.imageAttr]
@@ -232,12 +259,21 @@ class OWImageGrid(widget.OWWidget):
             self.thumbnailView.setFixedRowCount(self.rows)
 
             for i, inst in enumerate(self.image_grid.image_list):
-                thumbnail = GraphicsThumbnailWidget(QPixmap(), crop=self.cell_fit == 1)
+                label_text = (str(inst[self.label_attr])
+                    if self.label_attr is not None else "")
+                if label_text == "?":
+                    label_text = ""
+
+                thumbnail = GraphicsThumbnailWidget(
+                    QPixmap(), crop=self.cell_fit == 1,
+                    add_label=self.label_selected and
+                    self.label_attr is not None, text=label_text)
                 thumbnail.setThumbnailSize(size)
                 thumbnail.instance = inst
                 self.thumbnailView.addThumbnail(thumbnail)
 
-                if not np.isfinite(inst[attr]) or inst[attr] == "?":  # skip missing
+                if not np.isfinite(inst[attr]) or inst[attr] == "?":
+                    # skip missing
                     future, url = None, None
                 else:
                     url = self.url_from_value(inst[attr])
@@ -287,9 +323,9 @@ class OWImageGrid(widget.OWWidget):
 
                 self.items.append(_ImageItem(i, thumbnail, url, future))
 
-            if any(not it.future.done() if it.future else False for it in self.items):
-                self.info.setText("Retrieving...\n")
-            else:
+            if not any(
+                    not it.future.done() if it.future
+                    else False for it in self.items):
                 self._update_status()
                 self.apply_subset()
                 self.update_selection()
@@ -377,8 +413,10 @@ class OWImageGrid(widget.OWWidget):
 
     def apply_subset(self):
         if self.image_grid:
-            subset_indices = self.subset_indices if self.subset_indices else [True] * len(self.items)
-            ordered_subset_indices = self.image_grid.order_to_grid(subset_indices)
+            subset_indices = (self.subset_indices if self.subset_indices
+                else [True] * len(self.items))
+            ordered_subset_indices = self.image_grid.order_to_grid(
+                subset_indices)
 
             for item, in_subset in zip(self.items, ordered_subset_indices):
                 item.widget.setSubset(in_subset)
@@ -388,7 +426,8 @@ class OWImageGrid(widget.OWWidget):
             self.selection = np.zeros(len(self.items), dtype=np.uint8)
 
         # newly selected
-        indices = [item.index for item in self.items if item.widget in selected_items]
+        indices = [item.index for item in self.items
+                   if item.widget in selected_items]
 
         # Remove from selection
         if keys & Qt.AltModifier:
@@ -474,21 +513,8 @@ class OWImageGrid(widget.OWWidget):
 
     def _update_status(self):
         count = len([item for item in self.items if item.future is not None])
-        self.info.setText(
-            "Retrieving:\n" +
-            "{} of {} images".format(self._successcount, count))
 
         if self._errcount + self._successcount == count:
-            if self._errcount:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images, {} errors".format(count, self._errcount)
-                )
-            else:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images".format(count)
-                )
             attr = self.stringAttrs[self.imageAttr]
             if self._errcount == count and "type" not in attr.attributes:
                 self.error("No images found! Make sure the '%s' attribute "
@@ -573,7 +599,8 @@ class GraphicsPixmapWidget(QGraphicsWidget):
 
         rect = self.contentsRect()
         pixsize = QSizeF(self._pixmap.size())
-        aspectmode = (Qt.KeepAspectRatio if self._keepAspect else Qt.IgnoreAspectRatio)
+        aspectmode = (
+            Qt.KeepAspectRatio if self._keepAspect else Qt.IgnoreAspectRatio)
 
         if self._crop:
             height, width = pixsize.height(), pixsize.width()
@@ -609,8 +636,19 @@ class GraphicsPixmapWidget(QGraphicsWidget):
         painter.restore()
 
 
+class ElidedLabel(QLabel):
+    def paintEvent( self, event ):
+        painter = QPainter(self)
+
+        metrics = QFontMetrics(self.font())
+        elided = metrics.elidedText(self.text(), Qt.ElideRight, self.width())
+
+        painter.drawText(self.rect(), self.alignment(), elided)
+
+
 class GraphicsThumbnailWidget(QGraphicsWidget):
-    def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True, **kwargs):
+    def __init__(self, pixmap, parentItem=None, crop=False, in_subset=True,
+                 add_label=False, text="", **kwargs):
         super().__init__(parentItem, **kwargs)
         self.setFocusPolicy(Qt.StrongFocus)
         self._size = QSizeF()
@@ -627,8 +665,20 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         self.selectionPen = DEFAULT_SELECTION_PEN
 
         layout.addItem(self.pixmapWidget)
-        layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
 
+        self.label = None
+        if add_label:
+            l1 = ElidedLabel(text)
+            l1.setStyleSheet("background-color: rgba(255, 255, 255, 10);")
+            l1.setAlignment(Qt.AlignCenter)
+            l1.setFixedHeight(16)
+
+            self.label = l1
+            gs = QGraphicsScene()
+            w = gs.addWidget(l1)
+            layout.addItem(w)
+
+        layout.setAlignment(self.pixmapWidget, Qt.AlignCenter)
         self.setLayout(layout)
 
         self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
@@ -659,6 +709,8 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
     def setThumbnailSize(self, size):
         if self._size != size:
             self._size = QSizeF(size)
+            if self.label is not None:
+                self.label.setFixedWidth(size.width())
             self._updatePixmapSize()
 
     def paint(self, painter, option, widget=0):
@@ -713,10 +765,15 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         self.__layout.setSpacing(0)
         self.setLayout(self.__layout)
 
+    @property
+    def thumbnails(self):
+        return self.__thumbnails
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
 
-        if event.newSize().width() != event.oldSize().width() or event.newSize().height() != event.oldSize().height():
+        if (event.newSize().width() != event.oldSize().width() or
+                event.newSize().height() != event.oldSize().height()):
             self.__gridlayout()
 
     def setGeometry(self, rect):
@@ -866,7 +923,8 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
     def __scheduleLayout(self):
         if not self.__reflowPending:
             self.__reflowPending = True
-            QApplication.postEvent(self, QEvent(QEvent.LayoutRequest), Qt.HighEventPriority)
+            QApplication.postEvent(
+                self, QEvent(QEvent.LayoutRequest), Qt.HighEventPriority)
 
     def event(self, event):
         if event.type() == QEvent.LayoutRequest:
@@ -929,14 +987,17 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
     def __gridlayout(self):
         assert self.__layoutMode == GraphicsThumbnailGrid.FixedColumnCount
 
-        width = (self.size().width() - self.__columnCount * 10) / self.__columnCount
+        width = ((self.size().width() - self.__columnCount * 10) /
+                self.__columnCount)
         height = (self.size().height() - self.__rowCount * 10) / self.__rowCount
-        item_size = min(width, height)
 
         for item in self.__thumbnails:
+            label_size = item.label.height() + 1 if item.label is not None else 0
+            item_size = min(width, height - label_size)
             item.setThumbnailSize(QSizeF(item_size, item_size))
 
         self.__relayoutGrid(self.__columnCount)
+
 
     def __relayoutGrid(self, columnCount):
         layout = self.__layout
@@ -1089,6 +1150,10 @@ class ThumbnailView(QGraphicsView):
     def addThumbnail(self, thumbnail):
         self.__grid.addThumbnail(thumbnail)
 
+    @property
+    def grid(self):
+        return self.__grid
+
     @proxydoc(GraphicsThumbnailGrid.insertThumbnail)
     def insertThumbnail(self, index, thumbnail):
         self.__grid.insertThumbnail(index, thumbnail)
@@ -1151,7 +1216,8 @@ class ThumbnailView(QGraphicsView):
         return super().keyPressEvent(event)
 
     def __previewToggle(self):
-        if self.__previewWidget is None and self.__grid.currentItem() is not None:
+        if (self.__previewWidget is None and
+                self.__grid.currentItem() is not None):
             focusitem = self.__grid.currentItem()
             preview = self.__getPreviewWidget()
             preview.show()
@@ -1219,14 +1285,16 @@ class ThumbnailView(QGraphicsView):
 class GraphicsScene(QGraphicsScene):
     selectionRectPointChanged = Signal(QPointF)
 
-    # override the default signal since it should only be emitted when a selection is finished
+    # override the default signal since it should only be emitted when a
+    # selection is finished
     selectionChanged = Signal(set, int)
 
     def __init__(self, *args):
         QGraphicsScene.__init__(self, *args)
         self.selectionRect = None
 
-    # TODO figure out how to keep items highlighted and prevent redrawing during selection without disabling this method
+    # TODO figure out how to keep items highlighted and prevent redrawing
+    #  during selection without disabling this method
     def mousePressEvent(self, event):
         QGraphicsScene.mousePressEvent(self, event)
 
@@ -1253,7 +1321,9 @@ class GraphicsScene(QGraphicsScene):
 
             # the mouse was only clicked - create a selection area of 1x1 size
             else:
-                rect = QRectF(event.buttonDownScenePos(Qt.LeftButton), QSizeF(1., 1.)).intersected(self.sceneRect())
+                rect = QRectF(
+                    event.buttonDownScenePos(Qt.LeftButton),
+                    QSizeF(1., 1.)).intersected(self.sceneRect())
                 path.addRect(rect)
 
             self.setSelectionArea(path)
@@ -1273,7 +1343,6 @@ class GraphicsScene(QGraphicsScene):
         self.selectionRectPointChanged.emit(pos)
 
 
-# TODO only loads when workdir is image dir (ImportImages keeps only the filename in the path)
 def main(argv=None):
     import sys
     from orangecontrib.imageanalytics.import_images import ImportImages

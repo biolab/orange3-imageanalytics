@@ -1,6 +1,7 @@
 from AnyQt.QtTest import QSignalSpy
 from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.tests.base import WidgetTest
+from Orange.widgets.tests.utils import simulate
 
 from orangecontrib.imageanalytics.widgets.owimagegrid import OWImageGrid
 import numpy as np
@@ -92,3 +93,25 @@ class TestOWImageGrid(WidgetTest):
 
         sel_out = self.get_output("Selected Images")
         self.assertEqual(len(sel_out), 3)
+
+    def test_labels(self):
+        w = self.widget
+
+        self.send_signal("Embeddings", self.fake_embeddings)
+        self.wait_until_stop_blocking()
+
+        self.assertTrue(
+            all(x.label is None for x in w.thumbnailView.grid.thumbnails))
+
+        simulate.combobox_activate_index(w.controls.label_attr, 2)
+        self.wait_until_stop_blocking()
+        self.assertTrue(
+            all(x.label is not None for x in w.thumbnailView.grid.thumbnails))
+
+        # reset to no labels
+        simulate.combobox_activate_index(w.controls.label_attr, 0)
+        self.wait_until_stop_blocking()
+        self.assertTrue(
+            all(x.label is None for x in w.thumbnailView.grid.thumbnails))
+
+

@@ -35,7 +35,6 @@ from AnyQt.QtGui import (
 from AnyQt.QtCore import (
     Qt, QObject, QEvent, QThread, QSize, QPoint, QRect,
     QSizeF, QRectF, QPointF, QUrl, QDir, QMargins, QSettings,
-    QT_VERSION
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtNetwork import (
@@ -1431,12 +1430,10 @@ class ImageLoader(QObject):
             QNetworkRequest.CacheLoadControlAttribute,
             QNetworkRequest.PreferCache
         )
-
-        if QT_VERSION >= 0x50600:
-            request.setAttribute(
-                QNetworkRequest.FollowRedirectsAttribute, True
-            )
-            request.setMaximumRedirectsAllowed(5)
+        request.setAttribute(
+            QNetworkRequest.FollowRedirectsAttribute, True
+        )
+        request.setMaximumRedirectsAllowed(5)
 
         # Future yielding a QNetworkReply when finished.
         reply = self._netmanager.get(request)
@@ -1448,11 +1445,8 @@ class ImageLoader(QObject):
             if f.cancelled() and f._reply is not None:
                 f._reply.abort()
 
-        n_redir = 0
-
         def on_reply_ready(reply, future):
             # type: (QNetworkReply, Future) -> None
-            nonlocal n_redir
             # schedule deferred delete to ensure the reply is closed
             # otherwise we will leak file/socket descriptors
             reply.deleteLater()
@@ -1477,23 +1471,6 @@ class ImageLoader(QObject):
                 # XXX Maybe convert the error into standard
                 # http and urllib exceptions.
                 future.set_exception(Exception(reply.errorString()))
-                reply.close()
-                return
-
-            # Handle a possible redirection
-            location = reply.attribute(
-                QNetworkRequest.RedirectionTargetAttribute)
-
-            if location is not None and n_redir < 1:
-                n_redir += 1
-                location = reply.url().resolved(location)
-                # Retry the original request with a new url.
-                request = QNetworkRequest(reply.request())
-                request.setUrl(location)
-                newreply = self._netmanager.get(request)
-                future._reply = newreply
-                newreply.finished.connect(
-                    partial(on_reply_ready, newreply, future))
                 reply.close()
                 return
 

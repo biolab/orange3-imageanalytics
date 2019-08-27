@@ -387,10 +387,13 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         removed = self.__takeItemsFrom(0)
         assert removed == self.__thumbnails
         self.__thumbnails = []
+        scene = self.scene()
         for thumb in removed:
             thumb.removeEventFilter(self)
             if thumb.parentItem() is self:
                 thumb.setParentItem(None)
+            if scene is not None:
+                scene.removeItem(thumb)
         if self.__current is not None:
             self.__current = None
             self.currentThumbnailChanged.emit(None)

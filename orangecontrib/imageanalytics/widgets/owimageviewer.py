@@ -794,8 +794,12 @@ class ThumbnailView(QGraphicsView):
                 lambda item: isinstance(item, DeferredGraphicsThumbnailWidget),
                 items,
             )
+            # Limit the number of `deferredFetch` calls per single event.
+            count = 0
             for thumb in thumbs:  # type: DeferredGraphicsThumbnailWidget
-                thumb.deferredFetch()
+                count += thumb.deferredFetch()
+                if count > 32:
+                    break
         super().paintEvent(event)
 
 

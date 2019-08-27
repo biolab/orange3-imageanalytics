@@ -88,7 +88,7 @@ class GraphicsPixmapWidget(QGraphicsWidget):
         if which == Qt.PreferredSize:
             return QSizeF(self._pixmap.size())
         else:
-            return QGraphicsWidget.sizeHint(self, which, constraint)
+            return super().sizeHint(which, constraint)
 
     def paint(self, painter, option, widget=0):
         if self._pixmap.isNull():
@@ -594,11 +594,11 @@ class GraphicsScene(QGraphicsScene):
     selectionRectPointChanged = Signal(QPointF)
 
     def __init__(self, *args):
-        QGraphicsScene.__init__(self, *args)
+        super().__init__(*args)
         self.selectionRect = None
 
     def mousePressEvent(self, event):
-        QGraphicsScene.mousePressEvent(self, event)
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton:
@@ -606,14 +606,14 @@ class GraphicsScene(QGraphicsScene):
             buttonDown = event.buttonDownScreenPos(Qt.LeftButton)
             if (screenPos - buttonDown).manhattanLength() > 2.0:
                 self.updateSelectionRect(event)
-        QGraphicsScene.mouseMoveEvent(self, event)
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             if self.selectionRect:
                 self.removeItem(self.selectionRect)
                 self.selectionRect = None
-        QGraphicsScene.mouseReleaseEvent(self, event)
+        super().mouseReleaseEvent(event)
 
     def updateSelectionRect(self, event):
         pos = event.scenePos()

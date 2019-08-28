@@ -112,9 +112,11 @@ class GraphicsPixmapWidget(QGraphicsWidget):
 
 
 class GraphicsTextWidget(QGraphicsWidget):
-    def __init__(self, text, parent=None, **kwargs):
+    def __init__(self, text, parent=None, textWidth=-1, **kwargs):
         super().__init__(parent, **kwargs)
         self.labelItem = QGraphicsTextItem(self)
+        if textWidth >= 0:
+            self.labelItem.setTextWidth(textWidth)
         self.setHtml(text)
 
         self.labelItem.document().documentLayout().documentSizeChanged.connect(
@@ -150,9 +152,10 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         self.setContentsMargins(0, 0, 0, 0)
         self.pixmapWidget = GraphicsPixmapWidget(pixmap, self)
         self.labelWidget = GraphicsTextWidget(
-            '<center>' + escape(title) + '</center>', self
+            '<center>' + escape(title) + '</center>', self,
+            textWidth=max(100, thumbnailSize.width())
         )
-        self.labelWidget.setTextWidth(max(100, thumbnailSize.width()))
+
         layout = QGraphicsLinearLayout(Qt.Vertical, self)
         layout.setSpacing(2)
         layout.setContentsMargins(5, 5, 5, 5)
@@ -163,9 +166,6 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         layout.setAlignment(self.labelWidget, Qt.AlignHCenter | Qt.AlignBottom)
 
         self.setLayout(layout)
-
-        self.setTitle(title)
-        self.setTitleWidth(100)
         self._updatePixmapSize()
 
     def setPixmap(self, pixmap):

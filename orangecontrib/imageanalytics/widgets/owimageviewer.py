@@ -1140,25 +1140,15 @@ class OWImageViewer(widget.OWWidget):
 
     def _updateStatus(self):
         count = len([item for item in self.items if item.future is not None])
-        self.info.setText(
-            "Retrieving:\n" +
-            "{} of {} images".format(self._successcount, count))
+        text = f"{self._successcount} of {count} images displayed.\n"
 
-        if self._errcount + self._successcount == count:
-            if self._errcount:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images, {} errors".format(count, self._errcount)
-                )
-            else:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images".format(count)
-                )
-            attr = self.stringAttrs[self.imageAttr]
-            if self._errcount == count and "type" not in attr.attributes:
-                self.error("No images found! Make sure the '%s' attribute "
-                           "is tagged with 'type=image'" % attr.name)
+        if self._errcount:
+            text += f"{self._errcount} errors."
+        self.info.setText(text)
+        attr = self.stringAttrs[self.imageAttr]
+        if self._errcount == count and "type" not in attr.attributes:
+            self.error("No images could be ! Make sure the '%s' attribute "
+                       "is tagged with 'type=image'" % attr.name)
 
     def onDeleteWidget(self):
         self.clear()

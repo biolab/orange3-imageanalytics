@@ -14,7 +14,11 @@ from xml.sax.saxutils import escape
 from collections import namedtuple
 from functools import partial
 from itertools import zip_longest
-from typing import List, Optional
+from concurrent.futures import Future
+from contextlib import closing
+
+import typing
+from typing import List, Optional, Callable, Tuple, Sequence
 
 import numpy
 
@@ -25,12 +29,12 @@ from AnyQt.QtWidgets import (
     QStyle, QShortcut
 )
 from AnyQt.QtGui import (
-    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader
+    QPixmap, QPen, QBrush, QColor, QPainter, QPainterPath, QImageReader,
+    QImage, QPaintEvent
 )
 from AnyQt.QtCore import (
     Qt, QObject, QEvent, QThread, QSize, QPoint, QRect,
     QSizeF, QRectF, QPointF, QUrl, QDir, QMargins, QSettings,
-    QT_VERSION
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtNetwork import (
@@ -43,10 +47,8 @@ from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output
-from Orange.widgets.utils.annotated_data import (create_annotated_table,
-                                                 ANNOTATED_DATA_SIGNAL_NAME)
-
-from concurrent.futures import Future
+from Orange.widgets.utils.annotated_data import create_annotated_table
+from Orange.widgets.utils.concurrent import FutureSetWatcher, FutureWatcher
 
 _log = logging.getLogger(__name__)
 
@@ -86,7 +88,7 @@ class GraphicsPixmapWidget(QGraphicsWidget):
         if which == Qt.PreferredSize:
             return QSizeF(self._pixmap.size())
         else:
-            return QGraphicsWidget.sizeHint(self, which, constraint)
+            return super().sizeHint(which, constraint)
 
     def paint(self, painter, option, widget=0):
         if self._pixmap.isNull():
@@ -110,18 +112,16 @@ class GraphicsPixmapWidget(QGraphicsWidget):
 
 
 class GraphicsTextWidget(QGraphicsWidget):
-    def __init__(self, text, parent=None, **kwargs):
+    def __init__(self, text, parent=None, textWidth=-1, **kwargs):
         super().__init__(parent, **kwargs)
         self.labelItem = QGraphicsTextItem(self)
+        if textWidth >= 0:
+            self.labelItem.setTextWidth(textWidth)
         self.setHtml(text)
 
         self.labelItem.document().documentLayout().documentSizeChanged.connect(
             self.onLayoutChanged
         )
-
-    def setGeometry(self, rect):
-        self.prepareGeometryChange()
-        super().setGeometry(rect)
 
     def onLayoutChanged(self, *args):
         self.updateGeometry()
@@ -140,20 +140,25 @@ class GraphicsTextWidget(QGraphicsWidget):
 
 
 class GraphicsThumbnailWidget(QGraphicsWidget):
-    def __init__(self, pixmap, title="", parentItem=None, **kwargs):
+    def __init__(self, pixmap, title="", parentItem=None, *,
+                 thumbnailSize=QSizeF(), **kwargs):
         super().__init__(parentItem, **kwargs)
+        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
         self.setFocusPolicy(Qt.StrongFocus)
-        self._title = None
-        self._size = QSizeF()
+
+        self._title = title
+        self._size = QSizeF(thumbnailSize)
+        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.pixmapWidget = GraphicsPixmapWidget(pixmap, self)
+        self.labelWidget = GraphicsTextWidget(
+            '<center>' + escape(title) + '</center>', self,
+            textWidth=max(100, thumbnailSize.width())
+        )
 
         layout = QGraphicsLinearLayout(Qt.Vertical, self)
         layout.setSpacing(2)
         layout.setContentsMargins(5, 5, 5, 5)
-        self.setContentsMargins(0, 0, 0, 0)
-
-        self.pixmapWidget = GraphicsPixmapWidget(pixmap, self)
-        self.labelWidget = GraphicsTextWidget(title, self)
-
         layout.addItem(self.pixmapWidget)
         layout.addItem(self.labelWidget)
         layout.addStretch()
@@ -161,17 +166,7 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         layout.setAlignment(self.labelWidget, Qt.AlignHCenter | Qt.AlignBottom)
 
         self.setLayout(layout)
-
-        self.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-
-        self.setFlag(QGraphicsItem.ItemIsSelectable, True)
-
-        self.setTitle(title)
-        self.setTitleWidth(100)
-
-    def setGeometry(self, rect):
-        self.prepareGeometryChange()
-        super().setGeometry(rect)
+        self._updatePixmapSize()
 
     def setPixmap(self, pixmap):
         self.pixmapWidget.setPixmap(pixmap)
@@ -222,8 +217,34 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         self.pixmapWidget.setMaximumSize(pixsize)
 
 
-class GraphicsThumbnailGrid(QGraphicsWidget):
+class DeferredGraphicsThumbnailWidget(GraphicsThumbnailWidget):
+    deferred: Callable[[], 'Future[QImage]']
+    __did_call_once = False
 
+    def deferredFetch(self) -> bool:
+        """
+        Execute a deferred fetch. Return True is successful and False if
+        it was already called.
+        """
+        if not self.__did_call_once:
+            self.__did_call_once = True
+            f = self.deferred()
+            w = FutureWatcher(f, parent=self)
+            w.done.connect(self.__on_fetchDone)
+            return True
+        else:
+            return False
+
+    def __on_fetchDone(self, f: 'Future[QImage]'):
+        if f.cancelled():
+            self.setTitle("Cancelled")
+        elif f.exception() is not None:
+            self.setToolTip(self.toolTip() + f"\n{f.exception()}")
+        else:
+            self.setPixmap(QPixmap.fromImage(f.result()))
+
+
+class GraphicsThumbnailGrid(QGraphicsWidget):
     class LayoutMode(enum.Enum):
         FixedColumnCount, AutoReflow = 0, 1
     FixedColumnCount, AutoReflow = LayoutMode
@@ -366,10 +387,13 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
         removed = self.__takeItemsFrom(0)
         assert removed == self.__thumbnails
         self.__thumbnails = []
+        scene = self.scene()
         for thumb in removed:
             thumb.removeEventFilter(self)
             if thumb.parentItem() is self:
                 thumb.setParentItem(None)
+            if scene is not None:
+                scene.removeItem(thumb)
         if self.__current is not None:
             self.__current = None
             self.currentThumbnailChanged.emit(None)
@@ -570,11 +594,11 @@ class GraphicsScene(QGraphicsScene):
     selectionRectPointChanged = Signal(QPointF)
 
     def __init__(self, *args):
-        QGraphicsScene.__init__(self, *args)
+        super().__init__(*args)
         self.selectionRect = None
 
     def mousePressEvent(self, event):
-        QGraphicsScene.mousePressEvent(self, event)
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if event.buttons() & Qt.LeftButton:
@@ -582,14 +606,14 @@ class GraphicsScene(QGraphicsScene):
             buttonDown = event.buttonDownScreenPos(Qt.LeftButton)
             if (screenPos - buttonDown).manhattanLength() > 2.0:
                 self.updateSelectionRect(event)
-        QGraphicsScene.mouseMoveEvent(self, event)
+        super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
             if self.selectionRect:
                 self.removeItem(self.selectionRect)
                 self.selectionRect = None
-        QGraphicsScene.mouseReleaseEvent(self, event)
+        super().mouseReleaseEvent(event)
 
     def updateSelectionRect(self, event):
         pos = event.scenePos()
@@ -759,6 +783,25 @@ class ThumbnailView(QGraphicsView):
     def __ensureVisible(self, point):
         self.ensureVisible(QRectF(point, QSizeF(1, 1)), 5, 5),
 
+    def paintEvent(self, event: QPaintEvent) -> None:
+        QApplication.sendPostedEvents(self.__grid, QEvent.LayoutRequest)
+        scene = self.scene()
+        rect = event.rect()
+        if scene is not None:
+            rect = self.mapToScene(rect).boundingRect()
+            items = scene.items(rect, deviceTransform=self.viewportTransform())
+            thumbs = filter(
+                lambda item: isinstance(item, DeferredGraphicsThumbnailWidget),
+                items,
+            )
+            # Limit the number of `deferredFetch` calls per single event.
+            count = 0
+            for thumb in thumbs:  # type: DeferredGraphicsThumbnailWidget
+                count += thumb.deferredFetch()
+                if count > 32:
+                    break
+        super().paintEvent(event)
+
 
 class Preview(QWidget):
     def __init__(self, *args, **kwargs):
@@ -855,14 +898,17 @@ class Preview(QWidget):
         painter.end()
 
 
-_ImageItem = namedtuple(
-    "_ImageItem",
-    ["index",   # Row index in the input data table
-     "widget",  # GraphicsThumbnailWidget displaying the image.
-     "url",     # Composed final image url.
-     "future"]  # Future instance yielding an QImage
+_ImageItem = typing.NamedTuple(
+    "_ImageItem", [
+        ("index", int),   # Row index in the input data table
+        ("widget", GraphicsThumbnailWidget),  # GraphicsThumbnailWidget displaying the image.
+        ("url", QUrl),      # Composed final image url.
+        ("future", 'Future[QImage]'),   # Future instance yielding an QImage
+    ]
 )
 
+
+# TODO: Remove remote image loading. Should only allow viewing local files.
 
 class OWImageViewer(widget.OWWidget):
     name = "Image Viewer"
@@ -883,10 +929,8 @@ class OWImageViewer(widget.OWWidget):
     imageAttr = settings.ContextSetting(0)
     titleAttr = settings.ContextSetting(0)
 
-    imageSize = settings.Setting(100)
+    imageSize = settings.Setting(100)  # type: int
     autoCommit = settings.Setting(True)
-
-    buttons_area_orientation = Qt.Vertical
     graph_name = "scene"
 
     UserAdviceMessages = [
@@ -901,12 +945,9 @@ class OWImageViewer(widget.OWWidget):
         self.data = None
         self.allAttrs = []
         self.stringAttrs = []
-
         self.selectedIndices = []
-
-        #: List of _ImageItems
-        self.items = []
-
+        self.items = []  # type: List[_ImageItem]
+        self.__watcher = None  # type: Optional[FutureSetWatcher]
         self._errcount = 0
         self._successcount = 0
 
@@ -914,7 +955,6 @@ class OWImageViewer(widget.OWWidget):
             gui.vBox(self.controlArea, "Info"),
             "Waiting for input.\n"
         )
-
         self.imageAttrCB = gui.comboBox(
             self.controlArea, self, "imageAttr",
             box="Image Filename Attribute",
@@ -932,7 +972,6 @@ class OWImageViewer(widget.OWWidget):
             contentsLength=12,
             addSpace=True
         )
-
         self.titleAttrCB.setStyleSheet("combobox-popup: 0;")
 
         gui.hSlider(
@@ -943,7 +982,7 @@ class OWImageViewer(widget.OWWidget):
         )
         gui.rubber(self.controlArea)
 
-        gui.auto_commit(self.buttonsArea, self, "autoCommit", "Send", box=False)
+        gui.auto_commit(self.controlArea, self, "autoCommit", "Send", box=False)
 
         self.thumbnailView = ThumbnailView(
             alignment=Qt.AlignTop | Qt.AlignLeft,  # scene alignment,
@@ -953,7 +992,6 @@ class OWImageViewer(widget.OWWidget):
         self.mainArea.layout().addWidget(self.thumbnailView)
         self.scene = self.thumbnailView.scene()
         self.scene.selectionChanged.connect(self.onSelectionChanged)
-        self.loader = ImageLoader(self)
 
     def sizeHint(self):
         return QSize(800, 600)
@@ -962,7 +1000,6 @@ class OWImageViewer(widget.OWWidget):
     def setData(self, data):
         self.closeContext()
         self.clear()
-
         self.data = data
 
         if data is not None:
@@ -1000,112 +1037,57 @@ class OWImageViewer(widget.OWWidget):
         self.error()
         self.imageAttrCB.clear()
         self.titleAttrCB.clear()
+        if self.__watcher is not None:
+            self.__watcher.finishedAt.disconnect(self.__on_load_finished)
+            self.__watcher = None
+        self._cancelAllTasks()
         self.clearScene()
 
     def setupScene(self):
         self.error()
-        if self.data:
+        if self.data is not None:
             attr = self.stringAttrs[self.imageAttr]
             titleAttr = self.allAttrs[self.titleAttr]
+            urls = column_data_as_qurl(self.data, attr)
+            titles = column_data_as_str(self.data, titleAttr)
             assert self.thumbnailView.count() == 0
             size = QSizeF(self.imageSize, self.imageSize)
-
-            for i, inst in enumerate(self.data):
-                if not numpy.isfinite(inst[attr]):  # skip missing
+            assert len(self.data) == len(urls)
+            qnam = ImageLoader.networkAccessManagerInstance()
+            for i, (url, title) in enumerate(zip(urls, titles)):
+                if url.isEmpty():  # skip missing
                     continue
-                url = self.urlFromValue(inst[attr])
-                title = str(inst[titleAttr])
-
-                thumbnail = GraphicsThumbnailWidget(QPixmap(), title=title)
-                thumbnail.setThumbnailSize(size)
+                thumbnail = DeferredGraphicsThumbnailWidget(
+                    QPixmap(), title=title, thumbnailSize=size,
+                )
                 thumbnail.setToolTip(url.toString())
-                thumbnail.instance = inst
                 self.thumbnailView.addThumbnail(thumbnail)
-
-                if url.isValid() and url.isLocalFile():
-                    reader = QImageReader(url.toLocalFile())
-                    image = reader.read()
-                    if image.isNull():
-                        error = reader.errorString()
-                        thumbnail.setToolTip(
-                            thumbnail.toolTip() + "\n" + error)
-                        self._errcount += 1
-                    else:
-                        pixmap = QPixmap.fromImage(image)
-                        thumbnail.setPixmap(pixmap)
-                        self._successcount += 1
-
-                    future = Future()
-                    future.set_result(image)
-                    future._reply = None
-                elif url.isValid():
-                    future = self.loader.get(url)
-
-                    @future.add_done_callback
-                    def set_pixmap(future, thumb=thumbnail):
-                        if future.cancelled():
-                            return
-
-                        assert future.done()
-
-                        if future.exception():
-                            # Should be some generic error image.
-                            pixmap = QPixmap()
-                            thumb.setToolTip(thumb.toolTip() + "\n" +
-                                             str(future.exception()))
-                        else:
-                            pixmap = QPixmap.fromImage(future.result())
-
-                        thumb.setPixmap(pixmap)
-
-                        self._noteCompleted(future)
-                else:
-                    future = None
-
+                future, deferrable = image_loader(url, qnam)
+                thumbnail.deferred = deferrable
                 self.items.append(_ImageItem(i, thumbnail, url, future))
 
-            if any(it.future is not None and not it.future.done()
-                   for it in self.items):
-                self.info.setText("Retrieving...\n")
-            else:
-                self._updateStatus()
+        self.__watcher = FutureSetWatcher()
+        self.__watcher.setFutures([it.future for it in self.items])
+        self.__watcher.finishedAt.connect(self.__on_load_finished)
+        self._updateStatus()
 
-    def urlFromValue(self, value):
-        variable = value.variable
-        origin = variable.attributes.get("origin", "")
-        if origin and QDir(origin).exists():
-            origin = QUrl.fromLocalFile(origin)
-        elif origin:
-            origin = QUrl(origin)
-            if not origin.scheme():
-                origin.setScheme("file")
+    @Slot(int, Future)
+    def __on_load_finished(self, index: int, future: 'Future[QImage]'):
+        if future.cancelled():
+            return
+        if future.exception():
+            self._errcount += 1
         else:
-            origin = QUrl("")
-        base = origin.path()
-        if base.strip() and not base.endswith("/"):
-            origin.setPath(base + "/")
+            self._successcount += 1
+        self._updateStatus()
 
-        if os.path.exists(str(value)):
-            url = QUrl.fromLocalFile(str(value))
-        else:
-            name = QUrl(str(value))
-            url = origin.resolved(name)
-        if not url.scheme():
-            url.setScheme("file")
-        return url
-
-    def _cancelAllFutures(self):
+    def _cancelAllTasks(self):
         for item in self.items:
             if item.future is not None:
                 item.future.cancel()
-                if item.future._reply is not None:
-                    item.future._reply.close()
-                    item.future._reply.deleteLater()
-                    item.future._reply = None
 
     def clearScene(self):
-        self._cancelAllFutures()
-
+        self._cancelAllTasks()
         self.items = []
         self.thumbnailView.clear()
         self._errcount = 0
@@ -1121,8 +1103,9 @@ class OWImageViewer(widget.OWWidget):
 
     def updateTitles(self):
         titleAttr = self.allAttrs[self.titleAttr]
+        titles = column_data_as_str(self.data, titleAttr)
         for item in self.items:
-            item.widget.setTitle(str(item.widget.instance[titleAttr]))
+            item.widget.setTitle(titles[item.index])
 
     def onSelectionChanged(self):
         selected = [item for item in self.items if item.widget.isSelected()]
@@ -1157,29 +1140,214 @@ class OWImageViewer(widget.OWWidget):
 
     def _updateStatus(self):
         count = len([item for item in self.items if item.future is not None])
-        self.info.setText(
-            "Retrieving:\n" +
-            "{} of {} images".format(self._successcount, count))
+        text = f"{self._successcount} of {count} images displayed.\n"
 
-        if self._errcount + self._successcount == count:
-            if self._errcount:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images, {} errors".format(count, self._errcount)
-                )
-            else:
-                self.info.setText(
-                    "Done:\n" +
-                    "{} images".format(count)
-                )
-            attr = self.stringAttrs[self.imageAttr]
-            if self._errcount == count and "type" not in attr.attributes:
-                self.error("No images found! Make sure the '%s' attribute "
-                           "is tagged with 'type=image'" % attr.name)
+        if self._errcount:
+            text += f"{self._errcount} errors."
+        self.info.setText(text)
+        attr = self.stringAttrs[self.imageAttr]
+        if self._errcount == count and "type" not in attr.attributes:
+            self.error("No images could be ! Make sure the '%s' attribute "
+                       "is tagged with 'type=image'" % attr.name)
 
     def onDeleteWidget(self):
-        self._cancelAllFutures()
         self.clear()
+        super().onDeleteWidget()
+
+
+def column_data_as_qurl(
+        table: Orange.data.Table, var: Orange.data.StringVariable
+) -> Sequence[QUrl]:
+    coldata = table.get_column_view(var)[0]  # type: numpy.ndarray
+    assert numpy.issubdtype(coldata.dtype, numpy.object_)
+    namask = coldata == var.Unknown  # type: numpy.ndarray
+    origin = var.attributes.get("origin", "")
+
+    if origin and QDir(origin).exists():
+        origin = QUrl.fromLocalFile(origin)
+    elif origin:
+        origin = QUrl(origin)
+        if not origin.scheme():
+            origin.setScheme("file")
+    else:
+        origin = QUrl("")
+    base = origin.path()
+    if base.strip() and not base.endswith("/"):
+        origin.setPath(base + "/")
+
+    res = [QUrl()] * len(coldata)
+    for i, value, isna in zip(range(coldata.size), coldata.flat, namask.flat):
+        if isna:
+            url = QUrl()
+        else:
+            value = str(value)
+            if os.path.exists(value):
+                url = QUrl.fromLocalFile(value)
+            else:
+                url = QUrl(value)
+            url = origin.resolved(url)
+            if not url.scheme():
+                url.setScheme("file")
+        res[i] = url
+    return res
+
+
+def column_data_as_str(
+        table: Orange.data.Table, var: Orange.data.Variable
+) -> Sequence[str]:
+    var = table.domain[var]
+    data, _ = table.get_column_view(var)
+    return list(map(var.str_val, data))
+
+
+T = typing.TypeVar("T")
+
+Some = namedtuple("Some", ["val"])
+
+
+def once(f: Callable[[], T]) -> Callable[[], T]:
+    cached = None
+
+    def f_once():
+        nonlocal cached
+        if cached is None:
+            cached = Some(f())
+        return cached.val
+    return f_once
+
+
+def execute(thunk: Callable[[], T], future: 'Future[T]') -> 'Future[T]':
+    if not future.set_running_or_notify_cancel():
+        return future
+    try:
+        r = thunk()
+    except BaseException as e:
+        future.set_exception(e)
+    else:
+        future.set_result(r)
+    return future
+
+
+def loader_local(
+        url: QUrl, future: 'Future[QImage]'
+) -> Callable[[], 'Future[QImage]']:
+    def load_local_file() -> QImage:
+        reader = QImageReader(url.toLocalFile())
+        _log.debug("Read local: %s", reader.fileName())
+        image = reader.read()
+        if image.isNull():
+            error = reader.errorString()
+            raise ValueError(error)
+        else:
+            return image
+
+    return partial(execute, load_local_file, future)
+
+
+def loader_qnam(
+        url: QUrl, future: 'Future[QImage]', nam: QNetworkAccessManager,
+) -> Callable[[], 'Future[QImage]']:
+    def load_qnam() -> 'Future[QImage]':
+        request = QNetworkRequest(url)
+        request.setAttribute(
+            QNetworkRequest.CacheLoadControlAttribute,
+            QNetworkRequest.PreferCache
+        )
+        request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
+        request.setMaximumRedirectsAllowed(5)
+        _log.debug("Fetch: %s", url.toString())
+        reply = nam.get(request)
+
+        # Abort the network request on future.cancel()
+        # This is sort of cheating. We only set running state
+        # (set_running_or_notify_cancel) at the very end when the entire
+        # response is already available.
+        def abort_on_cancel(f: Future) -> None:
+            if f.cancelled():
+                if not reply.isFinished():
+                    _log.debug("Abort: %s", reply.url().toString())
+                    reply.abort()
+
+        def on_reply_finished():
+            # type: () -> None
+            nonlocal reply
+            nonlocal future
+            # schedule deferred delete to ensure the reply is closed
+            # otherwise we will leak file/socket descriptors
+            reply.deleteLater()
+            reply.finished.disconnect(on_reply_finished)
+
+            if _log.level <= logging.DEBUG:
+                s = io.StringIO()
+                print("\n", reply.url(), file=s)
+                if reply.attribute(QNetworkRequest.SourceIsFromCacheAttribute):
+                    print("  (served from cache)", file=s)
+                for name, val in reply.rawHeaderPairs():
+                    print(bytes(name).decode("latin-1"), ":",
+                          bytes(val).decode("latin-1"), file=s)
+                _log.debug(s.getvalue())
+
+            with closing(reply):
+                if not future.set_running_or_notify_cancel():
+                    return
+
+                if reply.error() == QNetworkReply.OperationCanceledError:
+                    # The network request was cancelled
+                    future.set_exception(Exception(reply.errorString()))
+                    return
+
+                if reply.error() != QNetworkReply.NoError:
+                    # XXX Maybe convert the error into standard http and
+                    # urllib exceptions.
+                    future.set_exception(Exception(reply.errorString()))
+                    return
+
+                reader = QImageReader(reply)
+                image = reader.read()
+                if image.isNull():
+                    future.set_exception(Exception(reader.errorString()))
+                else:
+                    future.set_result(image)
+
+        reply.finished.connect(on_reply_finished)
+        future.add_done_callback(abort_on_cancel)
+        return future
+    return load_qnam
+
+
+def image_loader(
+        url: QUrl, nam: QNetworkAccessManager,
+) -> Tuple['Future[QImage]', Callable[[], 'Future[QImage]']]:
+    """
+    Create and return a deferred image loader.
+
+    Parametes
+    ---------
+    url: QUrl
+        The url from which to load the image.
+    nam: QNetworkAccessManager
+        The network access manager to use for fetching remote content.
+
+    Returns
+    ------
+    res: Tuple[Future[QImage], Callable[[], Future[QImage]]:
+        The future QImage result and a function to schedule/start the execution.
+
+    Note
+    ----
+    The image load/fetch is not started until the returned callable is called.
+    """
+    future = Future()
+    if url.isValid() and url.isLocalFile():
+        loader = loader_local(url, future)
+        return future, once(loader)
+    elif url.isValid():
+        loader = loader_qnam(url, future, nam)
+        return future, once(loader)
+    else:
+        future.set_running_or_notify_cancel()
+        future.set_exception(ValueError(f"'{url.toString()}' is not a valid url"))
+        return future, lambda: future
 
 
 class ProxyFactory(QNetworkProxyFactory):
@@ -1229,11 +1397,9 @@ class ImageLoader(QObject):
     #: directory)
     _NETMANAGER_REF = None
 
-    def __init__(self, parent=None):
-        QObject.__init__(self, parent)
-        assert QThread.currentThread() is QApplication.instance().thread()
-
-        netmanager = self._NETMANAGER_REF and self._NETMANAGER_REF()
+    @classmethod
+    def networkAccessManagerInstance(cls):
+        netmanager = cls._NETMANAGER_REF and cls._NETMANAGER_REF()
         if netmanager is None:
             netmanager = QNetworkAccessManager()
             cache = QNetworkDiskCache()
@@ -1244,8 +1410,13 @@ class ImageLoader(QObject):
             netmanager.setCache(cache)
             f = ProxyFactory()
             netmanager.setProxyFactory(f)
-            ImageLoader._NETMANAGER_REF = weakref.ref(netmanager)
-        self._netmanager = netmanager
+            cls._NETMANAGER_REF = weakref.ref(netmanager)
+        return netmanager
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        assert QThread.currentThread() is QApplication.instance().thread()
+        self._netmanager = self.networkAccessManagerInstance()
 
     def get(self, url):
         future = Future()
@@ -1256,12 +1427,10 @@ class ImageLoader(QObject):
             QNetworkRequest.CacheLoadControlAttribute,
             QNetworkRequest.PreferCache
         )
-
-        if QT_VERSION >= 0x50600:
-            request.setAttribute(
-                QNetworkRequest.FollowRedirectsAttribute, True
-            )
-            request.setMaximumRedirectsAllowed(5)
+        request.setAttribute(
+            QNetworkRequest.FollowRedirectsAttribute, True
+        )
+        request.setMaximumRedirectsAllowed(5)
 
         # Future yielding a QNetworkReply when finished.
         reply = self._netmanager.get(request)
@@ -1273,11 +1442,8 @@ class ImageLoader(QObject):
             if f.cancelled() and f._reply is not None:
                 f._reply.abort()
 
-        n_redir = 0
-
         def on_reply_ready(reply, future):
             # type: (QNetworkReply, Future) -> None
-            nonlocal n_redir
             # schedule deferred delete to ensure the reply is closed
             # otherwise we will leak file/socket descriptors
             reply.deleteLater()
@@ -1302,23 +1468,6 @@ class ImageLoader(QObject):
                 # XXX Maybe convert the error into standard
                 # http and urllib exceptions.
                 future.set_exception(Exception(reply.errorString()))
-                reply.close()
-                return
-
-            # Handle a possible redirection
-            location = reply.attribute(
-                QNetworkRequest.RedirectionTargetAttribute)
-
-            if location is not None and n_redir < 1:
-                n_redir += 1
-                location = reply.url().resolved(location)
-                # Retry the original request with a new url.
-                request = QNetworkRequest(reply.request())
-                request.setUrl(location)
-                newreply = self._netmanager.get(request)
-                future._reply = newreply
-                newreply.finished.connect(
-                    partial(on_reply_ready, newreply, future))
                 reply.close()
                 return
 

@@ -253,8 +253,8 @@ class OWImageEmbedding(OWWidget):
                 file_paths=paths, image_processed_callback=advance)
 
         self.auto_commit_widget.setDisabled(True)
-        self.progressBarInit(processEvents=None)
-        self.progressBarSet(0.0, processEvents=None)
+        self.progressBarInit()
+        self.progressBarSet(0.0)
         self.setBlocking(True)
 
         f = self._executor.submit(run_embedding, file_paths_valid)
@@ -294,7 +294,7 @@ class OWImageEmbedding(OWWidget):
         self.cancel_button.setDisabled(True)
         self.cb_image_attr.setDisabled(False)
         self.cb_embedder.setDisabled(False)
-        self.progressBarFinished(processEvents=None)
+        self.progressBarFinished()
         self.setBlocking(False)
 
         try:
@@ -366,7 +366,7 @@ class OWImageEmbedding(OWWidget):
 
             self.auto_commit_widget.setDisabled(False)
             self.cancel_button.setDisabled(True)
-            self.progressBarFinished(processEvents=None)
+            self.progressBarFinished()
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)
             self.cb_embedder.setDisabled(False)

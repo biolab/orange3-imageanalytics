@@ -31,11 +31,40 @@ class ServerEmbedder(Http2Client):
             QSettings().value('error-reporting/machine-id', '', type=str) \
             or str(uuid.getnode())
         self.session_id = None
+        self.num_images_sent = 0
 
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model, layer)
 
     def from_file_paths(self, file_paths, image_processed_callback=None):
+        """
+        This function provides a fix for ProtocolError that happens on every
+        1000 image. Now only 999 images are send through one connection.
+
+        Parameters
+        ----------
+        file_paths: list
+            A list of file paths for images to be embedded.
+        image_processed_callback: callable (default=None)
+            A function that is called after each image is fully processed
+            by either getting a successful response from the server,
+            getting the result from cache or skipping the image.
+
+        Returns
+        -------
+        embeddings: array-like
+            Array-like of float16 arrays (embeddings) for
+            successfully embedded images and Nones for skipped images.
+        """
+        embeddings = []
+        for batch in self._yield_in_batches(file_paths, 999):
+            if self.num_images_sent > 0:  # prevents reconnection for first batch
+                self.reconnect_to_server()
+            embeddings += self.embedd_batch(batch, image_processed_callback)
+            self.num_images_sent += len(batch)
+        return np.array(embeddings)
+
+    def embedd_batch(self, file_paths, image_processed_callback=None):
         """Send the images to the remote server in batches. The batch size
         parameter is set by the http2 remote peer (i.e. the server).
 
@@ -108,11 +137,12 @@ class ServerEmbedder(Http2Client):
             [None if not isinstance(el, np.ndarray) and el == self.CANNOT_LOAD
              else el for el in all_embeddings]
 
-        return np.array(all_embeddings)
+        return all_embeddings
 
-    def _yield_in_batches(self, list_):
+    def _yield_in_batches(self, list_, batch_size=None):
         gen_ = (path for path in list_)
-        batch_size = self._max_concurrent_streams
+        if batch_size is None:
+            batch_size = self._max_concurrent_streams
 
         num_yielded = 0
 

@@ -913,6 +913,7 @@ _ImageItem = typing.NamedTuple(
 class OWImageViewer(widget.OWWidget):
     name = "Image Viewer"
     description = "View images referred to in the data."
+    keywords = ["image viewer", "viewer", "image"]
     icon = "icons/ImageViewer.svg"
     priority = 130
     replaces = ["Orange.widgets.data.owimageviewer.OWImageViewer", ]

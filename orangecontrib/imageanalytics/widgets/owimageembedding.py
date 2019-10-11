@@ -27,6 +27,7 @@ from orangecontrib.imageanalytics.image_embedder import MODELS as EMBEDDERS_INFO
 class OWImageEmbedding(OWWidget):
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
+    keywords = ["embedding", "image", "image embedding"]
     icon = "icons/ImageEmbedding.svg"
     priority = 150
 

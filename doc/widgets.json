@@ -1,0 +1,65 @@
+[
+ [
+  "Image Analytics",
+  [
+   {
+    "text": "Import Images",
+    "doc": "widgets/importimages.md",
+    "icon": "../orangecontrib/imageanalytics/widgets/icons/ImportImages.svg",
+    "background": "#F7F5A8",
+    "keywords": [
+     "import",
+     "image",
+     "import image",
+     "read",
+     "load"
+    ]
+   },
+   {
+    "text": "Image Viewer",
+    "doc": "widgets/imageviewer.md",
+    "icon": "../orangecontrib/imageanalytics/widgets/icons/ImageViewer.svg",
+    "background": "#F7F5A8",
+    "keywords": [
+     "image viewer",
+     "viewer",
+     "image"
+    ]
+   },
+   {
+    "text": "Image Embedding",
+    "doc": "widgets/imageembedding.md",
+    "icon": "../orangecontrib/imageanalytics/widgets/icons/ImageEmbedding.svg",
+    "background": "#F7F5A8",
+    "keywords": [
+     "embedding",
+     "image",
+     "image embedding"
+    ]
+   },
+   {
+    "text": "Image Grid",
+    "doc": "widgets/imagegrid.md",
+    "icon": "../orangecontrib/imageanalytics/widgets/icons/ImageGrid.svg",
+    "background": "#F7F5A8",
+    "keywords": [
+     "image",
+     "grid",
+     "similarity"
+    ]
+   },
+   {
+    "text": "Save Images",
+    "doc": null,
+    "icon": "../orangecontrib/imageanalytics/widgets/icons/SaveImages.svg",
+    "background": "#F7F5A8",
+    "keywords": [
+     "save",
+     "saveimages",
+     "save images",
+     "images"
+    ]
+   }
+  ]
+ ]
+]

@@ -11,6 +11,7 @@ DESCRIPTION = "Management and embedding of image data."
 
 ICON = "icons/Category-ImageAnalytics.svg"
 PRIORITY = 1000
+BACKGROUND = "#F7F5A8"
 
 WIDGET_HELP_PATH = (
 # Used for development.

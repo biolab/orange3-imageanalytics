@@ -37,6 +37,11 @@ Image Embedding offers several embedders, each trained for a specific task. Imag
 3. Tick the box on the left to start the embedding automatically. Alternatively, click *Apply*. To cancel the embedding, click *Cancel*.
 4. Access help.
 
+Embedders
+---------
+
+The **Inception v3** we are using is available [here](http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz). The only difference is that we are not using the final predictions, but the penultimate layer of the model, which represents images with vectors. A simple example of how to use the model can be found [here](https://github.com/tensorflow/models/blob/1af55e018eebce03fb61bba9959a04672536107d/tutorials/image/imagenet/classify_image.py). An [article](https://www.nature.com/articles/s41467-019-12397-x) by Godec et al. (2019) explains how the embeddings work and how to use it in Orange.
+
 Example
 -------
 

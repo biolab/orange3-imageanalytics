@@ -50,7 +50,7 @@
    },
    {
     "text": "Save Images",
-    "doc": null,
+    "doc": "widgets/saveimages.md",
     "icon": "../orangecontrib/imageanalytics/widgets/icons/SaveImages.svg",
     "background": "#F7F5A8",
     "keywords": [

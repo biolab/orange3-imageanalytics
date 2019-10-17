@@ -40,7 +40,17 @@ Image Embedding offers several embedders, each trained for a specific task. Imag
 Embedders
 ---------
 
-The **Inception v3** we are using is available [here](http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz). The only difference is that we are not using the final predictions, but the penultimate layer of the model, which represents images with vectors. A simple example of how to use the model can be found [here](https://github.com/tensorflow/models/blob/1af55e018eebce03fb61bba9959a04672536107d/tutorials/image/imagenet/classify_image.py). An [article](https://www.nature.com/articles/s41467-019-12397-x) by Godec et al. (2019) explains how the embeddings work and how to use it in Orange.
+**InceptionV3** is Google’s deep neural network for image recognition. It is trained on the ImageNet data set. The model we are using is available [here](http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz). For the embedding, we use the activations of the penultimate layer of the model, which represents images with vectors. 
+
+**SqueezeNet** is a deep model for image recognition that achieves AlexNet-level accuracy on ImageNet with 50x fewer parameters. The model is trained on the ImageNet dataset. We re-implemented the SqueezeNet by using weights from the [author’s pretrained model](https://github.com/DeepScale/SqueezeNet). We use activations from pre-softmax (`flatten10`) layer as an embedding.
+
+**VGG16** and **VGG19** are deep neural networks for image recognition proposed by Visual Geometry Group from the University of Oxford. They are trained on the ImageNet data set. We use a [community implementation](https://github.com/machrisaa/tensorflow-vgg) of networks with original weights. As an embedding, we use activations of the penultimate layer - `fc7`.
+
+Image Embedding also includes [**Painters**](https://github.com/inejc/painters), an embedder that was trained on 79,433 images of paintings by 1,584 painters and won Kaggle’s Painter by Numbers competition. Activations of the penultimate layer of the network are used as an embedding.
+
+**DeepLoc** is a convolutional network trained on 21,882 images of single cells that were manually assigned to one of 15 localization compartments. We use the pre-trained network proposed by [authors](https://github.com/okraus/DeepLoc). The embeddings are activations of penultimate layer `fc_2`. 
+
+An [article](https://www.nature.com/articles/s41467-019-12397-x) by Godec et al. (2019) explains how the embeddings work and how to use it in Orange.
 
 Example
 -------

@@ -1485,28 +1485,8 @@ class ImageLoader(QObject):
         return future
 
 
-def main(argv=sys.argv):
-    import sip
-    logging.basicConfig(level=logging.DEBUG)
-    app = QApplication(argv)
-    argv = app.arguments()
-    w = OWImageViewer()
-    w.show()
-    w.raise_()
-
-    if len(argv) > 1:
-        data = Orange.data.Table(argv[1])
-    else:
-        data = Orange.data.Table('zoo-with-images')
-
-    w.setData(data)
-    rval = app.exec_()
-    w.saveSettings()
-    w.onDeleteWidget()
-    sip.delete(w)
-    app.processEvents()
-    return rval
-
-
 if __name__ == "__main__":
-    main()
+    from orangewidget.utils.widgetpreview import WidgetPreview
+    from Orange.data import Table
+    WidgetPreview(OWImageViewer).run(
+        Table("https://datasets.biolab.si/core/bone-healing.xlsx"))

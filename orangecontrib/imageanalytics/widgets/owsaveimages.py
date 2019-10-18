@@ -399,4 +399,4 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
 
 if __name__ == "__main__":  # pragma: no cover
     WidgetPreview(OWSaveImages).run(
-        Table("https://datasets.biolab.si//core/bone-healing.xlsx"))
+        Table("https://datasets.biolab.si/core/bone-healing.xlsx"))

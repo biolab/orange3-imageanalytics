@@ -657,24 +657,6 @@ class UserInterruptError(BaseException):
     pass
 
 
-def main(argv=sys.argv):
-    app = QApplication(list(argv))
-    argv = app.arguments()
-    if len(argv) > 1:
-        path = argv[1]
-    else:
-        path = None
-    w = OWImportImages()
-    w.show()
-    w.raise_()
-
-    if path is not None:
-        w.setCurrentPath(path)
-
-    app.exec_()
-    w.saveSettings()
-    w.onDeleteWidget()
-    return 0
-
 if __name__ == "__main__":
-    sys.exit(main())
+    from orangewidget.utils.widgetpreview import WidgetPreview
+    WidgetPreview(OWImportImages).run()

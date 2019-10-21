@@ -1,8 +1,6 @@
 import logging
-import os.path
 import traceback
 from types import SimpleNamespace as namespace
-from urllib.parse import urlparse, urljoin
 import concurrent.futures
 
 import numpy as np
@@ -204,23 +202,9 @@ class OWImageEmbedding(OWWidget):
 
         file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
         file_paths = self._input_data[:, file_paths_attr].metas.flatten()
-        origin = file_paths_attr.attributes.get("origin", "")
-        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
-                origin[-1] != "/":
-            origin += "/"
-
-        assert file_paths_attr.is_string
-        assert file_paths.dtype == np.dtype('O')
 
         file_paths_mask = file_paths == file_paths_attr.Unknown
         file_paths_valid = file_paths[~file_paths_mask]
-        for i, a in enumerate(file_paths_valid):
-            urlparts = urlparse(a)
-            if urlparts.scheme not in ("http", "https", "ftp", "data"):
-                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
-                    file_paths_valid[i] = urljoin(origin, a)
-                else:
-                    file_paths_valid[i] = os.path.join(origin, a)
 
         ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
         set_progress = qconcurrent.methodinvoke(
@@ -235,16 +219,17 @@ class OWImageEmbedding(OWWidget):
             task.cancelled = True
             task.embedder.set_canceled(True)
 
-        def run_embedding(paths):
+        def run_embedding():
             return embedder(
-                file_paths=paths, image_processed_callback=advance)
+                self._input_data, col=file_paths_attr,
+                image_processed_callback=advance)
 
         self.auto_commit_widget.setDisabled(True)
         self.progressBarInit()
         self.progressBarSet(0.0)
         self.setBlocking(True)
 
-        f = _executor.submit(run_embedding, file_paths_valid)
+        f = _executor.submit(run_embedding)
         f.add_done_callback(
             qconcurrent.methodinvoke(self, "__set_results", (object,)))
 
@@ -302,19 +287,11 @@ class OWImageEmbedding(OWWidget):
         assert self._input_data is not None
         assert len(self._input_data) == len(task.file_paths_mask)
 
-        # Missing paths/urls were filtered out. Restore the full embeddings
-        # array from information stored in task.file_path_mask ...
-        embeddings_all = [None] * len(task.file_paths_mask)
-        for i, embedding in zip(np.flatnonzero(~task.file_paths_mask),
-                                embeddings):
-            embeddings_all[i] = embedding
-        embeddings_all = np.array(embeddings_all)
-        self._send_output_signals(embeddings_all)
+        self._send_output_signals(embeddings)
 
     def _send_output_signals(self, embeddings):
         self.Warning.images_skipped.clear()
-        embedded_images, skipped_images, num_skipped =\
-            ImageEmbedder.prepare_output_data(self._input_data, embeddings)
+        embedded_images, skipped_images, num_skipped = embeddings
         self.Outputs.embeddings.send(embedded_images)
         self.Outputs.skipped_images.send(skipped_images)
         if num_skipped is not 0:
@@ -365,5 +342,7 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    import sys
-    sys.exit(main(sys.argv))
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    WidgetPreview(OWImageEmbedding).run(
+        Table("https://datasets.biolab.si/core/bone-healing.xlsx"))

@@ -6,7 +6,7 @@ from urllib.parse import urlparse, urljoin
 import concurrent.futures
 
 import numpy as np
-from AnyQt.QtCore import Qt, QTimer, QThread
+from AnyQt.QtCore import Qt, QThread
 from AnyQt.QtCore import pyqtSlot as Slot
 from AnyQt.QtTest import QSignalSpy
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
@@ -44,7 +44,8 @@ class OWImageEmbedding(OWWidget):
     class Warning(OWWidget.Warning):
         switched_local_embedder = Msg(
             "No internet connection: switched to local embedder")
-        reapply = Msg("Click Apply to try again.")
+        no_image_attribute = Msg("Please provide data with an image attribute.")
+        images_skipped = Msg("{} images are skipped.")
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
@@ -60,18 +61,10 @@ class OWImageEmbedding(OWWidget):
         self._log = logging.getLogger(__name__)
         self._task = None
         self._setup_layout()
-        self._image_embedder = None
-        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.setBlocking(True)
-        QTimer.singleShot(0, self._init_server_connection)
 
     def _setup_layout(self):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
         self.layout().setSizeConstraint(QLayout.SetFixedSize)
-
-        widget_box = widgetBox(self.controlArea, 'Info')
-        self.input_data_info = widgetLabel(widget_box, self._NO_DATA_INFO_TEXT)
-        self.connection_info = widgetLabel(widget_box, "")
 
         widget_box = widgetBox(self.controlArea, 'Settings')
         self.cb_image_attr = comboBox(
@@ -122,94 +115,89 @@ class OWImageEmbedding(OWWidget):
         hbox.layout().addWidget(self.cancel_button)
         self.cancel_button.setDisabled(True)
 
-    def _init_server_connection(self):
-        self.setBlocking(False)
-        self._image_embedder = ImageEmbedder(
-            model=self.embedders[self.cb_embedder_current_id],
-            layer='penultimate'
-        )
-        self._set_server_info(
-            self._image_embedder.is_connected_to_server()
-        )
+    def set_data_summary(self, data):
+        if data is None:
+            self.info.set_input_summary(self.info.NoInput)
+        else:
+            self.info.set_input_summary(
+                str(len(data)),
+                f"Data have {len(data)} instances")
 
     @Inputs.images
     def set_data(self, data):
+        self.Warning.clear()
+        self.set_data_summary(data)
         if not data:
             self._input_data = None
-            self.Outputs.embeddings.send(None)
-            self.Outputs.skipped_images.send(None)
-            self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
+            self.clear_outputs()
             return
 
         self._image_attributes = ImageEmbedder.filter_image_attributes(data)
-        if not self._image_attributes:
-            input_data_info_text = (
-                "Data with {:d} instances, but without image attributes."
-                .format(len(data)))
-            input_data_info_text.format(input_data_info_text)
-            self.input_data_info.setText(input_data_info_text)
-            self._input_data = None
-            return
-
         if not self.cb_image_attr_current_id < len(self._image_attributes):
             self.cb_image_attr_current_id = 0
 
         self.cb_image_attr.setModel(VariableListModel(self._image_attributes))
         self.cb_image_attr.setCurrentIndex(self.cb_image_attr_current_id)
 
-        self._input_data = data
-        self.input_data_info.setText(
-            "Data with {:d} instances.".format(len(data)))
+        if not self._image_attributes:
+            self._input_data = None
+            self.Warning.no_image_attribute()
+            self.clear_outputs()
+            return
 
-        self.check_connection()
-        self._cb_image_attr_changed()
+        self._input_data = data
+
+        self.commit()
 
     def _cb_image_attr_changed(self):
         self.commit()
 
-    def check_connection(self):
+    def connect(self):
         """
-        The method check if it is possible to send images to embedder
-        if not embedder is switched to local
+        This function tries to connects to the selected embedder if it is not
+        successful due to any server/connection error it switches to the
+        local embedder and warns the user about that.
         """
         self.Warning.switched_local_embedder.clear()
-        if not self._image_embedder.is_local_embedder() and \
-            not self._image_embedder.is_connected_to_server(use_hyper=False):
+
+        # try to connect to current embedder
+        embedder = ImageEmbedder(
+            model=self.embedders[self.cb_embedder_current_id],
+            layer='penultimate'
+        )
+
+        if not embedder.is_local_embedder() and \
+            not embedder.is_connected_to_server(use_hyper=False):
+            # there is a problem with connecting to the server
             # switching to local embedder
             self.Warning.switched_local_embedder()
+            del embedder  # remove current embedder
             self.cb_embedder_current_id = self.embedders.index("squeezenet")
-            self._init_server_connection()
+            print(self.embedders[self.cb_embedder_current_id])
+            embedder = ImageEmbedder(
+                model=self.embedders[self.cb_embedder_current_id],
+                layer='penultimate'
+            )
+
+        return embedder
 
     def _cb_embedder_changed(self):
         current_embedder = self.embedders[self.cb_embedder_current_id]
-        self._image_embedder = ImageEmbedder(
-            model=current_embedder,
-            layer='penultimate'
-        )
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]['description'])
         if self._input_data:
-            self.input_data_info.setText(
-                "Data with {:d} instances.".format(len(self._input_data)))
             self.commit()
-        else:
-            self.input_data_info.setText(self._NO_DATA_INFO_TEXT)
-        self._set_server_info(self._image_embedder.is_connected_to_server())
 
     def commit(self):
         if self._task is not None:
             self.cancel()
 
-        if self._image_embedder is None:
-            self._set_server_info(connected=False)
-            return
-
         if not self._image_attributes or self._input_data is None:
-            self.Outputs.embeddings.send(None)
-            self.Outputs.skipped_images.send(None)
+            self.clear_outputs()
             return
 
-        self._set_server_info(connected=True)
+        embedder = self.connect()
+        _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.cancel_button.setDisabled(False)
         self.cb_image_attr.setDisabled(True)
         self.cb_embedder.setDisabled(True)
@@ -247,8 +235,6 @@ class OWImageEmbedding(OWWidget):
             task.cancelled = True
             task.embedder.set_canceled(True)
 
-        embedder = self._image_embedder
-
         def run_embedding(paths):
             return embedder(
                 file_paths=paths, image_processed_callback=advance)
@@ -258,7 +244,7 @@ class OWImageEmbedding(OWWidget):
         self.progressBarSet(0.0)
         self.setBlocking(True)
 
-        f = self._executor.submit(run_embedding, file_paths_valid)
+        f = _executor.submit(run_embedding, file_paths_valid)
         f.add_done_callback(
             qconcurrent.methodinvoke(self, "__set_results", (object,)))
 
@@ -304,7 +290,6 @@ class OWImageEmbedding(OWWidget):
             self._log.exception("Error", exc_info=True)
             self.Outputs.embeddings.send(None)
             self.Outputs.skipped_images.send(None)
-            self._set_server_info(connected=False)
             return
         except Exception as err:
             self._log.exception("Error", exc_info=True)
@@ -327,43 +312,29 @@ class OWImageEmbedding(OWWidget):
         self._send_output_signals(embeddings_all)
 
     def _send_output_signals(self, embeddings):
+        self.Warning.images_skipped.clear()
         embedded_images, skipped_images, num_skipped =\
             ImageEmbedder.prepare_output_data(self._input_data, embeddings)
         self.Outputs.embeddings.send(embedded_images)
         self.Outputs.skipped_images.send(skipped_images)
         if num_skipped is not 0:
-            self.input_data_info.setText(
-                "Data with {:d} instances, {:d} images skipped.".format(
-                    len(self._input_data), num_skipped))
+            self.Warning.images_skipped(num_skipped)
 
-    def _set_server_info(self, connected):
-        self.Warning.reapply.clear()
-        if self._image_embedder is None:
-            return
-
-        if connected:
-            self.connection_info.setText("Connected to server.")
-        elif self._image_embedder.is_local_embedder():
-            self.connection_info.setText("Using local embedder.")
-        else:
-            self.connection_info.setText("Not connected to server.")
-            self.Warning.reapply()
+    def clear_outputs(self):
+        self.Outputs.embeddings.send(None)
+        self.Outputs.skipped_images.send(None)
 
     def onDeleteWidget(self):
         self.cancel()
         super().onDeleteWidget()
-        if self._image_embedder is not None:
-            self._image_embedder.__exit__(None, None, None)
 
     def cancel(self):
         if self._task is not None:
             task, self._task = self._task, None
             task.cancel()
-            # wait until done
-            try:
-                task.future.exception()
-            except qconcurrent.CancelledError:
-                pass
+            del task.embedder
+            # the process will still continue in the background - it will
+            # wait current waiting response to come back but then will stop
 
             self.auto_commit_widget.setDisabled(False)
             self.cancel_button.setDisabled(True)
@@ -371,22 +342,15 @@ class OWImageEmbedding(OWWidget):
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)
             self.cb_embedder.setDisabled(False)
-            self._image_embedder.set_canceled(False)
-            # reset the connection.
-            connected = self._image_embedder.reconnect_to_server()
-            self._set_server_info(connected=connected)
 
 
 def main(argv=None):
     from AnyQt.QtWidgets import QApplication
+    from orangecontrib.imageanalytics.widgets.tests.utils import load_images
     logging.basicConfig(level=logging.DEBUG)
     app = QApplication(list(argv) if argv else [])
-    argv = app.arguments()
-    if len(argv) > 1:
-        filename = argv[1]
-    else:
-        filename = "zoo-with-images"
-    data = Table(filename)
+
+    data = load_images()
     widget = OWImageEmbedding()
     widget.show()
     assert QSignalSpy(widget.blockingStateChanged).wait()

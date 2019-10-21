@@ -57,7 +57,7 @@ class OWImageGrid(widget.OWWidget):
     graph_name = "scene"
 
     class Inputs:
-        data = Input("Embeddings", Orange.data.Table)
+        data = Input("Embeddings", Orange.data.Table, default=True)
         data_subset = Input("Data Subset", Orange.data.Table)
 
     class Outputs:
@@ -1343,39 +1343,14 @@ class GraphicsScene(QGraphicsScene):
         self.selectionRectPointChanged.emit(pos)
 
 
-def main(argv=None):
-    import sys
-    from orangecontrib.imageanalytics.import_images import ImportImages
-    from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
-
-    if argv is None:
-        argv = sys.argv
-
-    argv = list(argv)
-    app = QApplication(argv)
-
-    if len(argv) > 1:
-        image_dir = argv[1]
-    else:
-        raise ValueError("Provide the image directory as the first argument.")
-
-    import_images = ImportImages()
-    images, err = import_images(image_dir)
-
-    image_embedder = ImageEmbedder()
-    embeddings, _, _ = image_embedder(images)
-
-    ow = OWImageGrid()
-    ow.show()
-    ow.raise_()
-    ow.set_data(Orange.data.Table(embeddings))
-    rval = app.exec()
-
-    ow.saveSettings()
-    ow.onDeleteWidget()
-
-    return rval
-
-
 if __name__ == "__main__":
-    main()
+    from Orange.data import Table
+
+    from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+    from orangewidget.utils.widgetpreview import WidgetPreview
+
+    embedding, _, _ = ImageEmbedder(model="squeezenet")(
+        Table("https://datasets.biolab.si/core/bone-healing.xlsx"),
+        col="Image")
+
+    WidgetPreview(OWImageGrid).run(embedding)

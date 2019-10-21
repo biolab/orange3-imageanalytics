@@ -1,3 +1,6 @@
+import os
+from urllib.parse import urlparse, urljoin
+
 import numpy as np
 
 from Orange.data import ContinuousVariable, Domain, Table
@@ -122,9 +125,31 @@ class ImageEmbedder:
             raise TypeError
 
     def from_table(self, data, col="image", image_processed_callback=None):
-        file_paths = data[:, col].metas.flatten()
+        """
+        Calls embedding when data are provided as a Orange Table.
+        """
+        file_paths_attr = data.domain[col]
+        file_paths = data[:, file_paths_attr].metas.flatten()
+        origin = file_paths_attr.attributes.get("origin", "")
+        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
+                origin[-1] != "/":
+            origin += "/"
+
+        assert file_paths_attr.is_string
+        assert file_paths.dtype == np.dtype('O')
+
+        file_paths_mask = file_paths == file_paths_attr.Unknown
+        file_paths_valid = file_paths[~file_paths_mask]
+        for i, a in enumerate(file_paths_valid):
+            urlparts = urlparse(a)
+            if urlparts.scheme not in ("http", "https", "ftp", "data"):
+                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
+                    file_paths_valid[i] = urljoin(origin, a)
+                else:
+                    file_paths_valid[i] = os.path.join(origin, a)
+
         embeddings = self._embedder.from_file_paths(
-            file_paths, image_processed_callback)
+            file_paths_valid, image_processed_callback)
         return ImageEmbedder.prepare_output_data(data, embeddings)
 
     def __enter__(self):

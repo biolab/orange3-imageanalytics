@@ -2,7 +2,7 @@ import json
 import logging
 import unittest
 from io import BytesIO
-from os import environ
+from os import environ, path
 from os.path import join, dirname
 from unittest.mock import patch
 
@@ -11,7 +11,9 @@ from h2.exceptions import TooManyStreamsError
 from hypertemp.http20.exceptions import StreamResetError
 from numpy.testing import assert_array_equal
 
+from Orange.data import Table, StringVariable, Domain
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+
 
 _TESTED_MODULE = 'orangecontrib.imageanalytics.http2_client.{:s}'
 _EXAMPLE_IMAGE_JPG = join(dirname(__file__), 'example_image_0.jpg')
@@ -343,3 +345,50 @@ class ImageEmbedderTest(unittest.TestCase):
         self.embedder_local._embedder.cancelled = True
         with self.assertRaises(Exception):
             self.embedder_local(self.single_example)
+
+    def test_table_online_data(self):
+        data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")
+        emb, skipped, num_skiped = self.embedder_local(data, col="Image")
+
+        self.assertIsNone(skipped)
+        self.assertEqual(0, num_skiped)
+        self.assertEqual(len(data), len(emb))
+        self.assertTupleEqual((len(data), 1000), emb.X.shape)
+
+    @patch(_TESTED_MODULE.format('HTTP20Connection'), DummyHttp2Connection)
+    def test_table_server_embedder(self):
+        data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")
+        emb, skipped, num_skiped = self.embedder_server(data, col="Image")
+
+        self.assertIsNone(skipped)
+        self.assertEqual(0, num_skiped)
+        self.assertEqual(len(data), len(emb))
+        self.assertTupleEqual((len(data), 2), emb.X.shape)
+
+    def test_table_local_data(self):
+        str_var = StringVariable("Image")
+        str_var.attributes["origin"] = path.dirname(
+            path.abspath(__file__))
+        data = Table(
+            Domain([], [], metas=[str_var]),
+            np.empty((3, 0)), np.empty((3, 0)),
+            metas=[[_EXAMPLE_IMAGE_JPG],
+                   [_EXAMPLE_IMAGE_TIFF],
+                   [_EXAMPLE_IMAGE_GRAYSCALE]])
+
+        emb, skipped, num_skiped = self.embedder_local(data, col="Image")
+
+        self.assertIsNone(skipped)
+        self.assertEqual(0, num_skiped)
+        self.assertEqual(len(data), len(emb))
+        self.assertTupleEqual((len(data), 1000), emb.X.shape)
+
+    def test_table_skip(self):
+        data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")
+        data.metas[0, 1] = "tralala"
+        emb, skipped, num_skiped = self.embedder_local(data, col="Image")
+
+        self.assertIsNotNone(skipped)
+        self.assertEqual(1, num_skiped)
+        self.assertEqual(len(data) - 1, len(emb))
+        self.assertTupleEqual((len(data) - 1, 1000), emb.X.shape)

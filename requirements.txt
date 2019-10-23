@@ -2,7 +2,7 @@
 hypertemp
 numpy==1.16.*
 Orange3>=3.20.0
-Pillow>=4.2.1,!=5.1.0
+pillow>=6.2.0
 requests
 cachecontrol
 lockfile

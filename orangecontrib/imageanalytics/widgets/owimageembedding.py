@@ -113,7 +113,7 @@ class OWImageEmbedding(OWWidget):
         hbox.layout().addWidget(self.cancel_button)
         self.cancel_button.setDisabled(True)
 
-    def set_data_summary(self, data):
+    def set_input_data_summary(self, data):
         if data is None:
             self.info.set_input_summary(self.info.NoInput)
         else:
@@ -121,10 +121,22 @@ class OWImageEmbedding(OWWidget):
                 str(len(data)),
                 f"Data have {len(data)} instances")
 
+    def set_output_data_summary(self, data_emb, data_skip):
+        if data_emb is None and data_skip is None:
+            self.info.set_output_summary(self.info.NoOutput)
+        else:
+            success = 0 if data_emb is None else len(data_emb)
+            skip = 0 if data_skip is None else len(data_skip)
+            self.info.set_output_summary(
+                f"{success}",
+                f"{success} images successfully embedded ,\n"
+                f"{skip} images skipped."
+            )
+
     @Inputs.images
     def set_data(self, data):
         self.Warning.clear()
-        self.set_data_summary(data)
+        self.set_input_data_summary(data)
         if not data:
             self._input_data = None
             self.clear_outputs()
@@ -273,15 +285,13 @@ class OWImageEmbedding(OWWidget):
             embeddings = f.result()
         except ConnectionError:
             self._log.exception("Error", exc_info=True)
-            self.Outputs.embeddings.send(None)
-            self.Outputs.skipped_images.send(None)
+            self._send_output_signals((None, None, 0))
             return
         except Exception as err:
             self._log.exception("Error", exc_info=True)
             self.error(
                 "\n".join(traceback.format_exception_only(type(err), err)))
-            self.Outputs.embeddings.send(None)
-            self.Outputs.skipped_images.send(None)
+            self._send_output_signals((None, None, 0))
             return
 
         assert self._input_data is not None
@@ -296,10 +306,10 @@ class OWImageEmbedding(OWWidget):
         self.Outputs.skipped_images.send(skipped_images)
         if num_skipped is not 0:
             self.Warning.images_skipped(num_skipped)
+        self.set_output_data_summary(embedded_images, skipped_images)
 
     def clear_outputs(self):
-        self.Outputs.embeddings.send(None)
-        self.Outputs.skipped_images.send(None)
+        self._send_output_signals((None, None, 0))
 
     def onDeleteWidget(self):
         self.cancel()

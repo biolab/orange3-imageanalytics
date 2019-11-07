@@ -1,257 +1,302 @@
-import logging
+import asyncio
 import random
+import json
 import uuid
-from itertools import islice
+from json import JSONDecodeError
+from os import getenv
+from typing import Dict, List, Callable, Optional, Any
 
-import numpy as np
+import httpx
 from AnyQt.QtCore import QSettings
 
-from orangecontrib.imageanalytics.http2_client import Http2Client
-from orangecontrib.imageanalytics.http2_client import MaxNumberOfRequestsError
 from orangecontrib.imageanalytics.utils.embedder_utils import \
-    EmbeddingCancelledException, ImageLoader, EmbedderCache
+    EmbeddingCancelledException, ImageLoader, EmbedderCache, \
+    EmbeddingConnectionError
 
-log = logging.getLogger(__name__)
 
+class ServerEmbedder:
+    MAX_REPEATS = 3
+    MAX_PARALLEL = 100
 
-class ServerEmbedder(Http2Client):
-    MAX_REPEATS = 4
-    CANNOT_LOAD = "cannot load"
+    count_errors = 10
+    initial_count_errors = 10
 
-    def __init__(self, model, model_settings, layer, server_url):
-        super().__init__(server_url)
+    def __init__(
+            self,
+            model: str,
+            model_settings: Dict[str, Any],
+            server_url: str
+    ) -> None:
+        self.server_url = getenv('ORANGE_EMBEDDING_API_URL', server_url)
         self._model = model
-        self._layer = layer
 
-        self._target_image_size = model_settings['target_image_size']
+        self._im_size = model_settings['target_image_size']
         # attribute that offers support for cancelling the embedding
         # if ran in another thread
         self.cancelled = False
         self.machine_id = \
             QSettings().value('error-reporting/machine-id', '', type=str) \
             or str(uuid.getnode())
-        self.session_id = None
-        self.num_images_sent = 0
+        self.session_id = str(random.randint(1, 1e10))
 
         self._image_loader = ImageLoader()
-        self._cache = EmbedderCache(model, layer)
+        self._cache = EmbedderCache(model)
+        self.batch_size = 10000
 
-    def from_file_paths(self, file_paths, image_processed_callback=None):
+        # default embedding timeouts are too small we need to increase them
+        self.timeouts = httpx.TimeoutConfig(timeout=60)
+        self.num_parallel_requests = 0
+
+    def from_file_paths(
+            self,
+            file_paths: List[str],
+            image_processed_callback: Callable[[bool], None] = None
+    ) -> List[Optional[List[float]]]:
         """
-        This function provides a fix for ProtocolError that happens on every
-        1000 image. Now only 999 images are send through one connection.
+        This function repeats calling embedding function until all images
+        are embedded. It prevents skipped images due to network issues.
+        The process is repeated for each image maximally MAX_REPEATS times.
 
         Parameters
         ----------
-        file_paths: list
-            A list of file paths for images to be embedded.
-        image_processed_callback: callable (default=None)
-            A function that is called after each image is fully processed
+        file_paths
+            A list of images paths to be embedded.
+        image_processed_callback
+            A function that is called after each image is embedded
             by either getting a successful response from the server,
             getting the result from cache or skipping the image.
 
         Returns
         -------
-        embeddings: array-like
-            Array-like of float16 arrays (embeddings) for
-            successfully embedded images and Nones for skipped images.
-        """
-        embeddings = []
-        for batch in self._yield_in_batches(file_paths, 999):
-            if self.num_images_sent > 0:  # prevents reconnection for first batch
-                self.reconnect_to_server()
-            embeddings += self.embedd_batch(batch, image_processed_callback)
-            self.num_images_sent += len(batch)
-        return np.array(embeddings)
-
-    def embedd_batch(self, file_paths, image_processed_callback=None):
-        """Send the images to the remote server in batches. The batch size
-        parameter is set by the http2 remote peer (i.e. the server).
-
-        Parameters
-        ----------
-        file_paths: list
-            A list of file paths for images to be embedded.
-
-        image_processed_callback: callable (default=None)
-            A function that is called after each image is fully processed
-            by either getting a successful response from the server,
-            getting the result from cache or skipping the image.
-
-        Returns
-        -------
-        embeddings: array-like
-            Array-like of float16 arrays (embeddings) for
-            successfully embedded images and Nones for skipped images.
+        embeddings
+            Array-like of float arrays (embeddings) for successfully embedded
+            images and Nones for skipped images.
 
         Raises
         ------
-        ConnectionError:
-            If disconnected or connection with the server is lost
-            during the embedding process.
-
+        EmbeddingConnectionError
+            Error which indicate that the embedding is not possible due to
+            connection error.
         EmbeddingCancelledException:
             If cancelled attribute is set to True (default=False).
         """
-        if not self.is_connected_to_server():
-            self.reconnect_to_server()
+        # if there is less images than 10 connection error should be rised
+        # earlier
+        self.count_errors = len(file_paths) * 3 \
+            if len(file_paths) * 3 < 10 else 10
+        self.initial_count_errors = self.count_errors
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        embeddings = [None] * len(file_paths)
+        repeats_count = 0
+        to_embedd = list(enumerate(file_paths))
 
-        self.session_id = str(random.randint(1, 1e10))
-        all_embeddings = [None] * len(file_paths)
-        repeats_counter = 0
+        # repeats until all embedded or max_repeats reached
+        while len(to_embedd) > 0 and repeats_count < self.MAX_REPEATS:
+            repeats_count += 1
+            # get paths that are not embedded yet
+            idx, paths = list(zip(*to_embedd))
 
-        # repeat while all images has embeddings or
-        # while counter counts out (prevents cycling)
-        while len([el for el in all_embeddings if el is None]) > 0 and \
-                repeats_counter < self.MAX_REPEATS:
+            # call embedding
+            new_embeddings = asyncio.get_event_loop().run_until_complete(
+                self.embedd_batch(
+                    paths, repeats_count, image_processed_callback))
 
-            # take all images without embeddings yet
-            selected_indices = [i for i, v in enumerate(all_embeddings)
-                                if v is None]
-            file_paths_wo_emb = [(file_paths[i], i) for i in selected_indices]
+            to_embedd = []
+            # save embeddings to list
+            for i, e, p in zip(idx, new_embeddings, paths):
+                if e is None:
+                    # return it back to the embedding process embedding none
+                    to_embedd.append((i, p))
+                else:
+                    embeddings[i] = e
+        loop.close()
+        return embeddings
 
-            for batch in self._yield_in_batches(file_paths_wo_emb):
-                b_images, b_indices = zip(*batch)
-                try:
-                    embeddings = self._send_to_server(
-                        b_images, image_processed_callback, repeats_counter
-                    )
-                except (MaxNumberOfRequestsError, BrokenPipeError):
-                    # maximum number of http2 requests through a single
-                    # connection is exceeded and a remote peer has closed
-                    # the connection so establish a new connection and retry
-                    # with the same batch (should happen rarely as the setting
-                    # is usually set to >= 1000 requests in http2)
-                    self.reconnect_to_server()
-                    embeddings = [None] * len(batch)
-
-                # insert embeddings into the list
-                for i, emb in zip(b_indices, embeddings):
-                    all_embeddings[i] = emb
-
-                self._cache.persist_cache()
-            repeats_counter += 1
-
-        # change images that were not loaded from 'cannot loaded' to None
-        all_embeddings = \
-            [None if not isinstance(el, np.ndarray) and el == self.CANNOT_LOAD
-             else el for el in all_embeddings]
-
-        return all_embeddings
-
-    def _yield_in_batches(self, list_, batch_size=None):
-        gen_ = (path for path in list_)
-        if batch_size is None:
-            batch_size = self._max_concurrent_streams
-
-        num_yielded = 0
-
-        while True:
-            batch = list(islice(gen_, batch_size))
-            num_yielded += len(batch)
-
-            yield batch
-
-            if num_yielded == len(list_):
-                return
-
-    def _send_to_server(self, file_paths, image_processed_callback, retry_n):
-        """ Load images and compute cache keys and send requests to
-        an http2 server for valid ones.
+    async def embedd_batch(
+            self,
+            file_paths: List[str],
+            n_repeats: int,
+            proc_callback: Callable[[bool], None] = None
+    ) -> List[Optional[List[float]]]:
         """
-        cache_keys = []
-        http_streams = []
+        Function perform embedding of a batch of images.
 
-        for file_path in file_paths:
-            if self.cancelled:
-                raise EmbeddingCancelledException()
+        Parameters
+        ----------
+        file_paths
+            A list of file paths for images to be embedded.
+        n_repeats
+            The index of retry. It is zero when batch is sent to server
+            for the first time. In case when first trial was not successful
+            we will send images again.
+        proc_callback
+            A function that is called after each image is fully processed
+            by either getting a successful response from the server,
+            getting the result from cache or skipping the image.
 
-            image = self._image_loader.load_image_bytes(
-                file_path, self._target_image_size)
-            if not image:
-                # skip the sending because image was skipped at loading
-                http_streams.append(None)
-                cache_keys.append(None)
-                continue
+        Returns
+        -------
+        embeddings
+            Array-like of float arrays (embeddings) for successfully embedded
+            images and Nones for skipped images.
 
-            cache_key = self._cache.md5_hash(image)
-            cache_keys.append(cache_key)
-            if self._cache.exist_in_cache(cache_key):
-                # skip the sending because image is present in the
-                # local cache
-                http_streams.append(None)
-                continue
+        Raises
+        ------
+        EmbeddingCancelledException:
+            If cancelled attribute is set to True (default=False).
+        """
+        requests = []
+        async with httpx.Client(
+                timeout=self.timeouts, base_url=self.server_url) as client:
+            for p in file_paths:
+                if self.cancelled:
+                    raise EmbeddingCancelledException()
+                requests.append(
+                    self._send_to_server(
+                        p, n_repeats, client, proc_callback))
 
-            try:
-                headers = {
-                    'Content-Type': 'image/jpeg',
-                    'Content-Length': str(len(image))
-                }
-                stream_id = self._send_request(
-                    method='POST',
-                    url='/image/' + self._model +
-                        '?machine={}&session={}&retry={}'
-                        .format(self.machine_id, self.session_id, retry_n),
-                    headers=headers,
-                    body_bytes=image
-                )
-                http_streams.append(stream_id)
-            except (ConnectionError, BrokenPipeError):
-                self._cache.persist_cache()
-                raise
-
-        # wait for the responses in a blocking manner
-        return self._get_responses_from_server(
-            http_streams,
-            cache_keys,
-            image_processed_callback
-        )
-
-    def _get_responses_from_server(self, http_streams, cache_keys,
-                                   image_processed_callback):
-        """Wait for responses from an http2 server in a blocking manner."""
-        embeddings = []
-
-        for stream_id, cache_key in zip(http_streams, cache_keys):
-            if self.cancelled:
-                raise EmbeddingCancelledException()
-
-            if not stream_id and not cache_key:
-                # when image cannot be loaded
-                embeddings.append(self.CANNOT_LOAD)
-
-                if image_processed_callback:
-                    image_processed_callback(success=False)
-                continue
-
-            if not stream_id:
-                # skip rest of the waiting because image was either
-                # skipped at loading or is present in the local cache
-                embedding = self._cache.get_cached_result_or_none(cache_key)
-                embeddings.append(embedding)
-
-                if image_processed_callback:
-                    image_processed_callback(success=embedding is not None)
-                continue
-
-            try:
-                response = self._get_json_response_or_none(stream_id)
-            except (ConnectionError, MaxNumberOfRequestsError):
-                self._cache.persist_cache()
-                self.reconnect_to_server()
-                return embeddings
-
-            if not response or 'embedding' not in response:
-                # returned response is not a valid json response
-                # or the embedding key not present in the json
-                embeddings.append(None)
-            else:
-                # successful response
-                embedding = np.array(response['embedding'], dtype=np.float16)
-                embeddings.append(embedding)
-                self._cache.add(cache_key, embedding)
-
-            if image_processed_callback:
-                image_processed_callback(embeddings[-1] is not None)
+            embeddings = await asyncio.gather(*requests)
+        self._cache.persist_cache()
+        assert self.num_parallel_requests == 0
 
         return embeddings
+
+    async def __wait_until_released(self) -> None:
+        while self.num_parallel_requests >= self.MAX_PARALLEL:
+            await asyncio.sleep(0.1)
+
+    async def _send_to_server(
+            self,
+            image: str,
+            n_repeats: int,
+            client: httpx.Client,
+            proc_callback: Callable[[bool], None] = None
+    ) -> Optional[List[float]]:
+        """
+        Function get list of images objects. It send them to server and
+        retrieve responses.
+
+        Parameters
+        ----------
+        image
+            Single image path.
+        n_repeats
+            The index of retry. It is zero when batch is sent to server
+            for the first time. In case when first trial was not successful
+            we will send images again.
+        client
+            HTTPX client that communicates with the server
+        proc_callback
+            A function that is called after each image is fully processed
+            by either getting a successful response from the server,
+            getting the result from cache or skipping the image.
+
+        Returns
+        -------
+        emb
+            Embedding. For images that are not successfully embedded returns
+            None.
+        """
+        await self.__wait_until_released()
+
+        if self.cancelled:
+            raise EmbeddingCancelledException()
+
+        self.num_parallel_requests += 1
+        # load image
+        im = self._image_loader.load_image_bytes(image, self._im_size)
+        if im is None:
+            self.num_parallel_requests -= 1
+            return None
+
+        # if image in cache return it
+        cache_key = self._cache.md5_hash(im)
+        emb = self._cache.get_cached_result_or_none(cache_key)
+
+        if emb is None:
+            # gather responses
+            url = f"/image/{self._model}?machine={self.machine_id}" \
+                  f"&session={self.session_id}&retry={n_repeats}"
+            emb = await self._send_request(client, im, url)
+            if emb is not None:
+                self._cache.add(cache_key, emb)
+        if proc_callback:
+            proc_callback(emb is not None)
+
+        self.num_parallel_requests -= 1
+        return emb
+
+    async def _send_request(
+            self, client: httpx.Client,
+            image: bytes,
+            url: str
+    ) -> Optional[List[float]]:
+        """
+        This function sends a single request to the server.
+
+        Parameters
+        ----------
+        client
+            HTTPX client that communicates with the server
+        image
+            Single image packed in sequence of bytes.
+        url
+            Rest of the url string.
+
+        Returns
+        -------
+        embedding
+            Embedding. For images that are not successfully embedded returns
+            None.
+        """
+        headers = {
+            'Content-Type': 'image/jpeg',
+            'Content-Length': str(len(image))
+        }
+        try:
+            response = await client.post(
+                url,
+                headers=headers,
+                data=image
+            )
+        except OSError:
+            # we count number of consecutive errors
+            self.count_errors -= 1
+            # if there is more than 10 consecutive errors it means that
+            # there is probably no connection so we stop with embedding
+            # with EmbeddingConnectionError
+            if self.count_errors <= 0:
+                self.num_parallel_requests = 0  # for safety reasons
+                raise EmbeddingConnectionError
+            return None
+        # we reset the counter at successful embedding
+        self.count_errors = self.initial_count_errors
+        return ServerEmbedder._parse_response(response)
+
+    @staticmethod
+    def _parse_response(response: httpx.Response) -> Optional[List[float]]:
+        """
+        This function get response and extract embeddings out of them.
+
+        Parameters
+        ----------
+        response
+            Response by the server
+
+        Returns
+        -------
+        embedding
+            Embedding. For images that are not successfully embedded returns
+            None.
+        """
+        if response.content:
+            try:
+                cont = json.loads(response.content.decode('utf-8'))
+                return cont.get('embedding', None)
+            except JSONDecodeError:
+                # in case that embedding was not successful response is not
+                # valid JSON
+                return None
+        else:
+            return None

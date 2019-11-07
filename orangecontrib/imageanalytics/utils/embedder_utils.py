@@ -22,8 +22,16 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class EmbeddingCancelledException(Exception):
-    """Thrown when the embedding task is cancelled from another thread.
+    """
+    Thrown when the embedding task is cancelled from another thread.
     (i.e. ImageEmbedder.cancelled attribute is set to True).
+    """
+
+
+class EmbeddingConnectionError(ConnectionError):
+    """
+    Common error when embedding is interrupted because of connection problems
+    or server unavailability.
     """
 
 
@@ -104,12 +112,12 @@ class ImageLoader:
 
 class EmbedderCache:
 
-    _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
+    _cache_file_blueprint = '{:s}_embeddings.pickle'
 
-    def __init__(self, model, layer):
+    def __init__(self, model):
         # init the cache
 
-        cache_file_path = self._cache_file_blueprint.format(model, layer)
+        cache_file_path = self._cache_file_blueprint.format(model)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
 
@@ -152,5 +160,3 @@ class EmbedderCache:
     def add(self, cache_key, value):
         self._cache_dict[cache_key] = value
 
-    def exist_in_cache(self, cache_key):
-        return cache_key in self._cache_dict

@@ -336,13 +336,11 @@ class OWImageGrid(widget.OWWidget):
 
         if self.data and self.data_subset:
             transformed = self.data_subset.transform(self.data.domain)
-            if np.all(self.data.domain.metas == self.data_subset.domain.metas):
-                indices = {e.id for e in transformed}
-                self.subset_indices = [ex.id in indices for ex in self.data]
+            indices = {e.id for e in transformed}
+            self.subset_indices = [ex.id in indices for ex in self.data]
 
-            else:
-                self.Warning.incompatible_subset()
-
+            # else:
+            #     self.Warning.incompatible_subset()
         self.apply_subset()
 
     def url_from_value(self, value):

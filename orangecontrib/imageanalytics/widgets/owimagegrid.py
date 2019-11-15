@@ -336,7 +336,8 @@ class OWImageGrid(widget.OWWidget):
 
         if self.data and self.data_subset:
             transformed = self.data_subset.transform(self.data.domain)
-            if np.all(self.data.domain.metas == self.data_subset.domain.metas):
+            if np.all(self.data.domain.attributes ==
+                      self.data_subset.domain.attributes):
                 indices = {e.id for e in transformed}
                 self.subset_indices = [ex.id in indices for ex in self.data]
 

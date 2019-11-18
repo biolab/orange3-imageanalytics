@@ -1,5 +1,6 @@
-from unittest import mock
+from unittest import mock, skipIf
 
+import pkg_resources
 from Orange.data import Table
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
@@ -130,3 +131,26 @@ class TestOWImageEmbedding(WidgetTest):
         # it should jut not chrash
         cbox = self.widget.controls.cb_embedder_current_id
         simulate.combobox_activate_index(cbox, 3)
+
+    @skipIf(pkg_resources.get_distribution("orange3").version >= "2.23.0",
+            "make removed in newer versions of orange")
+    def test_variable_make(self):
+        """
+        Embedders call make when they create a variable - it will use the
+        existing variable with the same name if it already exists. In test
+        we will crate two embeddings and check whether variables are same.
+        """
+        w = self.widget
+
+        data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")[::5]
+        self.send_signal(w.Inputs.images, data)
+        self.wait_until_stop_blocking()
+        emb1 = self.get_output(self.widget.Outputs.embeddings)
+
+        self.send_signal(w.Inputs.images, data)
+        self.wait_until_stop_blocking()
+        emb2 = self.get_output(self.widget.Outputs.embeddings)
+
+        self.assertTrue(
+            all(v1 is v2 and id(v1) == id(v2) for v1, v2 in
+                zip(emb1.domain.attributes, emb2.domain.attributes)))

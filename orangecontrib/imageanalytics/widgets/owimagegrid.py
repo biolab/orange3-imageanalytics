@@ -334,13 +334,23 @@ class OWImageGrid(widget.OWWidget):
         self.Warning.incompatible_subset.clear()
         self.subset_indices = []
 
-        if self.data and self.data_subset:
+        if self.data and self.data_subset and len(self.stringAttrs) > 0:
             transformed = self.data_subset.transform(self.data.domain)
-            indices = {e.id for e in transformed}
-            self.subset_indices = [ex.id in indices for ex in self.data]
+            attr = self.stringAttrs[self.imageAttr]
 
-            # else:
-            #     self.Warning.incompatible_subset()
+            # for the subset we need to check if it contains the image
+            # attribute, if all indices from the subset are in the original
+            # array, and if same image on the same index
+            data_indices = [e.id for e in self.data]
+            if attr in self.data_subset.domain \
+                and all(row.id in data_indices and self.data[np.where(
+                    data_indices == row.id)[0][0], attr] == row[attr]
+                        for row in transformed):
+                indices = {e.id for e in transformed}
+
+                self.subset_indices = [ex.id in indices for ex in self.data]
+            else:
+                self.Warning.incompatible_subset()
         self.apply_subset()
 
     def url_from_value(self, value):

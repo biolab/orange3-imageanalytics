@@ -114,4 +114,74 @@ class TestOWImageGrid(WidgetTest):
         self.assertTrue(
             all(x.label is None for x in w.thumbnailView.grid.thumbnails))
 
+    def tests_subset_mixed_arrays(self):
+        """
+        This function test subsets with mixed arrays.
+        """
+        w = self.widget
+        self.send_signal(w.Inputs.data, self.fake_embeddings)
+        self.assertEqual(0, len(w.subset_indices))
 
+        # send regular subset
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[:2])
+        self.assertListEqual([True, True, False, False], w.subset_indices)
+
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[::2])
+        self.assertListEqual([True, False, True, False], w.subset_indices)
+
+        # send mixed subset
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 2]])
+        self.assertListEqual([False, False, True, True], w.subset_indices)
+
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 0, 2]])
+        self.assertListEqual([True, False, True, True], w.subset_indices)
+
+        # try with mixed data (data has mixed indices - at [0] there is no
+        # row with index 0
+        mixed_fake_emb = self.fake_embeddings[[1, 3, 2, 0]]
+        self.send_signal(w.Inputs.data_subset, None)
+        self.send_signal(w.Inputs.data, mixed_fake_emb)
+        self.assertEqual(0, len(w.subset_indices))
+
+        # send regular subset
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[:2])
+        self.assertListEqual([True, False, False, True], w.subset_indices)
+
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[::2])
+        self.assertListEqual([False, False, True, True], w.subset_indices)
+
+        # send mixed subset
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 2]])
+        self.assertListEqual([False, True, True, False], w.subset_indices)
+
+        self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 0, 2]])
+        self.assertListEqual([False, True, True, True], w.subset_indices)
+
+    def tests_subset_conditions(self):
+        """
+        This function test the condition for the validness of the subset.
+        Here we will just consider examples not included in
+        `tests_subset_mixed_arrays`
+        """
+        w = self.widget
+        self.send_signal(w.Inputs.data, self.fake_embeddings)
+        self.assertEqual(0, len(w.subset_indices))
+
+        # test with different indices in the subset
+        fake_embedding_copy = self.fake_embeddings.copy()
+        fake_embedding_copy.ids[0] = 10000
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
+        self.assertListEqual([], w.subset_indices)
+        self.assertTrue(self.widget.Warning.incompatible_subset.is_shown())
+
+        # reset
+        self.send_signal(w.Inputs.data_subset, None)
+        self.assertListEqual([], w.subset_indices)
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+
+        # test with different image under the same index
+        fake_embedding_copy = self.fake_embeddings.copy()
+        fake_embedding_copy[0, "Images"] = "tralala"
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
+        self.assertListEqual([], w.subset_indices)
+        self.assertTrue(self.widget.Warning.incompatible_subset.is_shown())

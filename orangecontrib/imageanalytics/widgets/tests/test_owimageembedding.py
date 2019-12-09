@@ -1,4 +1,6 @@
 import time
+from unittest.mock import patch
+
 import numpy as np
 from unittest import mock, skipIf
 
@@ -7,6 +9,8 @@ from Orange.data import Table
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
 
+from orangecontrib.imageanalytics.tests.test_image_embedder import \
+    regular_dummy_sr, HTTPX_POST_METHOD
 from orangecontrib.imageanalytics.utils.embedder_utils import \
     EmbeddingConnectionError
 from orangecontrib.imageanalytics.widgets.owimageembedding \
@@ -40,6 +44,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, table)
         self.send_signal(self.widget.Inputs.images, None)
 
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_data_corpus(self):
         table = load_images()
         table = DummyCorpus(table)
@@ -47,20 +52,22 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.embeddings)
 
-        self.assertEqual(type(results), DummyCorpus)  # check if outputs type
+        self.assertIsInstance(results, DummyCorpus)  # check if outputs type
         self.assertEqual(len(results), len(table))
 
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_data_regular_table(self):
         table = load_images()
 
         self.send_signal(self.widget.Inputs.images, table)
         results = self.get_output(self.widget.Outputs.embeddings)
 
-        self.assertEqual(type(results), Table)  # check if output right type
+        self.assertIsInstance(results, Table)  # check if output right type
 
         # true for zoo since no images are skipped
         self.assertEqual(len(results), len(table))
 
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_skipped_images(self):
         table = load_images()
 
@@ -77,7 +84,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, table)
         skipped = self.get_output(self.widget.Outputs.skipped_images)
 
-        self.assertEqual(type(skipped), Table)
+        self.assertIsInstance(skipped, Table)
         self.assertEqual(len(skipped), len(table))
         self.assertTrue(self.widget.Warning.active)
 
@@ -95,11 +102,11 @@ class TestOWImageEmbedding(WidgetTest):
         table = load_images()
         self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
         self.send_signal(w.Inputs.images, table)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertEqual(w.cb_embedder.currentText(), "SqueezeNet (local)")
 
         output = self.get_output(self.widget.Outputs.embeddings)
-        self.assertEqual(type(output), Table)
+        self.assertIsInstance(output, Table)
         self.assertEqual(len(output), len(table))
         self.assertEqual(output.X.shape[1], 1000)
 
@@ -116,10 +123,9 @@ class TestOWImageEmbedding(WidgetTest):
         simulate.combobox_activate_index(cbox, 3)
 
         self.assertEqual(w.cb_embedder.currentText(), "VGG-19")
-        self.wait_until_stop_blocking(wait=20000)
 
         output = self.get_output(self.widget.Outputs.embeddings)
-        self.assertEqual(type(output), Table)
+        self.assertIsInstance(output, Table)
         self.assertEqual(len(output), len(table))
         # 4096 shows that output is really by VGG-19
         self.assertEqual(output.X.shape[1], 4096)
@@ -131,7 +137,7 @@ class TestOWImageEmbedding(WidgetTest):
         w = self.widget
         table = Table("iris")
         self.send_signal(w.Inputs.images, table)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         # it should jut not chrash
         cbox = self.widget.controls.cb_embedder_current_id
@@ -150,7 +156,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(self.widget.Inputs.images, table)
         time.sleep(0.5)
         self.widget.cancel_button.click()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         results = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertIsNone(results)
@@ -167,11 +173,11 @@ class TestOWImageEmbedding(WidgetTest):
 
         data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")[::5]
         self.send_signal(w.Inputs.images, data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         emb1 = self.get_output(self.widget.Outputs.embeddings)
 
         self.send_signal(w.Inputs.images, data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         emb2 = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertTrue(
@@ -192,9 +198,8 @@ class TestOWImageEmbedding(WidgetTest):
         table = load_images()
         self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
         self.send_signal(w.Inputs.images, table)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertIsNone(output)
         self.widget.Error.unexpected_error.is_shown()
-        print(self.widget.Error.unexpected_error)

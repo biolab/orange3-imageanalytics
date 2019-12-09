@@ -12,7 +12,7 @@ from Orange.data import Table, StringVariable, Domain
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 
 
-_HTTPX_POST_METHOD = "httpx.client.Client.post"
+HTTPX_POST_METHOD = "httpx.client.Client.post"
 _TESTED_MODULE = 'orangecontrib.imageanalytics.server_embedder.ServerEmbedder.{:s}'
 _EXAMPLE_IMAGE_JPG = join(dirname(__file__), 'example_image_0.jpg')
 _EXAMPLE_IMAGE_TIFF = join(dirname(__file__), 'example_image_1.tiff')
@@ -52,7 +52,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.embedder_server.clear_cache()
         logging.disable(logging.NOTSET)
 
-    @patch(_HTTPX_POST_METHOD)
+    @patch(HTTPX_POST_METHOD)
     def test_with_non_existing_image(self, connection_mock):
         single_example = ['/non_existing_image']
 
@@ -61,26 +61,32 @@ class ImageEmbedderTest(unittest.TestCase):
         connection_mock.get_response.assert_not_called()
         self.assertEqual(self.embedder_server._embedder._cache._cache_dict, {})
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_on_successful_response(self):
         res = self.embedder_server(self.single_example)
         assert_array_equal(res, [[0, 1]])
         self.assertEqual(
             len(self.embedder_server._embedder._cache._cache_dict), 1)
 
-    @patch(_HTTPX_POST_METHOD, make_dummy_post(b''))
+    @patch(HTTPX_POST_METHOD, make_dummy_post(b''))
+    def test_on_empty_response(self):
+        self.assertEqual(self.embedder_server(self.single_example), [None])
+        self.assertEqual(
+            len(self.embedder_server._embedder._cache._cache_dict), 0)
+
+    @patch(HTTPX_POST_METHOD, make_dummy_post(b'blabla'))
     def test_on_non_json_response(self):
         self.assertEqual(self.embedder_server(self.single_example), [None])
         self.assertEqual(
             len(self.embedder_server._embedder._cache._cache_dict), 0)
 
-    @patch(_HTTPX_POST_METHOD, make_dummy_post(b'{"wrong-key": [0, 1]}'))
+    @patch(HTTPX_POST_METHOD, make_dummy_post(b'{"wrong-key": [0, 1]}'))
     def test_on_json_wrong_key_response(self):
         self.assertEqual(self.embedder_server(self.single_example), [None])
         self.assertEqual(
             len(self.embedder_server._embedder._cache._cache_dict), 0)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_persistent_caching(self):
         self.assertEqual(
             len(self.embedder_server._embedder._cache._cache_dict), 0)
@@ -98,7 +104,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(
             len(self.embedder_server._embedder._cache._cache_dict), 0)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_different_models_caches(self):
         embedder = ImageEmbedder(model='painters')
         embedder.clear_cache()
@@ -116,7 +122,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(len(embedder._embedder._cache._cache_dict), 1)
         embedder.clear_cache()
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_with_statement(self):
         # server embedder
         with self.embedder_server as embedder:
@@ -136,7 +142,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(
             len(self.embedder_local._embedder._cache._cache_dict), 1)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_too_many_examples_for_one_batch(self):
         too_many_examples = [_EXAMPLE_IMAGE_JPG for _ in range(200)]
         true_res = [np.array([0, 1], dtype=np.float16) for _ in range(200)]
@@ -147,7 +153,7 @@ class ImageEmbedderTest(unittest.TestCase):
         # no need to test it on local embedder since it does not work
         # in batches
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_successful_result_shape(self):
         # global embedder
         more_examples = [_EXAMPLE_IMAGE_JPG for _ in range(5)]
@@ -163,7 +169,7 @@ class ImageEmbedderTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.embedder_server = ImageEmbedder(model='invalid_model')
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_with_grayscale_image(self):
         # test server embedder
         res = self.embedder_server([_EXAMPLE_IMAGE_GRAYSCALE])
@@ -176,7 +182,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(
             len(self.embedder_local._embedder._cache._cache_dict), 1)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_with_tiff_image(self):
         # test server embedder
         res = self.embedder_server([_EXAMPLE_IMAGE_TIFF])
@@ -190,7 +196,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(
             len(self.embedder_local._embedder._cache._cache_dict), 1)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_server_url_env_var(self):
         url_value = 'url:1234'
         self.assertTrue(self.embedder_server._embedder.server_url != url_value)
@@ -200,7 +206,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertTrue(self.embedder_server._embedder.server_url == url_value)
         del environ['ORANGE_EMBEDDING_API_URL']
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_embedding_cancelled(self):
         # test for the server embedders
         self.assertFalse(self.embedder_server._embedder.cancelled)
@@ -223,7 +229,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(len(data), len(emb))
         self.assertTupleEqual((len(data), 1000), emb.X.shape)
 
-    @patch(_HTTPX_POST_METHOD, regular_dummy_sr)
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_table_server_embedder(self):
         data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")
         emb, skipped, num_skiped = self.embedder_server(data, col="Image")
@@ -261,7 +267,7 @@ class ImageEmbedderTest(unittest.TestCase):
         self.assertEqual(len(data) - 1, len(emb))
         self.assertTupleEqual((len(data) - 1, 1000), emb.X.shape)
 
-    @patch(_HTTPX_POST_METHOD, make_dummy_post(
+    @patch(HTTPX_POST_METHOD, make_dummy_post(
         b'{"embedding": [0, 1]}', sleep=1))
     def test_wait(self):
         """
@@ -281,9 +287,9 @@ class ImageEmbedderTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.embedder_server('abc')
 
-    @patch(_HTTPX_POST_METHOD, side_effect=OSError)
+    @patch(HTTPX_POST_METHOD, side_effect=OSError)
     def test_connection_error(self, _):
         for num_images in range(1, 20):
             with self.assertRaises(ConnectionError):
                 self.embedder_server(self.single_example * num_images)
-        self.setUp()  # to init new embedder
+            self.setUp()  # to init new embedder

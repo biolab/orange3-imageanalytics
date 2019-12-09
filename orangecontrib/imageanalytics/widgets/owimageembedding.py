@@ -1,28 +1,88 @@
 import logging
-import traceback
-from types import SimpleNamespace as namespace
-import concurrent.futures
+from types import SimpleNamespace
+from typing import Optional
 
 import numpy as np
-from AnyQt.QtCore import Qt, QThread
-from AnyQt.QtCore import pyqtSlot as Slot
-from AnyQt.QtTest import QSignalSpy
+from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
-from Orange.data import Table
+from Orange.data import Table, Variable
 from Orange.widgets.gui import hBox
 from Orange.widgets.gui import widgetBox, widgetLabel, comboBox, auto_commit
 from Orange.widgets.settings import Setting
-from Orange.widgets.utils import concurrent as qconcurrent
+from Orange.widgets.utils.concurrent import ConcurrentWidgetMixin, TaskState
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.widget import Input, Output, Msg
 from Orange.widgets.widget import OWWidget
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 from orangecontrib.imageanalytics.image_embedder import MODELS as EMBEDDERS_INFO
+from orangecontrib.imageanalytics.utils.embedder_utils import \
+    EmbeddingConnectionError
 
 
-class OWImageEmbedding(OWWidget):
+class Result(SimpleNamespace):
+    embedding: Optional[Table] = None
+    skip_images: Optional[Table] = None
+    num_skipped: int = None
+
+
+def run_embedding(
+    images: Table,
+    file_paths_attr: Variable,
+    embedder_name: str,
+    state: TaskState
+) -> Result:
+    """
+    Run the embedding process
+
+    Parameters
+    ----------
+    images
+        Data table with images to embed.
+    file_paths_attr
+        The column of the table with images.
+    embedder_name
+        The name of selected embedder.
+    state
+        State object used for controlling and progress.
+
+    Returns
+    -------
+    The object that holds embedded images, skipped images, and number
+    of skipped images.
+    """
+    embedder = ImageEmbedder(model=embedder_name)
+
+    file_paths = images[:, file_paths_attr].metas.flatten()
+
+    file_paths_mask = file_paths == file_paths_attr.Unknown
+    file_paths_valid = file_paths[~file_paths_mask]
+
+    # init progress bar and fuction
+    ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
+
+    def advance(success=True):
+        if state.is_interruption_requested():
+            embedder.set_canceled(True)
+        if success:
+            state.set_progress_value(next(ticks))
+    try:
+        emb, skip, n_skip = embedder(
+            images, col=file_paths_attr, image_processed_callback=advance)
+    except EmbeddingConnectionError:
+        # recompute ticks to go from current state to 100
+        ticks = iter(np.linspace(next(ticks), 100.0, file_paths_valid.size))
+
+        state.set_partial_result("squeezenet")
+        embedder = ImageEmbedder(model="squeezenet")
+        emb, skip, n_skip = embedder(
+            images, col=file_paths_attr, image_processed_callback=advance)
+
+    return Result(embedding=emb, skip_images=skip, num_skipped=n_skip)
+
+
+class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
     keywords = ["embedding", "image", "image embedding"]
@@ -42,8 +102,12 @@ class OWImageEmbedding(OWWidget):
     class Warning(OWWidget.Warning):
         switched_local_embedder = Msg(
             "No internet connection: switched to local embedder")
-        no_image_attribute = Msg("Please provide data with an image attribute.")
+        no_image_attribute = Msg(
+            "Please provide data with an image attribute.")
         images_skipped = Msg("{} images are skipped.")
+
+    class Error(OWWidget.Error):
+        unexpected_error = Msg("Embedding error: {}")
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
@@ -51,7 +115,9 @@ class OWImageEmbedding(OWWidget):
     _NO_DATA_INFO_TEXT = "No data on input."
 
     def __init__(self):
-        super().__init__()
+        OWWidget.__init__(self)
+        ConcurrentWidgetMixin.__init__(self)
+
         self.embedders = sorted(list(EMBEDDERS_INFO),
                                 key=lambda k: EMBEDDERS_INFO[k]['order'])
         self._image_attributes = None
@@ -162,36 +228,8 @@ class OWImageEmbedding(OWWidget):
     def _cb_image_attr_changed(self):
         self.commit()
 
-    def connect(self):
-        """
-        This function tries to connects to the selected embedder if it is not
-        successful due to any server/connection error it switches to the
-        local embedder and warns the user about that.
-        """
-        self.Warning.switched_local_embedder.clear()
-
-        # try to connect to current embedder
-        embedder = ImageEmbedder(
-            model=self.embedders[self.cb_embedder_current_id],
-            layer='penultimate'
-        )
-
-        if not embedder.is_local_embedder() and \
-            not embedder.is_connected_to_server(use_hyper=False):
-            # there is a problem with connecting to the server
-            # switching to local embedder
-            self.Warning.switched_local_embedder()
-            del embedder  # remove current embedder
-            self.cb_embedder_current_id = self.embedders.index("squeezenet")
-            print(self.embedders[self.cb_embedder_current_id])
-            embedder = ImageEmbedder(
-                model=self.embedders[self.cb_embedder_current_id],
-                layer='penultimate'
-            )
-
-        return embedder
-
     def _cb_embedder_changed(self):
+        self.Warning.switched_local_embedder.clear()
         current_embedder = self.embedders[self.cb_embedder_current_id]
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]['description'])
@@ -199,156 +237,82 @@ class OWImageEmbedding(OWWidget):
             self.commit()
 
     def commit(self):
-        if self._task is not None:
-            self.cancel()
-
         if not self._image_attributes or self._input_data is None:
             self.clear_outputs()
             return
 
-        embedder = self.connect()
-        _executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        self.cancel_button.setDisabled(False)
-        self.cb_image_attr.setDisabled(True)
-        self.cb_embedder.setDisabled(True)
+        self._set_fields_active(False)
 
-        file_paths_attr = self._image_attributes[self.cb_image_attr_current_id]
-        file_paths = self._input_data[:, file_paths_attr].metas.flatten()
-
-        file_paths_mask = file_paths == file_paths_attr.Unknown
-        file_paths_valid = file_paths[~file_paths_mask]
-
-        ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
-        set_progress = qconcurrent.methodinvoke(
-            self, "__progress_set", (float,))
-
-        def advance(success=True):
-            if success:
-                set_progress(next(ticks))
-
-        def cancel():
-            task.future.cancel()
-            task.cancelled = True
-            task.embedder.set_canceled(True)
-
-        def run_embedding():
-            return embedder(
-                self._input_data, col=file_paths_attr,
-                image_processed_callback=advance)
-
-        self.auto_commit_widget.setDisabled(True)
-        self.progressBarInit()
-        self.progressBarSet(0.0)
-        self.setBlocking(True)
-
-        f = _executor.submit(run_embedding)
-        f.add_done_callback(
-            qconcurrent.methodinvoke(self, "__set_results", (object,)))
-
-        task = self._task = namespace(
-            file_paths_mask=file_paths_mask,
-            file_paths_valid=file_paths_valid,
-            file_paths=file_paths,
-            embedder=embedder,
-            cancelled=False,
-            cancel=cancel,
-            future=f,
+        embedder_name = self.embedders[self.cb_embedder_current_id]
+        image_attribute = self._image_attributes[self.cb_image_attr_current_id]
+        self.start(
+            run_embedding,
+            self._input_data,
+            image_attribute,
+            embedder_name
         )
-        self._log.debug("Starting embedding task for %i images",
-                        file_paths.size)
-        return
+        self.Error.unexpected_error.clear()
 
-    @Slot(float)
-    def __progress_set(self, value):
-        assert self.thread() is QThread.currentThread()
-        if self._task is not None:
-            self.progressBarSet(value)
+    def on_done(self, result: Result) -> None:
+        """
+        Invoked when task is done.
 
-    @Slot(object)
-    def __set_results(self, f):
-        assert self.thread() is QThread.currentThread()
-        if self._task is None or self._task.future is not f:
-            self._log.info("Reaping stale task")
-            return
+        Parameters
+        ----------
+        result
+            Embedding results.
+        """
+        self._set_fields_active(True)
+        assert (len(self._input_data)
+                == len(result.embedding or []) + len(result.skip_images or []))
+        self._send_output_signals(result)
 
-        assert f.done()
+    def on_partial_result(self, result: str) -> None:
+        self._switch_to_local_embedder()
 
-        task, self._task = self._task, None
-        self.auto_commit_widget.setDisabled(False)
-        self.cancel_button.setDisabled(True)
-        self.cb_image_attr.setDisabled(False)
-        self.cb_embedder.setDisabled(False)
-        self.progressBarFinished()
-        self.setBlocking(False)
+    def on_exception(self, ex: Exception) -> None:
+        """
+        When an exception occurs during the calculation.
 
-        try:
-            embeddings = f.result()
-        except ConnectionError:
-            self._log.exception("Error", exc_info=True)
-            self._send_output_signals((None, None, 0))
-            return
-        except Exception as err:
-            self._log.exception("Error", exc_info=True)
-            self.error(
-                "\n".join(traceback.format_exception_only(type(err), err)))
-            self._send_output_signals((None, None, 0))
-            return
+        Parameters
+        ----------
+        ex
+            Exception occurred during the embedding.
+        """
+        self._set_fields_active(True)
+        self.Error.unexpected_error(type(ex).__name__)
+        self.clear_outputs()
 
-        assert self._input_data is not None
-        assert len(self._input_data) == len(task.file_paths_mask)
+    def cancel(self):
+        self._set_fields_active(True)
+        super().cancel()
 
-        self._send_output_signals(embeddings)
+    def _switch_to_local_embedder(self):
+        self.Warning.switched_local_embedder()
+        self.cb_embedder_current_id = self.embedders.index("squeezenet")
 
-    def _send_output_signals(self, embeddings):
+    def _set_fields_active(self, active: bool) -> None:
+        self.auto_commit_widget.setDisabled(not active)
+        self.cancel_button.setDisabled(active)
+        self.cb_image_attr.setDisabled(not active)
+        self.cb_embedder.setDisabled(not active)
+
+    def _send_output_signals(self, result: Result) -> None:
         self.Warning.images_skipped.clear()
-        embedded_images, skipped_images, num_skipped = embeddings
-        self.Outputs.embeddings.send(embedded_images)
-        self.Outputs.skipped_images.send(skipped_images)
-        if num_skipped is not 0:
-            self.Warning.images_skipped(num_skipped)
-        self.set_output_data_summary(embedded_images, skipped_images)
+        self.Outputs.embeddings.send(result.embedding)
+        self.Outputs.skipped_images.send(result.skip_images)
+        if result.num_skipped != 0:
+            self.Warning.images_skipped(result.num_skipped)
+        self.set_output_data_summary(
+            result.embedding, result.skip_images)
 
     def clear_outputs(self):
-        self._send_output_signals((None, None, 0))
+        self._send_output_signals(
+            Result(embedding=None, skpped_images=None, num_skipped=0))
 
     def onDeleteWidget(self):
         self.cancel()
         super().onDeleteWidget()
-
-    def cancel(self):
-        if self._task is not None:
-            task, self._task = self._task, None
-            task.cancel()
-            del task.embedder
-            # the process will still continue in the background - it will
-            # wait current waiting response to come back but then will stop
-
-            self.auto_commit_widget.setDisabled(False)
-            self.cancel_button.setDisabled(True)
-            self.progressBarFinished()
-            self.setBlocking(False)
-            self.cb_image_attr.setDisabled(False)
-            self.cb_embedder.setDisabled(False)
-
-
-def main(argv=None):
-    from AnyQt.QtWidgets import QApplication
-    from orangecontrib.imageanalytics.widgets.tests.utils import load_images
-    logging.basicConfig(level=logging.DEBUG)
-    app = QApplication(list(argv) if argv else [])
-
-    data = load_images()
-    widget = OWImageEmbedding()
-    widget.show()
-    assert QSignalSpy(widget.blockingStateChanged).wait()
-    widget.set_data(data)
-    widget.handleNewSignals()
-    app.exec()
-    widget.set_data(None)
-    widget.handleNewSignals()
-    widget.saveSettings()
-    widget.onDeleteWidget()
-    return 0
 
 
 if __name__ == '__main__':

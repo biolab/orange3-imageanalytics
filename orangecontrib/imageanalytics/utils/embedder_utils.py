@@ -1,17 +1,18 @@
-from io import BytesIO
-from os.path import join, isfile
 import logging
 import hashlib
 import pickle
 import ftplib
-
 import cachecontrol.caches
 import requests
-from PIL.Image import open as open_image, LANCZOS
+from io import BytesIO
+from os.path import join, isfile
 from requests.exceptions import RequestException
-from PIL import ImageFile
 from urllib.parse import urlparse
-from urllib.request import urlopen, URLError
+from urllib.request import urlopen
+from urllib.error import URLError
+
+from PIL.Image import open as open_image, LANCZOS
+from PIL import ImageFile
 import numpy as np
 
 from Orange.misc.environ import cache_dir
@@ -44,7 +45,7 @@ class ImageLoader:
                 join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
         )
 
-    def load_image_or_none(self, file_path, target_size):
+    def load_image_or_none(self, file_path, target_size=None):
         image = self._load_image_from_url_or_local_path(file_path)
 
         if image is None:
@@ -60,7 +61,7 @@ class ImageLoader:
             image = image.resize(target_size, LANCZOS)
         return image
 
-    def load_image_bytes(self, file_path, target_size):
+    def load_image_bytes(self, file_path, target_size=None):
         image = self.load_image_or_none(file_path, target_size)
         if image is None:
             return None

@@ -69,6 +69,12 @@ class ImageEmbedderTest(unittest.TestCase):
             len(self.embedder_server._embedder._cache._cache_dict), 1)
 
     @patch(_HTTPX_POST_METHOD, make_dummy_post(b''))
+    def test_on_empty_response(self):
+        self.assertEqual(self.embedder_server(self.single_example), [None])
+        self.assertEqual(
+            len(self.embedder_server._embedder._cache._cache_dict), 0)
+
+    @patch(_HTTPX_POST_METHOD, make_dummy_post(b'blabla'))
     def test_on_non_json_response(self):
         self.assertEqual(self.embedder_server(self.single_example), [None])
         self.assertEqual(
@@ -286,4 +292,4 @@ class ImageEmbedderTest(unittest.TestCase):
         for num_images in range(1, 20):
             with self.assertRaises(ConnectionError):
                 self.embedder_server(self.single_example * num_images)
-        self.setUp()  # to init new embedder
+            self.setUp()  # to init new embedder

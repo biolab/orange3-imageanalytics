@@ -1,9 +1,14 @@
+import time
+import numpy as np
 from unittest import mock, skipIf
 
 import pkg_resources
 from Orange.data import Table
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
+
+from orangecontrib.imageanalytics.utils.embedder_utils import \
+    EmbeddingConnectionError
 from orangecontrib.imageanalytics.widgets.owimageembedding \
     import OWImageEmbedding
 from orangecontrib.imageanalytics.widgets.tests.utils import load_images
@@ -77,9 +82,9 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertTrue(self.widget.Warning.active)
 
     @mock.patch(
-        'orangecontrib.imageanalytics.image_embedder.ImageEmbedder.'
-        'is_connected_to_server',
-        side_effect=lambda use_hyper: False)
+        'orangecontrib.imageanalytics.server_embedder.ServerEmbedder.'
+        'from_file_paths',
+        side_effect=EmbeddingConnectionError)
     def test_no_connection(self, _):
         """
         In this unittest we will simulate that there is no connection
@@ -90,8 +95,8 @@ class TestOWImageEmbedding(WidgetTest):
         table = load_images()
         self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
         self.send_signal(w.Inputs.images, table)
-        self.assertEqual(w.cb_embedder.currentText(), "SqueezeNet (local)")
         self.wait_until_stop_blocking()
+        self.assertEqual(w.cb_embedder.currentText(), "SqueezeNet (local)")
 
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertEqual(type(output), Table)
@@ -132,6 +137,24 @@ class TestOWImageEmbedding(WidgetTest):
         cbox = self.widget.controls.cb_embedder_current_id
         simulate.combobox_activate_index(cbox, 3)
 
+    def test_cancel_embedding(self):
+        table = load_images()
+
+        # make table longer that the processing do not finish before click
+        table = Table(
+            table.domain,
+            np.repeat(table.X, 50, axis=0),
+            np.repeat(table.Y, 50, axis=0),
+            np.repeat(table.metas, 50, axis=0))
+
+        self.send_signal(self.widget.Inputs.images, table)
+        time.sleep(0.5)
+        self.widget.cancel_button.click()
+        self.wait_until_stop_blocking()
+        results = self.get_output(self.widget.Outputs.embeddings)
+
+        self.assertIsNone(results)
+
     @skipIf(pkg_resources.get_distribution("orange3").version >= "2.23.0",
             "make removed in newer versions of orange")
     def test_variable_make(self):
@@ -154,3 +177,24 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertTrue(
             all(v1 is v2 and id(v1) == id(v2) for v1, v2 in
                 zip(emb1.domain.attributes, emb2.domain.attributes)))
+
+    @mock.patch(
+        'orangecontrib.imageanalytics.server_embedder.ServerEmbedder.'
+        'from_file_paths',
+        side_effect=OSError)
+    def test_unexpected_error(self, _):
+        """
+        In this unittest we will simulate how the widget survives unexpected
+        error.
+        """
+        w = self.widget
+
+        table = load_images()
+        self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
+        self.send_signal(w.Inputs.images, table)
+        self.wait_until_stop_blocking()
+
+        output = self.get_output(self.widget.Outputs.embeddings)
+        self.assertIsNone(output)
+        self.widget.Error.unexpected_error.is_shown()
+        print(self.widget.Error.unexpected_error)

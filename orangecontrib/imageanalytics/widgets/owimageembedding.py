@@ -6,7 +6,6 @@ import concurrent.futures
 import numpy as np
 from AnyQt.QtCore import Qt, QThread
 from AnyQt.QtCore import pyqtSlot as Slot
-from AnyQt.QtTest import QSignalSpy
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
 from Orange.data import Table
@@ -20,6 +19,8 @@ from Orange.widgets.widget import OWWidget
 
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
 from orangecontrib.imageanalytics.image_embedder import MODELS as EMBEDDERS_INFO
+from orangecontrib.imageanalytics.utils.embedder_utils import \
+    EmbeddingConnectionError
 
 
 class OWImageEmbedding(OWWidget):
@@ -42,8 +43,12 @@ class OWImageEmbedding(OWWidget):
     class Warning(OWWidget.Warning):
         switched_local_embedder = Msg(
             "No internet connection: switched to local embedder")
-        no_image_attribute = Msg("Please provide data with an image attribute.")
+        no_image_attribute = Msg(
+            "Please provide data with an image attribute.")
         images_skipped = Msg("{} images are skipped.")
+
+    class Error(OWWidget.Error):
+        unexpected_error = Msg("Embedding error: {}")
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
@@ -163,35 +168,18 @@ class OWImageEmbedding(OWWidget):
         self.commit()
 
     def connect(self):
-        """
-        This function tries to connects to the selected embedder if it is not
-        successful due to any server/connection error it switches to the
-        local embedder and warns the user about that.
-        """
-        self.Warning.switched_local_embedder.clear()
-
-        # try to connect to current embedder
         embedder = ImageEmbedder(
             model=self.embedders[self.cb_embedder_current_id],
-            layer='penultimate'
         )
-
-        if not embedder.is_local_embedder() and \
-            not embedder.is_connected_to_server(use_hyper=False):
-            # there is a problem with connecting to the server
-            # switching to local embedder
-            self.Warning.switched_local_embedder()
-            del embedder  # remove current embedder
-            self.cb_embedder_current_id = self.embedders.index("squeezenet")
-            print(self.embedders[self.cb_embedder_current_id])
-            embedder = ImageEmbedder(
-                model=self.embedders[self.cb_embedder_current_id],
-                layer='penultimate'
-            )
-
         return embedder
 
+    def _switch_to_local_embedder(self):
+        self.Warning.switched_local_embedder()
+        self.cb_embedder_current_id = self.embedders.index("squeezenet")
+        self.commit()
+
     def _cb_embedder_changed(self):
+        self.Warning.switched_local_embedder.clear()
         current_embedder = self.embedders[self.cb_embedder_current_id]
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]['description'])
@@ -283,21 +271,18 @@ class OWImageEmbedding(OWWidget):
 
         try:
             embeddings = f.result()
-        except ConnectionError:
-            self._log.exception("Error", exc_info=True)
-            self._send_output_signals((None, None, 0))
-            return
+        except EmbeddingConnectionError:
+            # when we get this error it means that embedding was not
+            # successful due to connection error
+            self._switch_to_local_embedder()
         except Exception as err:
             self._log.exception("Error", exc_info=True)
-            self.error(
-                "\n".join(traceback.format_exception_only(type(err), err)))
-            self._send_output_signals((None, None, 0))
-            return
-
-        assert self._input_data is not None
-        assert len(self._input_data) == len(task.file_paths_mask)
-
-        self._send_output_signals(embeddings)
+            self.Error.unexpected_error(type(err).__name__)
+            self.clear_outputs()
+        else:
+            assert self._input_data is not None
+            assert len(self._input_data) == len(task.file_paths_mask)
+            self._send_output_signals(embeddings)
 
     def _send_output_signals(self, embeddings):
         self.Warning.images_skipped.clear()
@@ -329,26 +314,6 @@ class OWImageEmbedding(OWWidget):
             self.setBlocking(False)
             self.cb_image_attr.setDisabled(False)
             self.cb_embedder.setDisabled(False)
-
-
-def main(argv=None):
-    from AnyQt.QtWidgets import QApplication
-    from orangecontrib.imageanalytics.widgets.tests.utils import load_images
-    logging.basicConfig(level=logging.DEBUG)
-    app = QApplication(list(argv) if argv else [])
-
-    data = load_images()
-    widget = OWImageEmbedding()
-    widget.show()
-    assert QSignalSpy(widget.blockingStateChanged).wait()
-    widget.set_data(data)
-    widget.handleNewSignals()
-    app.exec()
-    widget.set_data(None)
-    widget.handleNewSignals()
-    widget.saveSettings()
-    widget.onDeleteWidget()
-    return 0
 
 
 if __name__ == '__main__':

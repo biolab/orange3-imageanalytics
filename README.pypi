@@ -1,0 +1,9 @@
+Orange3 Image Analytics
+=======================
+
+Simplifies loading of images and through deep network-based embeddings
+enables their analysis. Embedding represents images with feature vectors,
+allowing the use of Orange's standard arsenal of widgets for
+clustering, classification or any other kind of
+feature-based analysis. Image Analytics also provides visualization
+widgets for images and allows saving them.

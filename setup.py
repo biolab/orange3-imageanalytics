@@ -7,7 +7,7 @@ import sys
 
 from setuptools import setup, find_packages
 
-with io.open('about.md', 'r', encoding='utf-8') as f:
+with io.open('README.pypi', 'r', encoding='utf-8') as f:
     ABOUT = f.read()
 
 NAME = 'Orange3-ImageAnalytics'

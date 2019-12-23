@@ -40,7 +40,7 @@ class TestOWSaveImages(WidgetTest):
         # Close the file, the directory will be removed after the test
         self.widget.cancel()
         self.widgets.remove(self.widget)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
     def test_dataset(self):
         self.widget.auto_save = True
@@ -49,7 +49,7 @@ class TestOWSaveImages(WidgetTest):
 
         datasig = self.widget.Inputs.data
         self.send_signal(datasig, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertEqual(insum.call_args[0][0], "6")
         insum.reset_mock()
         savefile.reset_mock()
@@ -62,7 +62,7 @@ class TestOWSaveImages(WidgetTest):
 
         self.widget.auto_save = True
         self.send_signal(datasig, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertEqual(insum.call_args[0][0], "6")
         savefile.assert_called()
 
@@ -151,25 +151,25 @@ class TestOWSaveImages(WidgetTest):
         widget.save_images = Mock()
 
         widget.save_file()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         widget.save_images.assert_not_called()
 
         widget.dirname = "foo"
         widget.save_file()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         # data is still none
         widget.save_images.assert_not_called()
 
         widget.dirname = ""
         self.send_signal(widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         widget.save_file()
         # name empty
         widget.save_images.assert_not_called()
 
         widget.dirname = "foo"
         widget.save_file()
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         widget.save_images.assert_called()
         widget.save_images.reset_mock()
 
@@ -187,7 +187,7 @@ class TestOWSaveImages(WidgetTest):
         widget.dirname = os.path.join(self.test_dir, "bar", "foo")
 
         self.send_signal(datasig, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertTrue(widget.Error.general_error.is_shown())
 
     def test_file_name_label(self):
@@ -211,13 +211,13 @@ class TestOWSaveImages(WidgetTest):
 
         self.widget.dirname = dirname
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertFalse(os.path.isdir(dirname))
 
         self.widget.auto_save = True
         self.widget.dirname = dirname
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         self.assertTrue(os.path.isdir(dirname))
 
         image_path = os.path.join(dirname, "Day7", "D7-Series037_z06.png")
@@ -230,14 +230,14 @@ class TestOWSaveImages(WidgetTest):
 
         self.widget.dirname = dirname
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         # nothing should change since no auto-save
         self.assertFalse(os.path.isdir(dirname))
 
         self.widget.auto_save = True
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         # test image size, since size not set the original image size is used
         image_path = os.path.join(dirname, "Day7", "D7-Series037_z06.png")
@@ -248,7 +248,7 @@ class TestOWSaveImages(WidgetTest):
 
         # enable scale
         self.widget.controls.use_scale.setChecked(True)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         im = Image.open(image_path)
         size = im.size
         # one of the scale is used, non of the preset scale is (512, 512)
@@ -256,7 +256,7 @@ class TestOWSaveImages(WidgetTest):
 
         # change scale
         simulate.combobox_activate_index(self.widget.controls.scale_index, 1)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         im = Image.open(image_path)
         size = im.size
         # second option is squeezenet with scale 227x227
@@ -289,7 +289,7 @@ class TestOWSaveImages(WidgetTest):
         self.widget.dirname = dirname
         self.widget.auto_save = True
         self.send_signal(self.widget.Inputs.data, data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
         # test images not in subdirs - all images in primary dir
 
         self.assertTrue(os.path.isdir(self.test_dir))
@@ -305,12 +305,12 @@ class TestOWSaveImages(WidgetTest):
         self.widget.dirname = dirname
         self.widget.auto_save = True
         self.send_signal(self.widget.Inputs.data, self.data)
-        self.wait_until_stop_blocking()
+        self.wait_until_finished()
 
         for i, f in enumerate(SUPPORTED_FILE_FORMATS):
             simulate.combobox_activate_index(
                 self.widget.controls.file_format_index, i)
-            self.wait_until_stop_blocking()
+            self.wait_until_finished()
 
             # test image has right ending
             image_path = os.path.join(

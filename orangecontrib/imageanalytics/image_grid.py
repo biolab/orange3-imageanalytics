@@ -21,7 +21,7 @@ class ImageGrid:
         self.data = data
 
         # reduce dimensions
-        data_2dim = Table(self._reduce_dimensions(data))
+        data_2dim = Table.from_numpy(None, self._reduce_dimensions(data))
 
         # normalize the data
         self.norm_data = np.array(self._normalize_data(data_2dim))
@@ -195,7 +195,7 @@ class ImageGrid:
 
     def _grid_indices_to_image_list(self, images):
         """
-        Return the image grid as a Table of images, ordered by rows. 
+        Return the image grid as a Table of images, ordered by rows.
         If a grid cell does not contain an image, put None in its place.
 
         Parameters

@@ -229,7 +229,7 @@ def create_table(image_meta, categories=None, start_dir=None):
             )
         else:
             # empty results, no images found
-            table = Orange.data.Table(domain)
+            table = Orange.data.Table.from_domain(domain)
     else:
         table = None
 

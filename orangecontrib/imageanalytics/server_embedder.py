@@ -3,7 +3,7 @@ import random
 import json
 import uuid
 from json import JSONDecodeError
-from os import getenv
+from os import getenv, environ
 from typing import Dict, List, Callable, Optional, Any
 
 import httpx
@@ -46,6 +46,24 @@ class ServerEmbedder:
         # default embedding timeouts are too small we need to increase them
         self.timeouts = httpx.TimeoutConfig(timeout=60)
         self.num_parallel_requests = 0
+
+    @staticmethod
+    def _get_proxies() -> Optional[Dict[str, str]]:
+        """
+        Return dict with proxy addresses if they exists.
+
+        Returns
+        -------
+        proxy_dict
+            Dictionary with format {proxy type: proxy address} or None if
+            they not set.
+        """
+        proxy_dict = {}
+        if "http_proxy" in environ:
+            proxy_dict["http"] = environ["http_proxy"]
+        if "https_proxy" in environ:
+            proxy_dict["https"] = environ["https_proxy"]
+        return proxy_dict if proxy_dict else None
 
     def from_file_paths(
             self,
@@ -148,7 +166,10 @@ class ServerEmbedder:
         """
         requests = []
         async with httpx.Client(
-                timeout=self.timeouts, base_url=self.server_url) as client:
+            timeout=self.timeouts,
+            base_url=self.server_url,
+            proxies=self._get_proxies()
+        ) as client:
             for p in file_paths:
                 if self.cancelled:
                     raise EmbeddingCancelledException()

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import unittest
 from os import environ, path
 from os.path import join, dirname
@@ -293,3 +294,27 @@ class ImageEmbedderTest(unittest.TestCase):
             with self.assertRaises(ConnectionError):
                 self.embedder_server(self.single_example * num_images)
             self.setUp()  # to init new embedder
+
+    def test_proxy(self):
+        """
+        Test the method that get proxy addresses.
+        """""
+        self.assertIsNone(self.embedder_server._embedder._get_proxies())
+
+        os.environ['http_proxy'] = "http:test.com"
+        self.assertDictEqual(
+            {"http": "http:test.com"},
+            self.embedder_server._embedder._get_proxies())
+
+        os.environ['https_proxy'] = "https:test.com"
+        self.assertDictEqual(
+            {"http": "http:test.com", "https": "https:test.com"},
+            self.embedder_server._embedder._get_proxies())
+
+        del os.environ['http_proxy']
+        self.assertDictEqual(
+            {"https": "https:test.com"},
+            self.embedder_server._embedder._get_proxies())
+
+        del os.environ['https_proxy']
+        self.assertIsNone(self.embedder_server._embedder._get_proxies())

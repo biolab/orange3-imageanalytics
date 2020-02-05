@@ -1,17 +1,18 @@
-from io import BytesIO
-from os.path import join, isfile
 import logging
 import hashlib
 import pickle
 import ftplib
-
 import cachecontrol.caches
 import requests
-from PIL.Image import open as open_image, LANCZOS
+from io import BytesIO
+from os.path import join, isfile
 from requests.exceptions import RequestException
-from PIL import ImageFile
 from urllib.parse import urlparse
-from urllib.request import urlopen, URLError
+from urllib.request import urlopen
+from urllib.error import URLError
+
+from PIL.Image import open as open_image, LANCZOS
+from PIL import ImageFile
 import numpy as np
 
 from Orange.misc.environ import cache_dir
@@ -22,8 +23,16 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class EmbeddingCancelledException(Exception):
-    """Thrown when the embedding task is cancelled from another thread.
+    """
+    Thrown when the embedding task is cancelled from another thread.
     (i.e. ImageEmbedder.cancelled attribute is set to True).
+    """
+
+
+class EmbeddingConnectionError(ConnectionError):
+    """
+    Common error when embedding is interrupted because of connection problems
+    or server unavailability.
     """
 
 
@@ -36,7 +45,7 @@ class ImageLoader:
                 join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
         )
 
-    def load_image_or_none(self, file_path, target_size):
+    def load_image_or_none(self, file_path, target_size=None):
         image = self._load_image_from_url_or_local_path(file_path)
 
         if image is None:
@@ -52,7 +61,7 @@ class ImageLoader:
             image = image.resize(target_size, LANCZOS)
         return image
 
-    def load_image_bytes(self, file_path, target_size):
+    def load_image_bytes(self, file_path, target_size=None):
         image = self.load_image_or_none(file_path, target_size)
         if image is None:
             return None
@@ -104,12 +113,12 @@ class ImageLoader:
 
 class EmbedderCache:
 
-    _cache_file_blueprint = '{:s}_{:s}_embeddings.pickle'
+    _cache_file_blueprint = '{:s}_embeddings.pickle'
 
-    def __init__(self, model, layer):
+    def __init__(self, model):
         # init the cache
 
-        cache_file_path = self._cache_file_blueprint.format(model, layer)
+        cache_file_path = self._cache_file_blueprint.format(model)
         self._cache_file_path = join(cache_dir(), cache_file_path)
         self._cache_dict = self._init_cache()
 
@@ -152,5 +161,3 @@ class EmbedderCache:
     def add(self, cache_key, value):
         self._cache_dict[cache_key] = value
 
-    def exist_in_cache(self, cache_key):
-        return cache_key in self._cache_dict

@@ -19,9 +19,8 @@ class LocalEmbedder:
 
     embedder = None
 
-    def __init__(self, model, model_settings, layer):
+    def __init__(self, model, model_settings):
         self.model = model
-        self.layer = layer
         self._load_model()
 
         self._target_image_size = model_settings["target_image_size"]
@@ -35,7 +34,7 @@ class LocalEmbedder:
         self.cancelled = False
 
         self._image_loader = ImageLoader()
-        self._cache = EmbedderCache(model, layer)
+        self._cache = EmbedderCache(model)
 
     def _load_model(self):
         self.embedder = squeezenet(include_softmax=False)

@@ -13,7 +13,12 @@ MODELS = {
         'description': 'Google\'s Inception v3 model trained on ImageNet.',
         'target_image_size': (299, 299),
         'layers': ['penultimate'],
-        'order': 0
+        'order': 0,
+        # batch size tell how many images we send in parallel, this number is
+        # high for inception since it has many workers, but other embedders
+        # send less images since bottleneck are workers, this way we avoid
+        # ReadTimeout because of images waiting in a queue at the server
+        'batch_size': 100
     },
     'painters': {
         'name': 'Painters',
@@ -21,28 +26,32 @@ MODELS = {
             'A model trained to predict painters from artwork\nimages.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
-        'order': 4
+        'order': 4,
+        'batch_size': 20
     },
     'deeploc': {
         'name': 'DeepLoc',
         'description': 'A model trained to analyze yeast cell images.',
         'target_image_size': (64, 64),
         'layers': ['penultimate'],
-        'order': 5
+        'order': 5,
+        'batch_size': 20
     },
     'vgg16': {
         'name': 'VGG-16',
         'description': '16-layer image recognition model trained on\nImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
-        'order': 2
+        'order': 2,
+        'batch_size': 15
     },
     'vgg19': {
         'name': 'VGG-19',
         'description': '19-layer image recognition model trained on\nImageNet.',
         'target_image_size': (224, 224),
         'layers': ['penultimate'],
-        'order': 3
+        'order': 3,
+        'batch_size': 15
     },
     'openface': {
         'name': 'openface',
@@ -50,7 +59,8 @@ MODELS = {
                        'CASIA-WebFace datasets.',
         'target_image_size': (256, 256),
         'layers': ['penultimate'],
-        'order': 6
+        'order': 6,
+        'batch_size': 20
     },
     'squeezenet': {
         'name': 'SqueezeNet',
@@ -61,7 +71,7 @@ MODELS = {
         'layers': ['penultimate'],
         'order': 1,
         'is_local': True,
-        'batch_size': 16
+        'batch_size': 16,
     }
 }
 
@@ -75,42 +85,33 @@ class ImageEmbedder:
     --------
     >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
     >>> image_file_paths = [...]
-    >>> with ImageEmbedder(model='model_name', layer='penultimate') as embedder:
-    ...    embeddings = embedder(image_file_paths)
+    >>> with ImageEmbedder(model='model_name') as emb:
+    ...    embeddings = emb(image_file_paths)
     """
+    _embedder = None
 
-    def __init__(self, model="inception-v3", layer="penultimate",
-                 server_url='api.garaza.io:443'):
+    def __init__(self, model="inception-v3",
+                 server_url='https://api.garaza.io/'):
 
-        self._model_settings = self. _get_model_settings_confidently(
-            model, layer)
+        self._model_settings = self. _get_model_settings_confidently(model)
 
-        # test
         if self.is_local_embedder():
-            self._embedder = LocalEmbedder(model, self._model_settings, layer)
+            self._embedder = LocalEmbedder(model, self._model_settings)
         else:
             self._embedder = ServerEmbedder(
-                model, self._model_settings, layer, server_url)
+                model, self._model_settings, server_url)
 
     def is_local_embedder(self):
         return self._model_settings.get("is_local") or False
 
     @staticmethod
-    def _get_model_settings_confidently(model, layer):
+    def _get_model_settings_confidently(model):
         if model not in MODELS.keys():
             model_error = "'{:s}' is not a valid model, should be one of: {:s}"
             available_models = ', '.join(MODELS.keys())
             raise ValueError(model_error.format(model, available_models))
 
         model_settings = MODELS[model]
-
-        if layer not in model_settings['layers']:
-            layer_error = (
-                "'{:s}' is not a valid layer for the '{:s}'"
-                " model, should be one of: {:s}")
-            available_layers = ', '.join(model_settings['layers'])
-            raise ValueError(layer_error.format(layer, model, available_layers))
-
         return model_settings
 
     def __call__(self, *args, **kwargs):
@@ -157,8 +158,6 @@ class ImageEmbedder:
 
     def __exit__(self, exception_type, exception_value, traceback):
         self.set_canceled(True)
-        if isinstance(self._embedder, ServerEmbedder):
-            self._embedder.disconnect_from_server()
 
     def __del__(self):
         self.__exit__(None, None, None)
@@ -182,11 +181,13 @@ class ImageEmbedder:
 
     @staticmethod
     def prepare_output_data(input_data, embeddings):
+        embeddings = np.array(embeddings)
         skipped_images_bool = np.array([x is None for x in embeddings])
 
         if np.any(skipped_images_bool):
             skipped_images = input_data[skipped_images_bool]
             skipped_images = skipped_images.copy()
+            skipped_images.name = "Skipped images"
             num_skipped = len(skipped_images)
         else:
             num_skipped = 0
@@ -205,6 +206,7 @@ class ImageEmbedder:
                 embeddings
             )
             embedded_images.ids = input_data.ids[embedded_images_bool]
+            embedded_images.name = "Embedded images"
         else:
             embedded_images = None
 
@@ -215,20 +217,16 @@ class ImageEmbedder:
         metas = data.domain.metas
         return [m for m in metas if m.attributes.get('type') == 'image']
 
-    def is_connected_to_server(self, use_hyper=True):
-        if not self.is_local_embedder():
-            return self._embedder.is_connected_to_server() if use_hyper else \
-                self._embedder.ping_server()
-        else:
-            return False
-
     def clear_cache(self):
         self._embedder._cache.clear_cache()
 
-    def reconnect_to_server(self):
-        if not self.is_local_embedder():
-            return self._embedder.reconnect_to_server()
-        return False
-
     def set_canceled(self, canceled):
-        self._embedder.cancelled = canceled
+        if self._embedder:
+            self._embedder.cancelled = canceled
+
+
+if __name__ == "__main__":
+    image_file_paths = ["tests/example_image_0.jpg"]
+    with ImageEmbedder(model='inception-v3') as embedder:
+        embedder.clear_cache()
+        embeddings = embedder(image_file_paths)

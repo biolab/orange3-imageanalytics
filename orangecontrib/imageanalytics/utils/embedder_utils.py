@@ -1,59 +1,45 @@
-import logging
-import hashlib
-import pickle
 import ftplib
-import cachecontrol.caches
-import requests
+import logging
 from io import BytesIO
-from os.path import join, isfile
-from requests.exceptions import RequestException
+from os.path import join
+from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import urlopen
-from urllib.error import URLError
 
-from PIL.Image import open as open_image, LANCZOS
-from PIL import ImageFile
+import cachecontrol.caches
 import numpy as np
+import requests
+from PIL import ImageFile
+from PIL.Image import LANCZOS
+from PIL.Image import open as open_image
+from requests.exceptions import RequestException
 
 from Orange.misc.environ import cache_dir
-
 
 log = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-class EmbeddingCancelledException(Exception):
-    """
-    Thrown when the embedding task is cancelled from another thread.
-    (i.e. ImageEmbedder.cancelled attribute is set to True).
-    """
-
-
-class EmbeddingConnectionError(ConnectionError):
-    """
-    Common error when embedding is interrupted because of connection problems
-    or server unavailability.
-    """
-
-
 class ImageLoader:
-
     def __init__(self):
         self._session = cachecontrol.CacheControl(
             requests.session(),
             cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
+                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache")
+            ),
         )
 
     def load_image_or_none(self, file_path, target_size=None):
+        if file_path is None:
+            return None
         image = self._load_image_from_url_or_local_path(file_path)
 
         if image is None:
             return image
 
-        if not image.mode == 'RGB':
+        if not image.mode == "RGB":
             try:
-                image = image.convert('RGB')
+                image = image.convert("RGB")
             except ValueError:
                 return None
 
@@ -77,7 +63,7 @@ class ImageLoader:
 
     def _load_image_from_url_or_local_path(self, file_path):
         urlparts = urlparse(file_path)
-        if urlparts.scheme in ('http', 'https'):
+        if urlparts.scheme in ("http", "https"):
             try:
                 file = self._session.get(file_path, stream=True).raw
             except RequestException:
@@ -86,7 +72,7 @@ class ImageLoader:
         elif urlparts.scheme in ("ftp", "data"):
             try:
                 file = urlopen(file_path)
-            except (URLError, ) + ftplib.all_errors:
+            except (URLError,) + ftplib.all_errors:
                 log.warning("Image skipped", exc_info=True)
                 return None
         else:
@@ -109,55 +95,3 @@ class ImageLoader:
         img_out[:, :, 0] = swap_img[:, :, 2]  # from rgb to bgr - caffe mode
         img_out[:, :, 2] = swap_img[:, :, 0]
         return img_out - mean_pixel
-
-
-class EmbedderCache:
-
-    _cache_file_blueprint = '{:s}_embeddings.pickle'
-
-    def __init__(self, model):
-        # init the cache
-
-        cache_file_path = self._cache_file_blueprint.format(model)
-        self._cache_file_path = join(cache_dir(), cache_file_path)
-        self._cache_dict = self._init_cache()
-
-    def _init_cache(self):
-        if isfile(self._cache_file_path):
-            try:
-                return self.load_pickle(self._cache_file_path)
-            except EOFError:
-                return {}
-        return {}
-
-    @staticmethod
-    def save_pickle(obj, file_name):
-        with open(file_name, 'wb') as f:
-            pickle.dump(obj, f)
-
-    @staticmethod
-    def load_pickle(file_name):
-        with open(file_name, 'rb') as f:
-            return pickle.load(f)
-
-    @staticmethod
-    def md5_hash(bytes_):
-        md5 = hashlib.md5()
-        md5.update(bytes_)
-        return md5.hexdigest()
-
-    def clear_cache(self):
-        self._cache_dict = {}
-        self.persist_cache()
-
-    def persist_cache(self):
-        self.save_pickle(self._cache_dict, self._cache_file_path)
-
-    def get_cached_result_or_none(self, cache_key):
-        if cache_key in self._cache_dict:
-            return self._cache_dict[cache_key]
-        return None
-
-    def add(self, cache_key, value):
-        self._cache_dict[cache_key] = value
-

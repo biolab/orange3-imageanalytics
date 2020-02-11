@@ -1,20 +1,19 @@
 import time
+import unittest
+from unittest import mock, skipIf
 from unittest.mock import patch
 
 import numpy as np
-from unittest import mock, skipIf
-
 import pkg_resources
+
 from Orange.data import Table
+from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
-
-from orangecontrib.imageanalytics.tests.test_image_embedder import \
-    regular_dummy_sr, HTTPX_POST_METHOD
-from orangecontrib.imageanalytics.utils.embedder_utils import \
-    EmbeddingConnectionError
-from orangecontrib.imageanalytics.widgets.owimageembedding \
-    import OWImageEmbedding
+from orangecontrib.imageanalytics.tests.test_image_embedder import (
+    HTTPX_POST_METHOD, regular_dummy_sr)
+from orangecontrib.imageanalytics.widgets.owimageembedding import \
+    OWImageEmbedding
 from orangecontrib.imageanalytics.widgets.tests.utils import load_images
 
 
@@ -89,9 +88,10 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertTrue(self.widget.Warning.active)
 
     @mock.patch(
-        'orangecontrib.imageanalytics.server_embedder.ServerEmbedder.'
-        'from_file_paths',
-        side_effect=EmbeddingConnectionError)
+        "orangecontrib.imageanalytics.server_embedder.ServerEmbedder."
+        "embedd_data",
+        side_effect=EmbeddingConnectionError,
+    )
     def test_no_connection(self, _):
         """
         In this unittest we will simulate that there is no connection
@@ -151,7 +151,8 @@ class TestOWImageEmbedding(WidgetTest):
             table.domain,
             np.repeat(table.X, 50, axis=0),
             np.repeat(table.Y, 50, axis=0),
-            np.repeat(table.metas, 50, axis=0))
+            np.repeat(table.metas, 50, axis=0),
+        )
 
         self.send_signal(self.widget.Inputs.images, table)
         time.sleep(0.5)
@@ -161,8 +162,10 @@ class TestOWImageEmbedding(WidgetTest):
 
         self.assertIsNone(results)
 
-    @skipIf(pkg_resources.get_distribution("orange3").version >= "2.23.0",
-            "make removed in newer versions of orange")
+    @skipIf(
+        pkg_resources.get_distribution("orange3").version >= "2.23.0",
+        "make removed in newer versions of orange",
+    )
     def test_variable_make(self):
         """
         Embedders call make when they create a variable - it will use the
@@ -181,13 +184,19 @@ class TestOWImageEmbedding(WidgetTest):
         emb2 = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertTrue(
-            all(v1 is v2 and id(v1) == id(v2) for v1, v2 in
-                zip(emb1.domain.attributes, emb2.domain.attributes)))
+            all(
+                v1 is v2 and id(v1) == id(v2)
+                for v1, v2 in zip(
+                    emb1.domain.attributes, emb2.domain.attributes
+                )
+            )
+        )
 
     @mock.patch(
-        'orangecontrib.imageanalytics.server_embedder.ServerEmbedder.'
-        'from_file_paths',
-        side_effect=OSError)
+        "orangecontrib.imageanalytics.server_embedder.ServerEmbedder."
+        "embedd_data",
+        side_effect=OSError,
+    )
     def test_unexpected_error(self, _):
         """
         In this unittest we will simulate how the widget survives unexpected
@@ -203,3 +212,7 @@ class TestOWImageEmbedding(WidgetTest):
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertIsNone(output)
         self.widget.Error.unexpected_error.is_shown()
+
+
+if __name__ == "__main__":
+    unittest.main()

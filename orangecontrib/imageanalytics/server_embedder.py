@@ -44,7 +44,7 @@ class ServerEmbedder:
         self.batch_size = 10000
 
         # default embedding timeouts are too small we need to increase them
-        self.timeouts = httpx.TimeoutConfig(timeout=60)
+        self.timeout = 60
         self.num_parallel_requests = 0
         self.max_parallel = model_settings['batch_size']
 
@@ -149,8 +149,8 @@ class ServerEmbedder:
             If cancelled attribute is set to True (default=False).
         """
         requests = []
-        async with httpx.Client(
-                timeout=self.timeouts, base_url=self.server_url) as client:
+        async with httpx.AsyncClient(
+                timeout=self.timeout, base_url=self.server_url) as client:
             for p in file_paths:
                 if self.cancelled:
                     raise EmbeddingCancelledException()

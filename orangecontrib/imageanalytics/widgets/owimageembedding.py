@@ -279,6 +279,8 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         ex
             Exception occurred during the embedding.
         """
+        log = logging.getLogger(__name__)
+        log.debug(ex, exc_info=ex)
         self._set_fields_active(True)
         self.Error.unexpected_error(type(ex).__name__)
         self.clear_outputs()

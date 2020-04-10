@@ -7,4 +7,4 @@ cachecontrol
 lockfile
 ndf>=0.1.2
 scipy
-httpx ~=0.10.1
+httpx~=0.12

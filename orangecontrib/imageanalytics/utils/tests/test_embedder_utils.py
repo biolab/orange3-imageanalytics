@@ -6,8 +6,7 @@ from urllib.error import URLError
 from PIL.Image import Image
 from requests import RequestException
 
-from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
-    EmbedderCache
+from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
 
 
 TEST_IMAGES = [
@@ -109,64 +108,6 @@ class TestImageLoader(unittest.TestCase):
     def test_unsuccessful_convert_to_RGB(self, _) -> None:
         image = self.image_loader.load_image_or_none(self.im_paths[2])
         self.assertIsNone(image)
-
-
-class TestEmbedderCache(unittest.TestCase):
-
-    def setUp(self) -> None:
-        self.cache = EmbedderCache("test_model")
-        self.cache.clear_cache()  # make sure cache is empty
-
-    def test_save_and_load(self) -> None:
-        self.cache.add("test", "test")
-        self.cache.persist_cache()
-
-        # when initialing cache again it should load same cache
-        self.cache = EmbedderCache("test_model")
-        self.assertEqual("test", self.cache.get_cached_result_or_none("test"))
-
-    def test_clear_cache(self) -> None:
-        """
-        Strategy 1: clear before persisting
-        """
-        self.cache.add("test", "test")
-        self.cache.clear_cache()
-        self.cache.persist_cache()
-
-        self.cache = EmbedderCache("test_model")
-        self.assertIsNone(self.cache.get_cached_result_or_none("test"))
-
-        """
-        Strategy 2: clear after persisting
-        """
-        self.cache.add("test", "test")
-        self.cache.persist_cache()
-        self.cache.clear_cache()
-
-        self.cache = EmbedderCache("test_model")
-        self.assertIsNone(self.cache.get_cached_result_or_none("test"))
-
-    def test_get_cached_result_or_none(self) -> None:
-        self.assertIsNone(self.cache.get_cached_result_or_none("test"))
-        self.cache._cache_dict = {"test": "test1"}
-        self.assertEqual("test1", self.cache.get_cached_result_or_none("test"))
-
-    def test_add(self) -> None:
-        self.assertDictEqual(dict(), self.cache._cache_dict)
-        self.cache.add("test", "test1")
-        self.assertDictEqual({"test": "test1"}, self.cache._cache_dict)
-
-    @patch(
-        "orangecontrib.imageanalytics.utils.embedder_utils.EmbedderCache."
-        "load_pickle", side_effect=EOFError)
-    def test_unsuccessful_load(self, _) -> None:
-        self.cache.add("test", "test")
-        self.cache.persist_cache()
-
-        # since load was not succesdful it should be initialized as an empty
-        # dict
-        self.cache = EmbedderCache("test_model")
-        self.assertDictEqual({}, self.cache._cache_dict)
 
 
 if __name__ == "__main__":

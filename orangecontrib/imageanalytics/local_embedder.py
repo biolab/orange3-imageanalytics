@@ -1,18 +1,13 @@
 from os.path import join
-import logging
-import requests
 
-import numpy as np
 import cachecontrol.caches
+import requests
 from ndf.example_models import squeezenet
 
-from Orange.misc.environ import cache_dir
-from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader, \
-    EmbedderCache
-from orangecontrib.imageanalytics.utils.embedder_utils import \
-    EmbeddingCancelledException
-
-log = logging.getLogger(__name__)
+from Orange.canvas.config import cache_dir
+from Orange.misc.utils.embedder_utils import (EmbedderCache,
+                                              EmbeddingCancelledException)
+from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
 
 
 class LocalEmbedder:
@@ -28,10 +23,11 @@ class LocalEmbedder:
         self._session = cachecontrol.CacheControl(
             requests.session(),
             cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache"))
+                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache")
+            ),
         )
 
-        self.cancelled = False
+        self._cancelled = False
 
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)
@@ -39,27 +35,28 @@ class LocalEmbedder:
     def _load_model(self):
         self.embedder = squeezenet(include_softmax=False)
 
-    def from_file_paths(self, file_paths, image_processed_callback=None):
+    def embedd_data(self, file_paths, processed_callback=None):
         all_embeddings = []
 
-        for image in file_paths:
-            all_embeddings.append(self._embed(image))
-            if image_processed_callback:
-                image_processed_callback(success=True)
+        for row in file_paths:
+            all_embeddings.append(self._embed(row))
+            if processed_callback:
+                processed_callback(success=True)
 
         self._cache.persist_cache()
 
-        return np.array(all_embeddings)
+        return all_embeddings
 
     def _embed(self, file_path):
         """ Load images and compute cache keys and send requests to
         an http2 server for valid ones.
         """
-        if self.cancelled:
+        if self._cancelled:
             raise EmbeddingCancelledException()
 
         image = self._image_loader.load_image_or_none(
-            file_path, self._target_image_size)
+            file_path, self._target_image_size
+        )
         if image is None:
             return None
         image = self._image_loader.preprocess_squeezenet(image)
@@ -74,3 +71,6 @@ class LocalEmbedder:
 
         self._cache.add(cache_key, embedded_image)
         return embedded_image
+
+    def set_cancelled(self):
+        self._cancelled = True

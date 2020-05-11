@@ -150,7 +150,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
             orientation=Qt.Horizontal,
             callback=self.setting_changed
         )
-        grid.addWidget(hbox_attr, 1, 0, 1, 2)
+        grid.addWidget(hbox_attr, 0, 0, 1, 2)
 
         # Scale images option
         hbox_scale = gui.hBox(None)
@@ -169,7 +169,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
                    for v in self.available_scales],
             callback=self.setting_changed
         )
-        grid.addWidget(hbox_scale, 3, 0, 1, 2)
+        grid.addWidget(hbox_scale, 1, 0, 1, 2)
 
         # file format
         hbox_format = gui.hBox(None)
@@ -182,7 +182,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
             orientation=Qt.Horizontal,
             callback=self.setting_changed
         )
-        grid.addWidget(hbox_format, 4, 0, 1, 2)
+        grid.addWidget(hbox_format, 2, 0, 1, 2)
 
         # auto save
         grid.addWidget(
@@ -192,17 +192,17 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
                 value="auto_save",
                 label="Autosave when receiving new data or settings change",
                 callback=self._update_messages),
-            5, 0, 1, 2)
+            3, 0, 1, 2)
 
         # buttons
         self.bt_save = gui.button(None, self, "Save", callback=self.save_file)
-        grid.addWidget(self.bt_save, 7, 0)
+        grid.addWidget(self.bt_save, 5, 0)
         grid.addWidget(
             gui.button(None, self, "Save as ...", callback=self.save_file_as),
-            7, 1)
+            5, 1)
 
-        grid.setRowMinimumHeight(5, 8)
-        grid.setRowMinimumHeight(6, 20)
+        grid.setRowMinimumHeight(3, 8)
+        grid.setRowMinimumHeight(4, 20)
 
         self.scale_combo.setEnabled(self.use_scale)
         self.adjustSize()

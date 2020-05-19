@@ -1,4 +1,3 @@
-import time
 import unittest
 from unittest import mock, skipIf
 from unittest.mock import patch
@@ -155,7 +154,6 @@ class TestOWImageEmbedding(WidgetTest):
         )
 
         self.send_signal(self.widget.Inputs.images, table)
-        time.sleep(0.5)
         self.widget.cancel_button.click()
         self.wait_until_finished()
         results = self.get_output(self.widget.Outputs.embeddings)
@@ -212,6 +210,25 @@ class TestOWImageEmbedding(WidgetTest):
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertIsNone(output)
         self.widget.Error.unexpected_error.is_shown()
+
+    @patch(HTTPX_POST_METHOD, regular_dummy_sr)
+    def test_rerun_on_new_data(self):
+        """ Check if embedding is automatically rerun on new data """
+        self.widget._auto_apply = False
+        table = load_images()
+        self.assertIsNone(self.get_output(self.widget.Outputs.embeddings))
+
+        self.send_signal(self.widget.Inputs.images, table[:3])
+        self.wait_until_finished()
+        self.assertEqual(
+            3, len(self.get_output(self.widget.Outputs.embeddings))
+        )
+
+        self.send_signal(self.widget.Inputs.images, table[:1])
+        self.wait_until_finished()
+        self.assertEqual(
+            1, len(self.get_output(self.widget.Outputs.embeddings))
+        )
 
 
 if __name__ == "__main__":

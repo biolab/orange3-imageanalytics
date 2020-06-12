@@ -7,3 +7,11 @@ allowing the use of Orange's standard arsenal of widgets for
 clustering, classification or any other kind of
 feature-based analysis. Image Analytics also provides visualization
 widgets for images and allows saving them.
+See [documentation](http://orange3-imageanalytics.readthedocs.org/).
+
+Features
+--------
+#### Image analysis
+* load and save images
+* represent images with a vector of numbers
+* displays images in a similarity grid

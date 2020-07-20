@@ -114,6 +114,8 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
+    _previous_attr_id = None
+    _previous_embedder_id = None
 
     _NO_DATA_INFO_TEXT = "No data on input."
 
@@ -208,9 +210,10 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     def set_data(self, data):
         self.Warning.clear()
         self.set_input_data_summary(data)
+        self.clear_outputs()
+
         if not data:
             self._input_data = None
-            self.clear_outputs()
             return
 
         self._image_attributes = ImageEmbedder.filter_image_attributes(data)
@@ -227,11 +230,13 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             return
 
         self._input_data = data
+        self._previous_attr_id = self.cb_image_attr_current_id
+        self._previous_embedder_id = self.cb_embedder_current_id
 
-        self.commit()
+        self.unconditional_commit()
 
     def _cb_image_attr_changed(self):
-        self.commit()
+        self._cb_changed()
 
     def _cb_embedder_changed(self):
         self.Warning.switched_local_embedder.clear()
@@ -239,7 +244,17 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self.embedder_info.setText(
             EMBEDDERS_INFO[current_embedder]["description"]
         )
-        if self._input_data:
+        self._cb_changed()
+
+    def _cb_changed(self):
+        if (
+            self._previous_embedder_id != self.cb_embedder_current_id
+            or self._previous_attr_id != self.cb_image_attr_current_id
+        ):
+            # recompute embeddings only when selected value in dropdown changes
+            self._previous_embedder_id = self.cb_embedder_current_id
+            self._previous_attr_id = self.cb_image_attr_current_id
+            self.cancel()
             self.commit()
 
     def commit(self):
@@ -247,7 +262,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             self.clear_outputs()
             return
 
-        self._set_fields_active(False)
+        self.cancel_button.setDisabled(False)
 
         embedder_name = self.embedders[self.cb_embedder_current_id]
         image_attribute = self._image_attributes[self.cb_image_attr_current_id]
@@ -265,7 +280,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         result
             Embedding results.
         """
-        self._set_fields_active(True)
+        self.cancel_button.setDisabled(True)
         assert len(self._input_data) == len(result.embedding or []) + len(
             result.skip_images or []
         )
@@ -285,24 +300,18 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         """
         log = logging.getLogger(__name__)
         log.debug(ex, exc_info=ex)
-        self._set_fields_active(True)
+        self.cancel_button.setDisabled(True)
         self.Error.unexpected_error(type(ex).__name__)
         self.clear_outputs()
         logging.debug("Exception", exc_info=ex)
 
     def cancel(self):
-        self._set_fields_active(True)
+        self.cancel_button.setDisabled(True)
         super().cancel()
 
     def _switch_to_local_embedder(self):
         self.Warning.switched_local_embedder()
         self.cb_embedder_current_id = self.embedders.index("squeezenet")
-
-    def _set_fields_active(self, active: bool) -> None:
-        self.auto_commit_widget.setDisabled(not active)
-        self.cancel_button.setDisabled(active)
-        self.cb_image_attr.setDisabled(not active)
-        self.cb_embedder.setDisabled(not active)
 
     def _send_output_signals(self, result: Result) -> None:
         self.Warning.images_skipped.clear()

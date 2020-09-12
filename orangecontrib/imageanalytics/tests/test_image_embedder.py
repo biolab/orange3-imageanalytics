@@ -44,6 +44,8 @@ class ImageEmbedderTest(unittest.TestCase):
         self.embedder_server.clear_cache()
         self.embedder_local = ImageEmbedder(model="squeezenet",)
         self.embedder_local.clear_cache()
+        self.embedder_local_2 = ImageEmbedder(model="tf-inception-v3",)
+        self.embedder_local_2.clear_cache()
         self.single_example = [_EXAMPLE_IMAGE_JPG]
 
         str_var = StringVariable("Image")
@@ -119,6 +121,12 @@ class ImageEmbedderTest(unittest.TestCase):
             self.assertEqual(1, len(emb_))
             self.assertEqual(1000, len(emb_[0]))
 
+        # local embedder 2
+        with self.embedder_local_2 as embedder:
+            emb_ = embedder(self.single_example)
+            self.assertEqual(1, len(emb_))
+            self.assertEqual(2048, len(emb_[0]))
+
     @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_too_many_examples_for_one_batch(self):
         too_many_examples = [_EXAMPLE_IMAGE_JPG for _ in range(200)]
@@ -142,6 +150,11 @@ class ImageEmbedderTest(unittest.TestCase):
         res = np.array(self.embedder_local(more_examples))
         self.assertEqual(res.shape, (5, 1000))
 
+        # local embedder 2
+        more_examples = [_EXAMPLE_IMAGE_JPG for _ in range(5)]
+        res = np.array(self.embedder_local_2(more_examples))
+        self.assertEqual(res.shape, (5, 2048))
+
     def test_invalid_model(self):
         with self.assertRaises(ValueError):
             self.embedder_server = ImageEmbedder(model="invalid_model")
@@ -158,6 +171,10 @@ class ImageEmbedderTest(unittest.TestCase):
         # test local embedder
         res = self.embedder_local([_EXAMPLE_IMAGE_GRAYSCALE])
         self.assertTupleEqual((1, 1000), np.array(res).shape)
+
+        # test local embedder 2
+        res = self.embedder_local_2([_EXAMPLE_IMAGE_GRAYSCALE])
+        self.assertTupleEqual((1, 2048), np.array(res).shape)
 
     @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_with_tiff_image(self):

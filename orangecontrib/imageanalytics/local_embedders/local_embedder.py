@@ -1,16 +1,18 @@
 from os.path import join
 
+from abc import ABC, abstractmethod
+from pathlib import Path
+
 import cachecontrol.caches
 import requests
-from ndf.example_models import squeezenet
 
 from Orange.canvas.config import cache_dir
-from Orange.misc.utils.embedder_utils import (EmbedderCache,
-                                              EmbeddingCancelledException)
+from Orange.misc.utils.embedder_utils import EmbedderCache, EmbeddingCancelledException
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
 
+MODELS_DIR= Path(".orange3-imageanalytics-models")
 
-class LocalEmbedder:
+class LocalEmbedder(ABC):
 
     embedder = None
 
@@ -32,8 +34,13 @@ class LocalEmbedder:
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)
 
+    @abstractmethod
     def _load_model(self):
-        self.embedder = squeezenet(include_softmax=False)
+        pass
+
+    @abstractmethod
+    def _load_image(self, image_path):
+        pass
 
     def embedd_data(self, file_paths, processed_callback=None):
         all_embeddings = []
@@ -53,21 +60,17 @@ class LocalEmbedder:
         """
         if self._cancelled:
             raise EmbeddingCancelledException()
+        image = self._load_image(file_path)
 
-        image = self._image_loader.load_image_or_none(
-            file_path, self._target_image_size
-        )
         if image is None:
             return None
-        image = self._image_loader.preprocess_squeezenet(image)
 
         cache_key = self._cache.md5_hash(image)
         cached_im = self._cache.get_cached_result_or_none(cache_key)
         if cached_im is not None:
             return cached_im
 
-        embedded_image = self.embedder.predict([image])
-        embedded_image = embedded_image[0][0]
+        embedded_image = self.embedder(image)
 
         self._cache.add(cache_key, embedded_image)
         return embedded_image

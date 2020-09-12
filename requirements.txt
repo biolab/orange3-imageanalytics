@@ -7,3 +7,4 @@ cachecontrol
 lockfile
 ndf>=0.1.4
 scipy
+tensorflow

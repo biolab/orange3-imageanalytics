@@ -139,6 +139,7 @@ class ImageEmbedder:
                 self._model_settings["batch_size"],
                 self.server_url,
                 "image",
+                self._model_settings["target_image_size"]
             )
 
     def __call__(

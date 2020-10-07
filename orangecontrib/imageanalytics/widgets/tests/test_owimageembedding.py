@@ -5,6 +5,9 @@ from unittest.mock import patch
 import numpy as np
 import pkg_resources
 
+from orangecontrib.imageanalytics.widgets.tests import patch_import
+
+patch_import()
 from Orange.data import Table
 from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
 from Orange.widgets.tests.base import WidgetTest

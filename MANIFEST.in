@@ -1,7 +1,4 @@
+recursive-include doc Makefile *.bat *.json *.md *.png *.py *.rst
 recursive-include orangecontrib/imageanalytics *.svg *.png *.jpg
 
-include requirements.txt
-include README.md
-include LICENSE.txt
-include about.md
-include *.py *.txt
+include *.py *.txt *.pypi *.md *.yml *.ini .coveragerc

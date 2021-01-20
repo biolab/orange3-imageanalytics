@@ -7,7 +7,7 @@ from types import SimpleNamespace as namespace
 
 
 from AnyQt.QtWidgets import QFileDialog, QGridLayout, QMessageBox
-from AnyQt.QtCore import Qt
+from AnyQt.QtCore import Qt, QSize
 
 from Orange.data.table import Table
 from Orange.widgets import gui, widget
@@ -395,6 +395,9 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     def onDeleteWidget(self):
         self.shutdown()
         super().onDeleteWidget()
+
+    def sizeHint(self):
+        return QSize(500, 450)
 
 
 if __name__ == "__main__":  # pragma: no cover

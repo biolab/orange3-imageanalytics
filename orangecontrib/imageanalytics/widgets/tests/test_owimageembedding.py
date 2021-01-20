@@ -80,7 +80,7 @@ class TestOWImageEmbedding(WidgetTest):
         table[:, "Images"] = "http://www.none.com/image.jpg"
 
         self.send_signal(self.widget.Inputs.images, table)
-        skipped = self.get_output(self.widget.Outputs.skipped_images)
+        skipped = self.get_output(self.widget.Outputs.skipped_images, wait=10000)
 
         self.assertIsInstance(skipped, Table)
         self.assertEqual(len(skipped), len(table))
@@ -123,7 +123,7 @@ class TestOWImageEmbedding(WidgetTest):
 
         self.assertEqual(w.cb_embedder.currentText(), "VGG-19")
 
-        output = self.get_output(self.widget.Outputs.embeddings)
+        output = self.get_output(self.widget.Outputs.embeddings, wait=10000)
         self.assertIsInstance(output, Table)
         self.assertEqual(len(output), len(table))
         # 4096 shows that output is really by VGG-19

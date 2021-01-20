@@ -242,23 +242,24 @@ class TestOWSaveImages(WidgetTest):
         # test image size, since size not set the original image size is used
         image_path = os.path.join(dirname, "Day7", "D7-Series037_z06.png")
 
-        im = Image.open(image_path)
-        size = im.size
+        with Image.open(image_path) as im:
+            size = im.size
         self.assertTupleEqual((512, 512), size)
 
         # enable scale
         self.widget.controls.use_scale.setChecked(True)
         self.wait_until_finished()
-        im = Image.open(image_path)
-        size = im.size
+        with Image.open(image_path) as im:
+            size = im.size
+
         # one of the scale is used, non of the preset scale is (512, 512)
         self.assertFalse((512, 512) == size)
 
         # change scale
         simulate.combobox_activate_index(self.widget.controls.scale_index, 1)
         self.wait_until_finished()
-        im = Image.open(image_path)
-        size = im.size
+        with Image.open(image_path) as im:
+            size = im.size
         # second option is squeezenet with scale 227x227
         self.assertTupleEqual((227, 227), size)
 

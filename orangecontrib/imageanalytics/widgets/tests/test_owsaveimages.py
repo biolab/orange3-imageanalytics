@@ -16,10 +16,6 @@ from Orange.widgets.tests.utils import simulate
 from orangecontrib.imageanalytics.widgets.owsaveimages import OWSaveImages, \
     SUPPORTED_FILE_FORMATS
 
-# Yay, MS Windows!
-# This is not the proper general way to do it, but it's simplest and sufficient
-# Short name is suitable for the function's purpose
-
 
 def _raise_error(*args):
     raise IOError
@@ -318,6 +314,9 @@ class TestOWSaveImages(WidgetTest):
                 dirname, "Day7",
                 "D7-0503-12-2-bone-inj-d7-3-0020-m1.{}".format(f))
             self.assertTrue(os.path.isfile(image_path))
+
+    def test_minimum_size(self):
+        pass
 
 
 @unittest.skipUnless(sys.platform in ("darwin", "win32"),

@@ -337,6 +337,38 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
 
         self.__scheduleLayout()
 
+    def appendThumbnails(self, thumbnails: Sequence[GraphicsThumbnailWidget]):
+        self.insertThumbnails(self.count(), thumbnails)
+
+    def insertThumbnails(self, index, thumbnails):
+        """
+        Insert a new thumbnail into a widget.
+
+        Raise a ValueError if thumbnail is already in the view.
+
+        Parameters
+        ----------
+        index: int
+            Index where to insert
+        thumbnails: Sequence[GraphicsThumbnailWidget]
+            The thumbnail to insert. GraphicsThumbnailGrid takes ownership
+            of the item.
+        """
+        thumbnails = list(thumbnails)
+        for w in thumbnails:
+            if w in self.__thumbnails:
+                raise ValueError("{!r} is already inserted".format(w))
+
+        index = max(min(index, self.count()), 0)
+        moved = self.__takeItemsFrom(index)
+        assert moved == self.__thumbnails[index:]
+        self.__thumbnails[index:index] = thumbnails
+        self.__appendItems(thumbnails + moved)
+        for thumbnail in thumbnails:
+            thumbnail.setParentItem(self)
+            thumbnail.installEventFilter(self)
+        assert self.count() == self.layout().count()
+
     def removeThumbnail(self, thumbnail):
         """
         Remove a single thumbnail from the grid.
@@ -676,6 +708,14 @@ class ThumbnailView(QGraphicsView):
     @proxydoc(GraphicsThumbnailGrid.insertThumbnail)
     def insertThumbnail(self, index, thumbnail):
         self.__grid.insertThumbnail(index, thumbnail)
+
+    @proxydoc(GraphicsThumbnailGrid.appendThumbnails)
+    def appendThumbnails(self, thumbnails):
+        self.__grid.appendThumbnails(thumbnails)
+
+    @proxydoc(GraphicsThumbnailGrid.insertThumbnails)
+    def insertThumbnails(self, index, thumbnails):
+        self.__grid.insertThumbnails(index, thumbnails)
 
     @proxydoc(GraphicsThumbnailGrid.setFixedColumnCount)
     def setFixedColumnCount(self, count):
@@ -1053,6 +1093,7 @@ class OWImageViewer(widget.OWWidget):
             size = QSizeF(self.imageSize, self.imageSize)
             assert len(self.data) == len(urls)
             qnam = ImageLoader.networkAccessManagerInstance()
+            widgets = []
             for i, (url, title) in enumerate(zip(urls, titles)):
                 if url.isEmpty():  # skip missing
                     continue
@@ -1060,11 +1101,11 @@ class OWImageViewer(widget.OWWidget):
                     QPixmap(), title=title, thumbnailSize=size,
                 )
                 thumbnail.setToolTip(url.toString())
-                self.thumbnailView.addThumbnail(thumbnail)
+                widgets.append(thumbnail)
                 future, deferrable = image_loader(url, qnam)
                 thumbnail.deferred = deferrable
                 self.items.append(_ImageItem(i, thumbnail, url, future))
-
+            self.thumbnailView.appendThumbnails(widgets)
         self.__watcher = FutureSetWatcher()
         self.__watcher.setFutures([it.future for it in self.items])
         self.__watcher.finishedAt.connect(self.__on_load_finished)

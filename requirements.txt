@@ -8,3 +8,4 @@ cachecontrol
 lockfile
 ndf>=0.1.4
 scipy
+dataclasses; python_version<"3.7"

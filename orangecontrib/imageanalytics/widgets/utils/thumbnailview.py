@@ -1,27 +1,33 @@
 from concurrent.futures import Future, CancelledError
+from dataclasses import dataclass
 from typing import Iterable, Optional, Dict
 
 from AnyQt.QtCore import (
     Qt, QSize, QModelIndex, QVariantAnimation, QPersistentModelIndex,
     Slot, Signal,
 )
-from AnyQt.QtGui import QIcon, QImage, QPixmap
+from AnyQt.QtGui import QIcon, QImage, QPixmap, QHelpEvent
 from AnyQt.QtWidgets import (
     QListView, QStyleOptionViewItem, QStyle, QWidget, QApplication,
-    QAbstractItemDelegate, QStyledItemDelegate
+    QAbstractItemDelegate, QStyledItemDelegate, QAbstractItemView, QToolTip
 )
 from orangewidget.utils.concurrent import FutureWatcher
 from Orange.widgets.utils.textimport import StampIconEngine
 
 
 class IconViewDelegate(QStyledItemDelegate):
+    @dataclass
+    class _Item:
+        image: Optional[QImage]
+        error_text: Optional[str]
+
     displayChanged = Signal()
 
     def __init__(self, parent=None, **kwargs):
         super().__init__(parent, **kwargs)
         self.__max_pending = 32
         self.__pending: Dict[QPersistentModelIndex, 'Future[QImage]'] = {}
-        self.__image_cache: Dict[QPersistentModelIndex, 'QImage'] = {}
+        self.__image_cache: Dict[QPersistentModelIndex, IconViewDelegate._Item] = {}
         self.__spin_value = 0
         self.__animation = QVariantAnimation(
             parent=self, startValue=0, endValue=8, loopCount=-1, duration=5000,
@@ -59,7 +65,7 @@ class IconViewDelegate(QStyledItemDelegate):
         self.__pending[pindex] = f
         w = FutureWatcher(f, )
         w.done.connect(self.__on_future_done)
-        f._p_watcher = w
+        f._p_watcher = w  # type: ignore
         self.__animation.start()
         return True
 
@@ -75,8 +81,10 @@ class IconViewDelegate(QStyledItemDelegate):
     def __getIcon(self, index: QModelIndex):
         pindex = QPersistentModelIndex(index)
         if pindex in self.__image_cache:
-            img = self.__image_cache[pindex]
-            return QIcon(QPixmap.fromImage(img))
+            item = self.__image_cache[pindex]
+            if item.image is None:
+                return QIcon(StampIconEngine("\N{Empty Set}", Qt.red))
+            return QIcon(QPixmap.fromImage(item.image))
 
         if pindex in self.__pending:
             return self.__spin_icon()
@@ -95,8 +103,8 @@ class IconViewDelegate(QStyledItemDelegate):
         """
         pindex = QPersistentModelIndex(index)
         if pindex in self.__image_cache:
-            img = self.__image_cache[pindex]
-            return QImage(img)
+            item = self.__image_cache[pindex]
+            return QImage(item.image) if item.image is not None else None
         else:
             return None
 
@@ -113,9 +121,11 @@ class IconViewDelegate(QStyledItemDelegate):
             img = f.result()
         except CancelledError:
             return
-        except BaseException:
-            img = QImage()
-        self.__image_cache[pindex] = img
+        except BaseException as err:
+            item = IconViewDelegate._Item(None, str(err))
+        else:
+            item = IconViewDelegate._Item(img, None)
+        self.__image_cache[pindex] = item
 
     def __spin_icon(self):
         table = (
@@ -133,6 +143,18 @@ class IconViewDelegate(QStyledItemDelegate):
                 index = QModelIndex(pindex)
                 model = index.model()
                 model.dataChanged.emit(index, index, ())
+
+    def helpEvent(
+            self, event: QHelpEvent, view: QAbstractItemView,
+            option: QStyleOptionViewItem, index: QModelIndex
+    ) -> bool:
+        pindex = QPersistentModelIndex(index)
+        if pindex in self.__image_cache:
+            item = self.__image_cache[pindex]
+            if item.error_text is not None:
+                QToolTip.showText(event.globalPos(), item.error_text, view)
+                return True
+        return super().helpEvent(event, view, option, index)
 
 
 class IconView(QListView):

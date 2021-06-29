@@ -548,6 +548,8 @@ def loader_qnam(
         )
         request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
         request.setMaximumRedirectsAllowed(5)
+        if hasattr(QNetworkRequest, "setTransferTimeout"):
+            request.setTransferTimeout(10000)
         _log.debug("Fetch: %s", url.toString())
         reply = nam.get(request)
 

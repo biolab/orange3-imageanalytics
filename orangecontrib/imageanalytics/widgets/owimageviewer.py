@@ -276,7 +276,6 @@ class OWImageViewer(widget.OWWidget):
     def setData(self, data):
         self.closeContext()
         self.clear()
-        self.info.set_output_summary(self.info.NoOutput)
         self.data = data
 
         if data is not None:
@@ -305,9 +304,6 @@ class OWImageViewer(widget.OWWidget):
 
             if self.stringAttrs:
                 self.setupModel()
-        else:
-            self.info.set_input_summary(self.info.NoInput)
-            self.info.set_output_summary(self.info.NoOutput)
         self.commit()
 
     def clear(self):
@@ -400,9 +396,6 @@ class OWImageViewer(widget.OWWidget):
         smodel = self.thumbnailView.selectionModel()
         indices = [idx.row() for idx in smodel.selectedRows()]
         self.selectedIndices = [items[i].index for i in indices]
-        self.info.set_output_summary(
-            str(len(self.selectedIndices)),
-            f"{len(self.selectedIndices)} images selected")
         self.commit()
 
     def commit(self):
@@ -433,11 +426,6 @@ class OWImageViewer(widget.OWWidget):
 
     def _updateStatus(self):
         count = len([item for item in self.items if item.future is not None])
-        text = f"{self._successcount} of {count} images displayed.\n"
-
-        if self._errcount:
-            text += f"{self._errcount} errors."
-        self.info.set_input_summary(str(count), text)
         attr = self.stringAttrs[self.imageAttr]
         if self._errcount == count and "type" not in attr.attributes:
             self.error("No images could be ! Make sure the '%s' attribute "

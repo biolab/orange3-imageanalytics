@@ -99,9 +99,8 @@ if __name__ == '__main__':
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
         extras_require={
-            'test': [
-                'coverage',
-            ],
+            'test': ['coverage', ],
+            'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme', ],
         },
         namespace_packages=['orangecontrib'],
         entry_points=ENTRY_POINTS,

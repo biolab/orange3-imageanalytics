@@ -997,7 +997,6 @@ class OWImageViewer(widget.OWWidget):
     def setData(self, data):
         self.closeContext()
         self.clear()
-        self.info.set_output_summary(self.info.NoOutput)
         self.data = data
 
         if data is not None:
@@ -1026,9 +1025,7 @@ class OWImageViewer(widget.OWWidget):
 
             if self.stringAttrs:
                 self.setupScene()
-        else:
-            self.info.set_input_summary(self.info.NoInput)
-            self.info.set_output_summary(self.info.NoOutput)
+
         self.commit()
 
     def clear(self):
@@ -1109,9 +1106,7 @@ class OWImageViewer(widget.OWWidget):
     def onSelectionChanged(self):
         selected = [item for item in self.items if item.widget.isSelected()]
         self.selectedIndices = [item.index for item in selected]
-        self.info.set_output_summary(
-            str(len(self.selectedIndices)),
-            f"{len(self.selectedIndices)} images selected")
+
         self.commit()
 
     def commit(self):
@@ -1146,7 +1141,6 @@ class OWImageViewer(widget.OWWidget):
 
         if self._errcount:
             text += f"{self._errcount} errors."
-        self.info.set_input_summary(str(count), text)
         attr = self.stringAttrs[self.imageAttr]
         if self._errcount == count and "type" not in attr.attributes:
             self.error("No images could be ! Make sure the '%s' attribute "

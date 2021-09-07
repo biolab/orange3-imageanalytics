@@ -17,9 +17,15 @@ from Orange.widgets.utils.textimport import StampIconEngine
 
 class IconViewDelegate(QStyledItemDelegate):
     @dataclass
+    class _Scaled:
+        pixmap: QPixmap
+        size: QSize
+
+    @dataclass
     class _Item:
         image: Optional[QImage]
         error_text: Optional[str]
+        scaled: Optional['_Scaled'] = None
 
     displayChanged = Signal()
 
@@ -47,9 +53,12 @@ class IconViewDelegate(QStyledItemDelegate):
         style = widget.style() if widget is not None else QApplication.style()
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)
-        icon = self.__getIcon(index)
+        dev = painter.device()
+        size = option.decorationSize * dev.devicePixelRatioF()
+        icon = self.__getIcon(index, size)
         if icon is not None and not icon.isNull():
             opt.icon = icon
+            opt.features |= QStyleOptionViewItem.HasDecoration
         style.drawControl(QStyle.CE_ItemViewItem, opt, painter, widget)
 
     def startThumbnailRender(self, index: QModelIndex) -> bool:
@@ -78,13 +87,20 @@ class IconViewDelegate(QStyledItemDelegate):
         """
         raise NotImplementedError
 
-    def __getIcon(self, index: QModelIndex):
+    def __getIcon(self, index: QModelIndex, size: QSize) -> QIcon:
         pindex = QPersistentModelIndex(index)
         if pindex in self.__image_cache:
             item = self.__image_cache[pindex]
             if item.image is None:
                 return QIcon(StampIconEngine("\N{Empty Set}", Qt.red))
-            return QIcon(QPixmap.fromImage(item.image))
+            if item.scaled is None or item.scaled.size != size:
+                image = item.image
+                image = image.scaled(size.width(), size.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pm = QPixmap.fromImage(image)
+                item.scaled = IconViewDelegate._Scaled(pm, size)
+            else:
+                pm = item.scaled.pixmap
+            return QIcon(pm)
 
         if pindex in self.__pending:
             return self.__spin_icon()

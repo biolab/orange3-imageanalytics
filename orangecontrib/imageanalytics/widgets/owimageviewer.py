@@ -377,6 +377,9 @@ class OWImageViewer(widget.OWWidget):
             selmodel.selectionChanged.disconnect(self.onSelectionChanged)
             model.clear()
         self.thumbnailView.setModel(None)
+        self.delegate.deleteLater()
+        self.delegate = DeferredIconViewDelegate()
+        self.thumbnailView.setItemDelegate(self.delegate)
         self._errcount = 0
         self._successcount = 0
 

@@ -152,13 +152,14 @@ class IconView(_IconView):
         delegate = self.itemDelegate()
         vprect = self.viewport().rect()
         indices = self._intersectSet(vprect)
-        count = 0
         if isinstance(delegate, DeferredIconViewDelegate):
+            pending_limit = 4
+            count = len(delegate.pendingIndices())
             for index in indices:
+                if count > pending_limit:
+                    break
                 if delegate.startThumbnailRender(index):
                     count += 1
-                if count > 32:
-                    break
 
     def _intersectSet(self, rect: QRect) -> List[QModelIndex]:
         """Return a list if indices that intersect `rect` in the viewport."""
@@ -540,7 +541,7 @@ def loader_qnam(
         request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
         request.setMaximumRedirectsAllowed(5)
         if hasattr(QNetworkRequest, "setTransferTimeout"):
-            request.setTransferTimeout(10000)
+            request.setTransferTimeout()
         _log.debug("Fetch: %s", url.toString())
         reply = nam.get(request)
 

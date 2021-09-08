@@ -1,6 +1,6 @@
 from concurrent.futures import Future, CancelledError
 from dataclasses import dataclass
-from typing import Iterable, Optional, Dict
+from typing import Iterable, Optional, Dict, Sequence
 
 from AnyQt.QtCore import (
     Qt, QSize, QModelIndex, QVariantAnimation, QPersistentModelIndex,
@@ -86,6 +86,13 @@ class IconViewDelegate(QStyledItemDelegate):
         Subclasses must implement this method.
         """
         raise NotImplementedError
+
+    def pendingIndices(self) -> Sequence[QModelIndex]:
+        """
+        Return a sequence of model indices for whom `renderThumbnail` has been
+        called but has not yet completed.
+        """
+        return [QModelIndex(idx) for idx in self.__pending if idx.isValid()]
 
     def __getIcon(self, index: QModelIndex, size: QSize) -> QIcon:
         pindex = QPersistentModelIndex(index)

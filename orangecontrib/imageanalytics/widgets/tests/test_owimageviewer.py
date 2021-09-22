@@ -1,5 +1,4 @@
 from os import path
-from unittest.mock import Mock
 import numpy as np
 
 from Orange.data import Table, StringVariable, Domain
@@ -49,27 +48,3 @@ class TestOWImageViewer(WidgetTest):
         self.send_signal("Data", None)
         self.assertIsNone(self.get_output(self.widget.Outputs.data))
         self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
-
-    def test_info_input(self):
-        input_sum = self.widget.info.set_input_summary = Mock()
-
-        self.send_signal(self.widget.Inputs.data, self.image_data)
-        input_sum.assert_called_with(
-            str(len(self.image_data)), '0 of 3 images displayed.\n')
-
-        self.send_signal(self.widget.Inputs.data, None)
-        input_sum.assert_called_with(self.widget.info.NoInput)
-
-    def test_info_output(self):
-        output_sum = self.widget.info.set_output_summary = Mock()
-
-        self.send_signal(self.widget.Inputs.data, self.image_data)
-        output_sum.assert_called_with(self.widget.info.NoOutput)
-
-        self.send_signal(self.widget.Inputs.data, None)
-        output_sum.assert_called_with(self.widget.info.NoOutput)
-
-        self.send_signal(self.widget.Inputs.data, self.image_data)
-        for itm in self.widget.items[:3]:
-            itm.widget.setSelected(True)
-        output_sum.assert_called_with("3", "3 images selected")

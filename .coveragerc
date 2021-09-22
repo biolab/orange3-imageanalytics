@@ -4,6 +4,7 @@ source = orangecontrib
 omit =
     orangecontrib/imageanalytics/tests/*
     orangecontrib/imageanalytics/widgets/tests/*
+    orangecontrib/imageanalytics/widgets/utils/tests/*
 
 [report]
 exclude_lines =

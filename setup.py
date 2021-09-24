@@ -81,7 +81,7 @@ def include_documentation(local_dir, install_dir):
 
 
 if __name__ == '__main__':
-    include_documentation('doc/_build/htmlhelp', 'help/orange3-imageanalytics')
+    include_documentation('doc/_build/html', 'help/orange3-imageanalytics')
     setup(
         name=NAME,
         version=VERSION,
@@ -99,9 +99,8 @@ if __name__ == '__main__':
         classifiers=CLASSIFIERS,
         install_requires=INSTALL_REQUIRES,
         extras_require={
-            'test': [
-                'coverage',
-            ],
+            'test': ['coverage', ],
+            'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme', ],
         },
         namespace_packages=['orangecontrib'],
         entry_points=ENTRY_POINTS,

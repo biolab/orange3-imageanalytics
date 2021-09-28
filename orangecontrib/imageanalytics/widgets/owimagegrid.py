@@ -524,9 +524,10 @@ class OWImageGrid(widget.OWWidget):
 
         if self._errcount + self._successcount == count:
             attr = self.stringAttrs[self.imageAttr]
-            if self._errcount == count and "type" not in attr.attributes:
-                self.error("No images found! Make sure the '%s' attribute "
-                           "is tagged with 'type=image'" % attr.name)
+            if self._errcount == count:
+                self.error(f"No images found for column '{attr.name}'! "
+                           f"Make sure to usa a column with valid image path "
+                           f"name or urls.")
 
     def onDeleteWidget(self):
         self.cancel_all_futures()

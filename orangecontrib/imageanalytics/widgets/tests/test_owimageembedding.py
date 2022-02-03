@@ -77,7 +77,8 @@ class TestOWImageEmbedding(WidgetTest):
 
         # all skipped
         del table.domain.metas[0].attributes["origin"]
-        table[:, "Images"] = "http://www.none.com/image.jpg"
+        with table.unlocked():
+            table[:, "Images"] = "http://www.none.com/image.jpg"
 
         self.send_signal(self.widget.Inputs.images, table)
         skipped = self.get_output(self.widget.Outputs.skipped_images, wait=10000)
@@ -159,36 +160,6 @@ class TestOWImageEmbedding(WidgetTest):
         results = self.get_output(self.widget.Outputs.embeddings)
 
         self.assertIsNone(results)
-
-    @skipIf(
-        pkg_resources.get_distribution("orange3").version >= "2.23.0",
-        "make removed in newer versions of orange",
-    )
-    def test_variable_make(self):
-        """
-        Embedders call make when they create a variable - it will use the
-        existing variable with the same name if it already exists. In test
-        we will crate two embeddings and check whether variables are same.
-        """
-        w = self.widget
-
-        data = Table("https://datasets.biolab.si/core/bone-healing.xlsx")[::5]
-        self.send_signal(w.Inputs.images, data)
-        self.wait_until_finished()
-        emb1 = self.get_output(self.widget.Outputs.embeddings)
-
-        self.send_signal(w.Inputs.images, data)
-        self.wait_until_finished()
-        emb2 = self.get_output(self.widget.Outputs.embeddings)
-
-        self.assertTrue(
-            all(
-                v1 is v2 and id(v1) == id(v2)
-                for v1, v2 in zip(
-                    emb1.domain.attributes, emb2.domain.attributes
-                )
-            )
-        )
 
     @mock.patch(
         "orangecontrib.imageanalytics.server_embedder.ServerEmbedder."

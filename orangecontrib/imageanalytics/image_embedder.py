@@ -260,8 +260,7 @@ class ImageEmbedder:
         Table with added embeddings to data.
         """
         new_attributes = [
-            ContinuousVariable.make("n{:d}".format(d))
-            for d in range(embeddings_.shape[1])
+            ContinuousVariable("n{:d}".format(d)) for d in range(embeddings_.shape[1])
         ]
         # prevent embeddings to be shown in long drop-downs in e.g. scatterplot
         for a in new_attributes:
@@ -273,7 +272,8 @@ class ImageEmbedder:
             embedded_images.domain.metas,
         )
         table = embedded_images.transform(domain_new)
-        table[:, new_attributes] = embeddings_
+        with table.unlocked(table.X):  # writing to fresh part, can be unlocked
+            table[:, new_attributes] = embeddings_
 
         return table
 

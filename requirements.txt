@@ -1,11 +1,9 @@
-# change when release >0.7.0 of hyper will be available
 numpy>=1.16.*
 orange-widget-base
-Orange3>=3.25.0
+Orange3>=3.31.1
 pillow>=6.2.0
 requests
 cachecontrol
 lockfile
 ndf>=0.1.4
 scipy
-dataclasses; python_version<"3.7"

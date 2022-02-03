@@ -90,10 +90,18 @@ class ImageEmbedder:
 
     Examples
     --------
+    >>> import Orange
     >>> from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
-    >>> image_file_paths = [...]
+
+    >>> # embedding from list of paths
+    >>> image_file_paths = ['image001.jpg', 'image001.jpg']
     >>> with ImageEmbedder(model='model_name') as emb:
     ...    embeddings = emb(image_file_paths)
+
+    >>> # embedding from orange tabl
+    >>> table = Orange.data.Table('Table_with_image_path.csv')
+    >>> with ImageEmbedder(model='model_name') as emb:
+    ...    embeddings = emb(table, col="image_path_column")
     """
 
     _embedder = None

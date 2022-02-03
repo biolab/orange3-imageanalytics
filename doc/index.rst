@@ -14,6 +14,14 @@ Widgets
    widgets/imagegrid
    widgets/saveimages
 
+Scripting
+---------
+
+.. toctree::
+   :maxdepth: 1
+
+   scripting/image_embedder
+
 
 Indices and tables
 ==================

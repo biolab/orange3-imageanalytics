@@ -169,7 +169,7 @@ class TestOWSaveImages(WidgetTest):
         widget.save_images.assert_called()
         widget.save_images.reset_mock()
 
-        self.data.X = sp.csr_matrix(self.data.X)
+        self.send_signal(widget.Inputs.data, self.data.to_sparse())
         widget.save_file()
         widget.save_images.assert_called()
 

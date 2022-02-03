@@ -212,7 +212,8 @@ class ImageEmbedderTest(unittest.TestCase):
 
     def test_table_skip(self):
         data = self.data_table
-        data.metas[0, 0] = "tralala"
+        with data.unlocked():
+            data.metas[0, 0] = "tralala"
         emb, skipped, num_skiped = self.embedder_local(data, col="Image")
 
         self.assertIsNotNone(skipped)
@@ -225,7 +226,8 @@ class ImageEmbedderTest(unittest.TestCase):
         Test with data that have missing data
         """
         data = self.data_table
-        data.metas[0, 0] = data.domain.metas[0].Unknown
+        with data.unlocked():
+            data.metas[0, 0] = data.domain.metas[0].Unknown
         emb, skipped, num_skiped = self.embedder_local(data, col="Image")
 
         self.assertIsNotNone(skipped)
@@ -238,7 +240,8 @@ class ImageEmbedderTest(unittest.TestCase):
         Test with data that have missing data
         """
         data = self.data_table
-        data.metas[1, 0] = data.domain.metas[0].Unknown
+        with  data.unlocked():
+            data.metas[1, 0] = data.domain.metas[0].Unknown
         emb, skipped, num_skiped = self.embedder_local(data, col="Image")
 
         self.assertIsNotNone(skipped)

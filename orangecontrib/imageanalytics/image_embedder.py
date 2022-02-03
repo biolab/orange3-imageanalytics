@@ -20,7 +20,7 @@ MODELS = {
         # high for inception since it has many workers, but other embedders
         # send less images since bottleneck are workers, this way we avoid
         # ReadTimeout because of images waiting in a queue at the server
-        "batch_size": 100,
+        "batch_size": 500,
     },
     "painters": {
         "name": "Painters",
@@ -28,7 +28,7 @@ MODELS = {
         "target_image_size": (256, 256),
         "layers": ["penultimate"],
         "order": 4,
-        "batch_size": 20,
+        "batch_size": 500,
     },
     "deeploc": {
         "name": "DeepLoc",
@@ -36,7 +36,7 @@ MODELS = {
         "target_image_size": (64, 64),
         "layers": ["penultimate"],
         "order": 5,
-        "batch_size": 20,
+        "batch_size": 500,
     },
     "vgg16": {
         "name": "VGG-16",
@@ -44,7 +44,7 @@ MODELS = {
         "target_image_size": (224, 224),
         "layers": ["penultimate"],
         "order": 2,
-        "batch_size": 15,
+        "batch_size": 500,
     },
     "vgg19": {
         "name": "VGG-19",
@@ -52,7 +52,7 @@ MODELS = {
         "target_image_size": (224, 224),
         "layers": ["penultimate"],
         "order": 3,
-        "batch_size": 15,
+        "batch_size": 500,
     },
     "openface": {
         "name": "openface",
@@ -61,7 +61,7 @@ MODELS = {
         "target_image_size": (256, 256),
         "layers": ["penultimate"],
         "order": 6,
-        "batch_size": 20,
+        "batch_size": 500,
     },
     "squeezenet": {
         "name": "SqueezeNet",

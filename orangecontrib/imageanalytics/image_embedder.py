@@ -1,13 +1,12 @@
-import os
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from urllib.parse import urljoin, urlparse
 
 import numpy as np
-
 from Orange.data import ContinuousVariable, Domain, Table, Variable
 from Orange.misc.utils.embedder_utils import EmbedderCache
+
 from orangecontrib.imageanalytics.local_embedder import LocalEmbedder
 from orangecontrib.imageanalytics.server_embedder import ServerEmbedder
+from orangecontrib.imageanalytics.utils.image_utils import extract_paths
 
 MODELS = {
     "inception-v3": {
@@ -212,31 +211,7 @@ class ImageEmbedder:
             Optional callback - function that is called for every embedded
             image and is used to report the progress.
         """
-        file_paths_attr = data.domain[col]
-        file_paths = data[:, file_paths_attr].metas.flatten()
-        origin = file_paths_attr.attributes.get("origin", "")
-        if (
-            urlparse(origin).scheme in ("http", "https", "ftp", "data")
-            and origin[-1] != "/"
-        ):
-            origin += "/"
-
-        assert file_paths_attr.is_string
-        assert file_paths.dtype == np.dtype("O")
-
-        file_paths_mask = file_paths == file_paths_attr.Unknown
-        # make sure that not defined images in not embedded
-        file_paths[file_paths_mask] = None
-        for i, a in enumerate(file_paths):
-            urlparts = urlparse(a)
-            if a is None:
-                continue
-            if urlparts.scheme not in ("http", "https", "ftp", "data"):
-                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
-                    file_paths[i] = urljoin(origin, a)
-                else:
-                    file_paths[i] = os.path.join(origin, a)
-
+        file_paths = extract_paths(data, data.domain[col])
         embeddings_ = self._embedder.embedd_data(file_paths, callback)
         return ImageEmbedder.prepare_output_data(data, embeddings_)
 
@@ -333,23 +308,6 @@ class ImageEmbedder:
             embedded_images = None
 
         return embedded_images, skipped_images, num_skipped
-
-    @staticmethod
-    def filter_image_attributes(data: Table) -> List[Variable]:
-        """
-        Filter attributes that have image paths data.
-
-        Parameters
-        ----------
-        data
-            Table with data
-
-        Returns
-        -------
-        List of variables that are attributes with image paths.
-        """
-        metas = data.domain.metas
-        return [m for m in metas if m.attributes.get("type") == "image"]
 
     def clear_cache(self) -> None:
         """

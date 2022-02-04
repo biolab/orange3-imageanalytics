@@ -16,6 +16,7 @@ from Orange.widgets.widget import Input, Msg, Output, OWWidget
 from orangecontrib.imageanalytics.image_embedder import \
     MODELS as EMBEDDERS_INFO
 from orangecontrib.imageanalytics.image_embedder import ImageEmbedder
+from orangecontrib.imageanalytics.utils.image_utils import filter_image_attributes
 
 
 class Result(SimpleNamespace):
@@ -51,13 +52,8 @@ def run_embedding(
     """
     embedder = ImageEmbedder(model=embedder_name)
 
-    file_paths = images[:, file_paths_attr].metas.flatten()
-
-    file_paths_mask = file_paths == file_paths_attr.Unknown
-    file_paths_valid = file_paths[~file_paths_mask]
-
     # init progress bar and fuction
-    ticks = iter(np.linspace(0.0, 100.0, file_paths_valid.size))
+    ticks = iter(np.linspace(0.0, 100.0, len(images)))
 
     def advance(success=True):
         if state.is_interruption_requested():
@@ -71,7 +67,7 @@ def run_embedding(
         )
     except EmbeddingConnectionError:
         # recompute ticks to go from current state to 100
-        ticks = iter(np.linspace(next(ticks), 100.0, file_paths_valid.size))
+        ticks = iter(np.linspace(next(ticks), 100.0, len(images)))
 
         state.set_partial_result("squeezenet")
         embedder = ImageEmbedder(model="squeezenet")
@@ -214,7 +210,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             self._input_data = None
             return
 
-        self._image_attributes = ImageEmbedder.filter_image_attributes(data)
+        self._image_attributes = filter_image_attributes(data)
         if not self.cb_image_attr_current_id < len(self._image_attributes):
             self.cb_image_attr_current_id = 0
 

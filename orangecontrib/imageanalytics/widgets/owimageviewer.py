@@ -15,11 +15,17 @@ from contextlib import closing
 import typing
 from typing import List, Optional, Callable, Tuple, Sequence
 
-import numpy
-
 from AnyQt.QtCore import (
-    Qt, QObject, QEvent, QThread, QSize, QUrl, QDir, QSettings,
-    QModelIndex, QRect, QPoint,
+    Qt,
+    QObject,
+    QEvent,
+    QThread,
+    QSize,
+    QUrl,
+    QSettings,
+    QModelIndex,
+    QRect,
+    QPoint,
 )
 from AnyQt.QtGui import QPixmap, QImageReader, QImage, QPaintEvent
 from AnyQt.QtWidgets import QApplication, QShortcut
@@ -33,15 +39,21 @@ from orangewidget.utils.itemmodels import PyListModel
 from orangewidget.utils.concurrent import FutureSetWatcher
 
 import Orange.data
+from Orange.data import StringVariable, DiscreteVariable, Table
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.itemmodels import VariableListModel
 from Orange.widgets.widget import Input, Output
 from Orange.widgets.utils.annotated_data import create_annotated_table
+from orangecontrib.imageanalytics.utils.image_utils import (
+    filter_image_attributes,
+    extract_paths,
+)
 
 from orangecontrib.imageanalytics.widgets.utils.imagepreview import Preview
 from orangecontrib.imageanalytics.widgets.utils.thumbnailview import (
     IconView as _IconView, IconViewDelegate
 )
+
 
 _log = logging.getLogger(__name__)
 
@@ -283,20 +295,12 @@ class OWImageViewer(widget.OWWidget):
             domain = data.domain
             self.allAttrs = (domain.class_vars + domain.metas +
                              domain.attributes)
-            self.stringAttrs = [a for a in domain.metas if a.is_string]
-
-            self.stringAttrs = sorted(
-                self.stringAttrs,
-                key=lambda attr: 0 if "type" in attr.attributes else 1
-            )
-
-            indices = [i for i, var in enumerate(self.stringAttrs)
-                       if var.attributes.get("type") == "image"]
-            if indices:
-                self.imageAttr = indices[0]
+            self.stringAttrs = filter_image_attributes(data)
 
             self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
             self.titleAttrCB.setModel(VariableListModel(self.allAttrs))
+            if self.stringAttrs:
+                self.imageAttr = 0
 
             self.openContext(data)
 
@@ -442,38 +446,19 @@ class OWImageViewer(widget.OWWidget):
 
 
 def column_data_as_qurl(
-        table: Orange.data.Table, var: Orange.data.StringVariable
+    table: Table, var: [StringVariable, DiscreteVariable]
 ) -> Sequence[QUrl]:
-    coldata = table.get_column_view(var)[0]  # type: numpy.ndarray
-    assert numpy.issubdtype(coldata.dtype, numpy.object_)
-    namask = coldata == var.Unknown  # type: numpy.ndarray
-    origin = var.attributes.get("origin", "")
+    file_paths = extract_paths(table, var)
 
-    if origin and QDir(origin).exists():
-        origin = QUrl.fromLocalFile(origin)
-    elif origin:
-        origin = QUrl(origin)
-        if not origin.scheme():
-            origin.setScheme("file")
-    else:
-        origin = QUrl("")
-    base = origin.path()
-    if base.strip() and not base.endswith("/"):
-        origin.setPath(base + "/")
-
-    res = [QUrl()] * len(coldata)
-    for i, value, isna in zip(range(coldata.size), coldata.flat, namask.flat):
-        if isna:
+    res = [QUrl()] * len(file_paths)
+    for i, value in enumerate(file_paths):
+        if value is None:
             url = QUrl()
         else:
-            value = str(value)
             if os.path.exists(value):
                 url = QUrl.fromLocalFile(value)
             else:
                 url = QUrl(value)
-            url = origin.resolved(url)
-            if not url.scheme():
-                url.setScheme("file")
         res[i] = url
     return res
 
@@ -774,6 +759,7 @@ class ImageLoader(QObject):
 
 if __name__ == "__main__":
     from orangewidget.utils.widgetpreview import WidgetPreview
-    from Orange.data import Table
+    from Orange.data import Table, StringVariable, ContinuousVariable
+
     WidgetPreview(OWImageViewer).run(
         Table("https://datasets.biolab.si/core/bone-healing.xlsx"))

@@ -8,8 +8,7 @@ from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
 from Orange.data import Table, Variable
 from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
-from Orange.widgets.gui import (auto_commit, comboBox, hBox, widgetBox,
-                                widgetLabel)
+from Orange.widgets import gui
 from Orange.widgets.settings import Setting
 from Orange.widgets.utils.concurrent import ConcurrentWidgetMixin, TaskState
 from Orange.widgets.utils.itemmodels import VariableListModel
@@ -91,6 +90,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     priority = 150
 
     want_main_area = False
+    buttons_area_orientation = Qt.Vertical
     _auto_apply = Setting(default=True)
 
     class Inputs:
@@ -136,8 +136,8 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
         self.layout().setSizeConstraint(QLayout.SetFixedSize)
 
-        widget_box = widgetBox(self.controlArea, "Settings")
-        self.cb_image_attr = comboBox(
+        widget_box = gui.widgetBox(self.controlArea, "Settings")
+        self.cb_image_attr = gui.comboBox(
             widget=widget_box,
             master=self,
             value="cb_image_attr_current_id",
@@ -146,7 +146,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             callback=self._cb_image_attr_changed,
         )
 
-        self.cb_embedder = comboBox(
+        self.cb_embedder = gui.comboBox(
             widget=widget_box,
             master=self,
             value="cb_embedder_current_id",
@@ -165,16 +165,15 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self.cb_embedder.setCurrentIndex(self.cb_embedder_current_id)
 
         current_embedder = self.embedders[self.cb_embedder_current_id]
-        self.embedder_info = widgetLabel(
+        self.embedder_info = gui.widgetLabel(
             widget_box, EMBEDDERS_INFO[current_embedder]["description"]
         )
 
-        self.auto_commit_widget = auto_commit(
-            widget=self.controlArea,
+        self.auto_commit_widget = gui.auto_commit(
+            widget=self.buttonsArea,
             master=self,
             value="_auto_apply",
             label="Apply",
-            commit=self.commit,
         )
 
         self.cancel_button = QPushButton(
@@ -182,8 +181,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             icon=self.style().standardIcon(QStyle.SP_DialogCancelButton),
         )
         self.cancel_button.clicked.connect(self.cancel)
-        hbox = hBox(self.controlArea)
-        hbox.layout().addWidget(self.cancel_button)
+        self.buttonsArea.layout().addWidget(self.cancel_button)
         self.cancel_button.setDisabled(True)
 
     def set_input_data_summary(self, data):
@@ -233,7 +231,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self._previous_attr_id = self.cb_image_attr_current_id
         self._previous_embedder_id = self.cb_embedder_current_id
 
-        self.unconditional_commit()
+        self.commit.now()
 
     def _cb_image_attr_changed(self):
         self._cb_changed()
@@ -255,8 +253,9 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             self._previous_embedder_id = self.cb_embedder_current_id
             self._previous_attr_id = self.cb_image_attr_current_id
             self.cancel()
-            self.commit()
+            self.commit.deferred()
 
+    @gui.deferred
     def commit(self):
         if not self._image_attributes or self._input_data is None:
             self.clear_outputs()

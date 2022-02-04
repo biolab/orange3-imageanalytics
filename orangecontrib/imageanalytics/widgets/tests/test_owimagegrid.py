@@ -1,3 +1,5 @@
+import unittest
+
 from AnyQt.QtTest import QSignalSpy
 from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.tests.base import WidgetTest
@@ -80,6 +82,8 @@ class TestOWImageGrid(WidgetTest):
         w = self.widget
 
         self.send_signal("Embeddings", self.fake_embeddings)
+
+        self.assertIsNone(self.get_output("Selected Images"))
 
         # all image spaces are full
         w.colSpinner.setValue(2)
@@ -185,3 +189,7 @@ class TestOWImageGrid(WidgetTest):
         self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
         self.assertListEqual([], w.subset_indices)
         self.assertTrue(self.widget.Warning.incompatible_subset.is_shown())
+
+
+if __name__ == "__main__":
+    unittest.main()

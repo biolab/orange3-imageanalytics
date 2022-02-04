@@ -19,8 +19,13 @@ from AnyQt.QtWidgets import (
     QGraphicsScene, QGraphicsView, QGraphicsWidget, QGraphicsItem,
     QGraphicsRectItem,
     QGraphicsLinearLayout,
-    QGraphicsGridLayout, QSizePolicy, QApplication, QStyle, QShortcut,
-    QFormLayout, QLabel)
+    QGraphicsGridLayout,
+    QSizePolicy,
+    QApplication,
+    QStyle,
+    QShortcut,
+    QLabel,
+)
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.settings import ContextSetting
 from Orange.widgets.utils.annotated_data import (
@@ -112,7 +117,6 @@ class OWImageGrid(widget.OWWidget):
             tooltip="Attribute with image filenames",
             callback=self.change_image_attr,
             contentsLength=12,
-            addSpace=True,
         )
 
         # cell fit (resize or crop)
@@ -122,25 +126,24 @@ class OWImageGrid(widget.OWWidget):
 
         self.gridSizeBox = gui.vBox(self.controlArea, "Grid size")
 
-        form = QFormLayout(
-            labelAlignment=Qt.AlignLeft,
-            formAlignment=Qt.AlignLeft,
-            fieldGrowthPolicy=QFormLayout.AllNonFixedFieldsGrow,
-            verticalSpacing=10
-        )
-
         self.colSpinner = gui.spin(
-            self.gridSizeBox, self, "columns", minv=2, maxv=40,
-            callback=self.update_size)
+            self.gridSizeBox,
+            self,
+            "columns",
+            minv=2,
+            maxv=40,
+            label="Columns",
+            callback=self.update_size,
+        )
         self.rowSpinner = gui.spin(
-            self.gridSizeBox, self, "rows", minv=2, maxv=40,
-            callback=self.update_size)
-
-        form.addRow("Columns:", self.colSpinner)
-        form.addRow("Rows:", self.rowSpinner)
-
-        gui.separator(self.gridSizeBox, 10)
-        self.gridSizeBox.layout().addLayout(form)
+            self.gridSizeBox,
+            self,
+            "rows",
+            minv=2,
+            maxv=40,
+            label="Rows",
+            callback=self.update_size,
+        )
 
         gui.button(
             self.gridSizeBox, self, "Set size automatically",
@@ -153,16 +156,13 @@ class OWImageGrid(widget.OWWidget):
             self.label_box, self, "label_attr",
             tooltip="Show labels",
             callback=self.update_size,
-            addSpace=True,
             model=self.label_model
         )
 
         gui.rubber(self.controlArea)
 
         # auto commit
-        self.autoCommitBox = gui.auto_commit(
-            self.controlArea, self, "auto_commit", "Apply",
-            checkbox_label="Apply automatically")
+        gui.auto_commit(self.buttonsArea, self, "auto_commit", "Apply")
 
         self.image_grid = None
         self.cell_fit = 0
@@ -208,10 +208,9 @@ class OWImageGrid(widget.OWWidget):
 
             indices = [i for i, var in enumerate(self.stringAttrs)
                        if var.attributes.get("type") == "image"]
+            self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
             if indices:
                 self.imageAttr = indices[0]
-
-            self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
 
             # set label combo labels
             self.label_model.set_domain(domain)
@@ -225,6 +224,7 @@ class OWImageGrid(widget.OWWidget):
                 self.setup_scene()
             else:
                 self.Warning.no_valid_data()
+        self.commit.now()
 
     @Inputs.data_subset
     def set_data_subset(self, data_subset):
@@ -452,14 +452,22 @@ class OWImageGrid(widget.OWWidget):
             self.selection[indices] = 1
 
         self.update_selection()
-        self.commit()
+        self.commit.deferred()
 
+    @gui.deferred
     def commit(self):
-        if self.data:
+        # if data are not valid - not in grid do not output
+        if self.data and len(self.items) > 0:
+            if self.selection is None:
+                self.selection = np.zeros(len(self.items), dtype=np.uint8)
             # add Group column (group number)
             self.Outputs.selected_data.send(
-                create_groups_table(self.image_grid.image_list, self.selection,
-                                    False, "Group"))
+                create_groups_table(
+                    self.image_grid.image_list, self.selection, False, "Group"
+                )
+                if np.any(self.selection > 0)
+                else None
+            )
 
             # filter out empty cells - keep indices of cells that contain images
             # add Selected column
@@ -473,7 +481,6 @@ class OWImageGrid(widget.OWWidget):
                     self.image_grid.image_list[self.nonempty],
                     np.nonzero(self.selection[self.nonempty]))
             self.Outputs.data.send(out_data)
-
         else:
             self.Outputs.data.send(None)
             self.Outputs.selected_data.send(None)
@@ -483,7 +490,7 @@ class OWImageGrid(widget.OWWidget):
             pen, brush = self.compute_colors()
 
             for s, item, p, b in zip(self.selection, self.items, pen, brush):
-                item.widget.setSelected(s > 0)
+                item.widget.setSelected(bool(s > 0))
                 item.widget.setSelectionColor(p, b)
 
     # Adapted from Scatter Plot Graph (change brush instead of pen)
@@ -719,7 +726,7 @@ class GraphicsThumbnailWidget(QGraphicsWidget):
         if self._size != size:
             self._size = QSizeF(size)
             if self.label is not None:
-                self.label.setFixedWidth(size.width())
+                self.label.setFixedWidth(int(size.width()))
             self._updatePixmapSize()
 
     def paint(self, painter, option, widget=0):

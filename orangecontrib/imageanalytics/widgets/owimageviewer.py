@@ -257,7 +257,7 @@ class OWImageViewer(widget.OWWidget):
         )
         gui.rubber(self.controlArea)
 
-        gui.auto_commit(self.controlArea, self, "autoCommit", "Send", box=False)
+        gui.auto_commit(self.buttonsArea, self, "autoCommit", "Send", box=False)
 
         self.thumbnailView = IconView(
             resizeMode=IconView.Adjust,
@@ -305,7 +305,7 @@ class OWImageViewer(widget.OWWidget):
 
             if self.stringAttrs:
                 self.setupModel()
-        self.commit()
+        self.commit.now()
 
     def clear(self):
         self.data = None
@@ -400,8 +400,9 @@ class OWImageViewer(widget.OWWidget):
         smodel = self.thumbnailView.selectionModel()
         indices = [idx.row() for idx in smodel.selectedRows()]
         self.selectedIndices = [items[i].index for i in indices]
-        self.commit()
+        self.commit.deferred()
 
+    @gui.deferred
     def commit(self):
         if self.data:
             if self.selectedIndices:

@@ -1,3 +1,4 @@
+import unittest
 from os import path
 import numpy as np
 
@@ -38,7 +39,7 @@ class TestOWImageViewer(WidgetTest):
 
         # select some data
         self.widget.selectedIndices = [0, 1, 2]
-        self.widget.commit()
+        self.widget.commit.now()
 
         self.assertIsNotNone(self.get_output(self.widget.Outputs.data))
         self.assertEqual(
@@ -48,3 +49,7 @@ class TestOWImageViewer(WidgetTest):
         self.send_signal("Data", None)
         self.assertIsNone(self.get_output(self.widget.Outputs.data))
         self.assertIsNone(self.get_output(self.widget.Outputs.selected_data))
+
+
+if __name__ == "__main__":
+    unittest.main()

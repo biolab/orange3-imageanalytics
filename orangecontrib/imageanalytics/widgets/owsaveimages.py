@@ -195,14 +195,8 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
             3, 0, 1, 2)
 
         # buttons
-        self.bt_save = gui.button(None, self, "Save", callback=self.save_file)
-        grid.addWidget(self.bt_save, 5, 0)
-        grid.addWidget(
-            gui.button(None, self, "Save as ...", callback=self.save_file_as),
-            5, 1)
-
-        grid.setRowMinimumHeight(3, 8)
-        grid.setRowMinimumHeight(4, 20)
+        self.bt_save = gui.button(self.buttonsArea, self, "Save", callback=self.save_file)
+        gui.button(self.buttonsArea, self, "Save as ...", callback=self.save_file_as)
 
         self.scale_combo.setEnabled(self.use_scale)
         self.adjustSize()

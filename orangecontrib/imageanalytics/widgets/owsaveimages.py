@@ -2,9 +2,7 @@ import os.path
 import shutil
 from collections import deque
 from os.path import join, isdir
-from urllib.parse import urlparse, urljoin
 from types import SimpleNamespace as namespace
-
 
 from AnyQt.QtWidgets import QFileDialog, QGridLayout, QMessageBox
 from AnyQt.QtCore import Qt, QSize
@@ -17,8 +15,12 @@ from Orange.widgets.settings import Setting
 from Orange.widgets.utils.widgetpreview import WidgetPreview
 from Orange.widgets.widget import Input, OWWidget
 
-from orangecontrib.imageanalytics.image_embedder import MODELS, ImageEmbedder
+from orangecontrib.imageanalytics.image_embedder import MODELS
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
+from orangecontrib.imageanalytics.utils.image_utils import (
+    extract_paths,
+    filter_image_attributes,
+)
 
 SUPPORTED_FILE_FORMATS = ["png", "jpeg", "gif", "tiff", "pdf", "bmp", "eps",
                           "ico"]
@@ -214,28 +216,13 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     def gather_paths(self):
         classes = _get_classes(self.data)
         file_paths_attr = self.image_attributes[self.image_attr_current_index]
-        file_paths = self.data[:, file_paths_attr].metas.flatten()
-        origin = file_paths_attr.attributes.get("origin", "")
-        file_paths_mask = file_paths == file_paths_attr.Unknown
-        file_paths_valid = file_paths[~file_paths_mask]
+        file_paths = extract_paths(self.data, file_paths_attr)
+        file_format = SUPPORTED_FILE_FORMATS[self.file_format_index]
+        from_paths, to_paths = [], []
 
-        if urlparse(origin).scheme in ("http", "https", "ftp", "data") and \
-                origin[-1] != "/":
-            origin += "/"
-
-        from_paths = []
-        to_paths = []
-        for i, a in enumerate(file_paths_valid):
-            urlparts = urlparse(a)
-            path = a
-            if urlparts.scheme not in ("http", "https", "ftp", "data"):
-                if urlparse(origin).scheme in ("http", "https", "ftp", "data"):
-                    path = urljoin(origin, a)
-                else:
-                    path = os.path.join(origin, a)
+        for i, path in enumerate(file_paths):
             from_paths.append(path)
 
-            file_format = SUPPORTED_FILE_FORMATS[self.file_format_index]
             filename = os.path.basename(path)
             if "." in filename:
                 filename = filename.rsplit(".")[0]  # remove file ending
@@ -318,8 +305,9 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
         self.data = data
         self._update_status()
         self._update_messages()
-        self.image_attributes = ImageEmbedder.filter_image_attributes(data) if \
-            data is not None else []
+        self.image_attributes = (
+            filter_image_attributes(data) if data is not None else []
+        )
         self._update_image_attributes()
         if self.auto_save and self.dirname:
             self.save_file()

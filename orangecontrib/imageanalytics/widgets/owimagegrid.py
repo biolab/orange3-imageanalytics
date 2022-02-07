@@ -1,6 +1,7 @@
 import enum
 import itertools
 import logging
+import os
 from collections import namedtuple
 from concurrent.futures import Future
 from itertools import zip_longest
@@ -8,7 +9,7 @@ from itertools import zip_longest
 import Orange.data
 import numpy as np
 from AnyQt.QtCore import (
-    Qt, QEvent, QSize, QSizeF, QRectF, QPointF, QUrl, QDir
+    Qt, QEvent, QSize, QSizeF, QRectF, QPointF, QUrl
 )
 from AnyQt.QtCore import pyqtSignal as Signal, pyqtSlot as Slot
 from AnyQt.QtGui import (
@@ -36,8 +37,12 @@ from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
 
 from orangecontrib.imageanalytics.image_grid import ImageGrid
-from orangecontrib.imageanalytics.widgets.owimageviewer import (
-    ImageLoader, Preview)
+from orangecontrib.imageanalytics.utils.image_utils import (
+    extract_image_path,
+    filter_image_attributes,
+)
+from orangecontrib.imageanalytics.widgets.owimageviewer import ImageLoader, Preview
+
 
 _log = logging.getLogger(__name__)
 
@@ -198,19 +203,12 @@ class OWImageGrid(widget.OWWidget):
             self.allAttrs = (domain.class_vars + domain.metas +
                              domain.attributes)
 
-            self.stringAttrs = [a for a in domain.metas if a.is_string]
+            self.stringAttrs = filter_image_attributes(data)
             self.domainAttrs = len(domain.attributes)
 
-            self.stringAttrs = sorted(
-                self.stringAttrs,
-                key=lambda attr: 0 if "type" in attr.attributes else 1
-            )
-
-            indices = [i for i, var in enumerate(self.stringAttrs)
-                       if var.attributes.get("type") == "image"]
             self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
-            if indices:
-                self.imageAttr = indices[0]
+            if self.stringAttrs:
+                self.imageAttr = 0
 
             # set label combo labels
             self.label_model.set_domain(domain)
@@ -272,12 +270,11 @@ class OWImageGrid(widget.OWWidget):
                 thumbnail.instance = inst
                 self.thumbnailView.addThumbnail(thumbnail)
 
-                if not np.isfinite(inst[attr]) or inst[attr] == "?":
-                    # skip missing
-                    future, url = None, None
-                else:
-                    url = self.url_from_value(inst[attr])
-                    thumbnail.setToolTip(url.toString())
+                path = extract_image_path(inst, attr)
+                future, url = None, None
+                if path is not None:
+                    url = QUrl.fromLocalFile(path) if os.path.exists(path) else QUrl(path)
+                    thumbnail.setToolTip(path)
                     self.nonempty.append(i)
 
                     if url.isValid() and url.isLocalFile():
@@ -352,20 +349,6 @@ class OWImageGrid(widget.OWWidget):
             else:
                 self.Warning.incompatible_subset()
         self.apply_subset()
-
-    def url_from_value(self, value):
-        base = value.variable.attributes.get("origin", "")
-        if QDir(base).exists():
-            base = QUrl.fromLocalFile(base)
-        else:
-            base = QUrl(base)
-
-        path = base.path()
-        if path.strip() and not path.endswith("/"):
-            base.setPath(path + "/")
-
-        url = base.resolved(QUrl(str(value)))
-        return url
 
     def cancel_all_futures(self):
         for item in self.items:

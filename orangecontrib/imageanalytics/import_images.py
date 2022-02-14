@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 
 
 DefaultFormats = (
-    "jpeg", "jpg", "png", "tiff", "tif", "pgm", "pbm", "ppm", "xbm", "xpm"
+    "jpeg", "jpg", "png", "tiff", "tif", "pgm", "pbm", "ppm", "xbm", "xpm", "bmp"
 )
 
 

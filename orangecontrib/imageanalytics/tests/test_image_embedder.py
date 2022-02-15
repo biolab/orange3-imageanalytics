@@ -15,9 +15,9 @@ HTTPX_POST_METHOD = "httpx.AsyncClient.post"
 _TESTED_MODULE = (
     "orangecontrib.imageanalytics.server_embedder.ServerEmbedder.{:s}"
 )
-_EXAMPLE_IMAGE_JPG = join(dirname(__file__), "example_image_0.jpg")
-_EXAMPLE_IMAGE_TIFF = join(dirname(__file__), "example_image_1.tiff")
-_EXAMPLE_IMAGE_GRAYSCALE = join(dirname(__file__), "example_image_2.png")
+_EXAMPLE_IMAGE_JPG = join(dirname(__file__), "test_images", "example_image_0.jpg")
+_EXAMPLE_IMAGE_TIFF = join(dirname(__file__), "test_images", "example_image_1.tiff")
+_EXAMPLE_IMAGE_GRAYSCALE = join(dirname(__file__), "test_images", "example_image_2.png")
 
 
 class DummyResponse:

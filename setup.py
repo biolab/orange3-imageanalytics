@@ -43,7 +43,7 @@ PACKAGES = find_packages()
 PACKAGE_DATA = {
     'orangecontrib.imageanalytics.widgets': ['icons/*.svg'],
     'orangecontrib.imageanalytics.widgets.tests': ['test_images/*'],
-    'orangecontrib.imageanalytics.tests': ['*.jpg', '*.tiff', '*.png']
+    'orangecontrib.imageanalytics.tests': ['test_images/*']
 }
 
 INSTALL_REQUIRES = sorted(set(

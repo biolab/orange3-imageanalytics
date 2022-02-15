@@ -332,7 +332,7 @@ class ImageEmbedder:
 
 
 if __name__ == "__main__":
-    image_file_paths = ["tests/example_image_0.jpg"]
+    image_file_paths = ["tests/test_images/example_image_0.jpg"]
     # with ImageEmbedder(model='inception-v3') as embedder:
     with ImageEmbedder(model="squeezenet") as embedder:
         embedder.clear_cache()

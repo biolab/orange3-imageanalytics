@@ -21,7 +21,7 @@ def image_name_to_path(im_name):
     orangeceontrib.imageanalytics.tests
     """
     path = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), "..", "..", "tests")
+        os.path.dirname(os.path.realpath(__file__)), "..", "..", "tests", "test_images")
     path = os.path.abspath(path)
     return os.path.join(path, im_name)
 

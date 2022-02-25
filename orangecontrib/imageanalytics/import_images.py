@@ -16,24 +16,18 @@ import logging
 
 from collections import namedtuple
 from types import SimpleNamespace as namespace
+from warnings import warn
 
 import numpy as np
-
-from AnyQt.QtGui import QImageReader
-
 import Orange.data
+from AnyQt.QtGui import QImageReader
 
 
 log = logging.getLogger(__name__)
 
 
-DefaultFormats = (
-    "jpeg", "jpg", "png", "tiff", "tif", "pgm", "pbm", "ppm", "xbm", "xpm"
-)
-
-
 class ImportImages:
-    """"
+    """
     Importing images into a data table. Scripting part.
 
         Examples
@@ -54,16 +48,24 @@ class ImportImages:
     )
     ImgDataError.isvalid = property(lambda self: False)
 
-    def __init__(self, formats=DefaultFormats, report_progress=None,
+    def __init__(self, formats=None, report_progress=None,
                  case_insensitive=True):
+        if formats is not None:
+            warn(
+                "formats parameter is deprecated and will be removed in "
+                "orange3-imageanalytics 0.9.0",
+                FutureWarning,
+            )
         self.formats = formats
         self.report_progress = report_progress
         self.cancelled = False
         self.case_insensitive = case_insensitive
 
     def __call__(self, start_dir):
-        patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
-                    for fmt in self.formats]
+        patterns = ('*',)
+        if self.formats is not None:
+            patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
+                        for fmt in self.formats]
 
         images = self.image_meta(scan(start_dir), patterns) or []
         categories = {}

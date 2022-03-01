@@ -1,9 +1,8 @@
 import unittest
-from unittest import mock, skipIf
+from unittest import mock
 from unittest.mock import patch
 
 import numpy as np
-import pkg_resources
 
 from Orange.data import Table
 from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
@@ -110,7 +109,8 @@ class TestOWImageEmbedding(WidgetTest):
         self.assertEqual(len(output), len(table))
         self.assertEqual(output.X.shape[1], 1000)
 
-    def test_embedder_changed(self):
+    @patch("orangecontrib.imageanalytics.widgets.owimageembedding.ImageEmbedder")
+    def test_embedder_changed(self, _):
         """
         We will check whether embedder changes correctly.
         """
@@ -119,16 +119,10 @@ class TestOWImageEmbedding(WidgetTest):
 
         self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
         self.send_signal(w.Inputs.images, table)
-        cbox = self.widget.controls.cb_embedder_current_id
-        simulate.combobox_activate_index(cbox, 3)
 
-        self.assertEqual(w.cb_embedder.currentText(), "VGG-19")
-
-        output = self.get_output(self.widget.Outputs.embeddings, wait=10000)
-        self.assertIsInstance(output, Table)
-        self.assertEqual(len(output), len(table))
-        # 4096 shows that output is really by VGG-19
-        self.assertEqual(output.X.shape[1], 4096)
+        simulate.combobox_activate_index(self.widget.controls.cb_embedder_current_id, 3)
+        self.assertEqual("VGG-19", w.cb_embedder.currentText())
+        self.assertEqual("vgg19", w.embedders[w.cb_embedder_current_id])
 
     def test_not_image_data_attributes(self):
         """

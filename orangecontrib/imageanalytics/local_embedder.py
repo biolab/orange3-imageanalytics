@@ -5,8 +5,8 @@ import requests
 from ndf.example_models import squeezenet
 
 from Orange.canvas.config import cache_dir
-from Orange.misc.utils.embedder_utils import (EmbedderCache,
-                                              EmbeddingCancelledException)
+from Orange.misc.utils.embedder_utils import EmbedderCache
+from Orange.util import dummy_callback
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
 
 
@@ -27,33 +27,26 @@ class LocalEmbedder:
             ),
         )
 
-        self._cancelled = False
-
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)
 
     def _load_model(self):
         self.embedder = squeezenet(include_softmax=False)
 
-    def embedd_data(self, file_paths, processed_callback=None):
+    def embedd_data(self, file_paths, callback=dummy_callback):
         all_embeddings = []
 
-        for row in file_paths:
+        for i, row in enumerate(file_paths, start=1):
             all_embeddings.append(self._embed(row))
-            if processed_callback:
-                processed_callback(success=True)
+            callback(i / len(file_paths))
 
         self._cache.persist_cache()
-
         return all_embeddings
 
     def _embed(self, file_path):
         """ Load images and compute cache keys and send requests to
         an http2 server for valid ones.
         """
-        if self._cancelled:
-            raise EmbeddingCancelledException()
-
         image = self._image_loader.load_image_or_none(
             file_path, self._target_image_size
         )
@@ -71,6 +64,3 @@ class LocalEmbedder:
 
         self._cache.add(cache_key, embedded_image)
         return embedded_image
-
-    def set_cancelled(self):
-        self._cancelled = True

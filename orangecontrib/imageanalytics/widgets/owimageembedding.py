@@ -52,28 +52,17 @@ def run_embedding(
     """
     embedder = ImageEmbedder(model=embedder_name)
 
-    # init progress bar and fuction
-    ticks = iter(np.linspace(0.0, 100.0, len(images)))
-
-    def advance(success=True):
+    def callback(s):
         if state.is_interruption_requested():
-            embedder.set_canceled()
-        if success:
-            state.set_progress_value(next(ticks))
+            raise Exception()
+        state.set_progress_value(s * 100)
 
     try:
-        emb, skip, n_skip = embedder(
-            images, col=file_paths_attr, callback=advance
-        )
+        emb, skip, n_skip = embedder(images, col=file_paths_attr, callback=callback)
     except EmbeddingConnectionError:
-        # recompute ticks to go from current state to 100
-        ticks = iter(np.linspace(next(ticks), 100.0, len(images)))
-
         state.set_partial_result("squeezenet")
         embedder = ImageEmbedder(model="squeezenet")
-        emb, skip, n_skip = embedder(
-            images, col=file_paths_attr, callback=advance
-        )
+        emb, skip, n_skip = embedder(images, col=file_paths_attr, callback=callback)
 
     return Result(embedding=emb, skip_images=skip, num_skipped=n_skip)
 

@@ -1,9 +1,0 @@
-numpy>=1.16.*
-orange-widget-base
-Orange3>=3.31.1
-pillow>=6.2.0
-requests
-cachecontrol
-lockfile
-ndf>=0.1.4
-scipy

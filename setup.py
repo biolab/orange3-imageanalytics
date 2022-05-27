@@ -45,11 +45,6 @@ PACKAGE_DATA = {
     'orangecontrib.imageanalytics.tests': ['test_images/*']
 }
 
-INSTALL_REQUIRES = sorted(set(
-    line.partition('#')[0].strip()
-    for line in open(os.path.join(os.path.dirname(__file__), 'requirements.txt'))
-) - {''})
-
 ENTRY_POINTS = {
     'orange.widgets':
         ('Image Analytics = orangecontrib.imageanalytics.widgets',),
@@ -96,7 +91,17 @@ if __name__ == '__main__':
         package_data=PACKAGE_DATA,
         keywords=KEYWORDS,
         classifiers=CLASSIFIERS,
-        install_requires=INSTALL_REQUIRES,
+        install_requires=[
+            "lockfile",
+            "cachecontrol",
+            "ndf >=0.1.4",
+            "numpy >=1.16",
+            "orange-widget-base",
+            "Orange3 >=3.32",
+            "pillow >=6.2.0",
+            "requests",
+            "scipy",
+        ],
         extras_require={
             'test': ['coverage', ],
             'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme', ],

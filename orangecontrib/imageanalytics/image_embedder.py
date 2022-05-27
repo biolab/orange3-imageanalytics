@@ -3,6 +3,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 from Orange.data import ContinuousVariable, Domain, Table, Variable
 from Orange.misc.utils.embedder_utils import EmbedderCache
+from Orange.util import dummy_callback
 
 from orangecontrib.imageanalytics.local_embedder import LocalEmbedder
 from orangecontrib.imageanalytics.server_embedder import ServerEmbedder
@@ -153,7 +154,7 @@ class ImageEmbedder:
         self,
         data: Union[Table, List[str], np.array],
         col: Optional[Union[str, Variable]] = None,
-        callback: Optional[Callable] = None,
+        callback: Optional[Callable] = dummy_callback,
     ) -> Union[Tuple[Table, Table, int], List[List[float]]]:
         """
         Embedd images.
@@ -188,9 +189,7 @@ class ImageEmbedder:
             return self.from_table(data, col=col, callback=callback)
         elif isinstance(data, (np.ndarray, list)):
             # if array-like on input array-like on output
-            return self._embedder.embedd_data(
-                data, processed_callback=callback
-            )
+            return self._embedder.embedd_data(data, callback=callback)
 
     def from_table(
         self,
@@ -212,14 +211,14 @@ class ImageEmbedder:
             image and is used to report the progress.
         """
         file_paths = extract_paths(data, data.domain[col])
-        embeddings_ = self._embedder.embedd_data(file_paths, callback)
+        embeddings_ = self._embedder.embedd_data(file_paths, callback=callback)
         return ImageEmbedder.prepare_output_data(data, embeddings_)
 
     def __enter__(self) -> "ImageEmbedder":
         return self
 
-    def __exit__(self, exception_type, exception_value, traceback) -> None:
-        self.set_canceled()
+    def __exit__(self, _, __, ___) -> None:
+        pass
 
     def __del__(self) -> None:
         self.__exit__(None, None, None)
@@ -322,13 +321,6 @@ class ImageEmbedder:
             # embedder is not initialized yet - clear it cache from file
             cache = EmbedderCache(self.model)
             cache.clear_cache()
-
-    def set_canceled(self) -> None:
-        """
-        Cancel the embedding
-        """
-        if self._embedder is not None:
-            self._embedder.set_cancelled()
 
 
 if __name__ == "__main__":

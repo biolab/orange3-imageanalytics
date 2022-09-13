@@ -27,7 +27,7 @@ class DummyResponse:
 
 def make_dummy_post(response, sleep=0):
     @staticmethod
-    async def dummy_post(url, headers, data):
+    async def dummy_post(url, headers, data=None, content=None):
         await asyncio.sleep(sleep)
         return DummyResponse(content=response)
 

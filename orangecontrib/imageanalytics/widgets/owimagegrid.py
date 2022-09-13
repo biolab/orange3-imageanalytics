@@ -31,7 +31,7 @@ from Orange.widgets import widget, gui, settings
 from Orange.widgets.settings import ContextSetting
 from Orange.widgets.utils.annotated_data import (
     create_annotated_table, create_groups_table)
-from Orange.widgets.utils.colorpalette import ColorPaletteGenerator
+from Orange.widgets.utils.colorpalettes import LimitedDiscretePalette
 from Orange.widgets.utils.itemmodels import VariableListModel, DomainModel
 from Orange.widgets.utils.overlay import proxydoc
 from Orange.widgets.widget import Input, Output, OWWidget, Msg
@@ -483,7 +483,7 @@ class OWImageGrid(widget.OWWidget):
         if sels == 1:
             brushes = [no_brush, no_brush]
         else:
-            palette = ColorPaletteGenerator(number_of_colors=sels + 1)
+            palette = LimitedDiscretePalette(number_of_colors=sels + 1)
             brushes = [no_brush] + [QBrush(palette[i]) for i in range(sels)]
         brush = [brushes[a] for a in self.selection]
 
@@ -922,8 +922,7 @@ class GraphicsThumbnailGrid(QGraphicsWidget):
     def __scheduleLayout(self):
         if not self.__reflowPending:
             self.__reflowPending = True
-            QApplication.postEvent(
-                self, QEvent(QEvent.LayoutRequest), Qt.HighEventPriority)
+            QApplication.postEvent(self, QEvent(QEvent.LayoutRequest))
 
     def event(self, event):
         if event.type() == QEvent.LayoutRequest:
@@ -1286,7 +1285,7 @@ class GraphicsScene(QGraphicsScene):
 
     # override the default signal since it should only be emitted when a
     # selection is finished
-    selectionChanged = Signal(set, int)
+    selectionChanged = Signal(set, Qt.KeyboardModifier)
 
     def __init__(self, *args):
         QGraphicsScene.__init__(self, *args)

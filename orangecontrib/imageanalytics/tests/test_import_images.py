@@ -34,17 +34,6 @@ class ImportImagesTest(unittest.TestCase):
         self.assertEqual(16, len(table))
         self.assertEqual(0, n_skipped)
 
-    def test_deprecation(self):
-        """
-        When this test starts to fail remove it and remove formats parameter
-        from the ImportImages class and everything connected with it.
-        """
-        self.assertLess(get_distribution("orange3-imageanalytics").version, "0.9.0")
-        self.import_images = ImportImages(formats=("jpg", "png"))
-        table, n_skipped = self.import_images(join(dirname(__file__), "test_images"))
-        self.assertEqual(3, len(table))
-        self.assertEqual(0, n_skipped)
-
 
 if __name__ == "__main__":
     unittest.main()

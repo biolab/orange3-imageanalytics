@@ -16,7 +16,6 @@ import logging
 
 from collections import namedtuple
 from types import SimpleNamespace as namespace
-from warnings import warn
 
 import numpy as np
 import Orange.data
@@ -48,26 +47,13 @@ class ImportImages:
     )
     ImgDataError.isvalid = property(lambda self: False)
 
-    def __init__(self, formats=None, report_progress=None,
-                 case_insensitive=True):
-        if formats is not None:
-            warn(
-                "formats parameter is deprecated and will be removed in "
-                "orange3-imageanalytics 0.9.0",
-                FutureWarning,
-            )
-        self.formats = formats
+    def __init__(self, report_progress=None, case_insensitive=True):
         self.report_progress = report_progress
         self.cancelled = False
         self.case_insensitive = case_insensitive
 
     def __call__(self, start_dir):
-        patterns = ('*',)
-        if self.formats is not None:
-            patterns = ["*.{}".format(fmt.lower() if self.case_insensitive else fmt)
-                        for fmt in self.formats]
-
-        images = self.image_meta(scan(start_dir), patterns) or []
+        images = self.image_meta(scan(start_dir)) or []
         categories = {}
         for imeta in images:
             # derive categories from the path relative to the starting dir

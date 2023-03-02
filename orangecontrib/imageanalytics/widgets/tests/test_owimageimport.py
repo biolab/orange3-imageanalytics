@@ -1,10 +1,10 @@
 import os
 import tempfile
 
-from AnyQt.QtCore import Qt, QUrl, QMimeData
+from AnyQt.QtCore import Qt, QUrl, QMimeData, QPointF
 from AnyQt.QtGui import QDropEvent, QDragEnterEvent
 from AnyQt.QtWidgets import QApplication
-from AnyQt.QtTest import QTest, QSignalSpy
+from AnyQt.QtTest import QSignalSpy
 from Orange.widgets.tests.base import WidgetTest
 
 from orangecontrib.imageanalytics.widgets.owimageimport import OWImportImages
@@ -58,7 +58,7 @@ class TestOWImageImport(WidgetTest):
             assert QApplication.sendEvent(widget.recent_cb, ev)
             self.assertTrue(ev.isAccepted())
             del ev
-            ev = QDropEvent(pos, actions, data,
+            ev = QDropEvent(QPointF(pos), actions, data,
                             Qt.LeftButton, Qt.NoModifier, QDropEvent.Drop)
             assert QApplication.sendEvent(widget.recent_cb, ev)
             self.assertTrue(ev.isAccepted())

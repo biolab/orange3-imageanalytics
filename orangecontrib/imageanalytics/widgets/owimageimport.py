@@ -29,6 +29,8 @@ from AnyQt.QtWidgets import (
     QVBoxLayout, QLabel
 )
 
+from orangecanvas.utils.localization import pl
+
 from Orange.data import Table
 from Orange.widgets import widget, gui, settings
 from Orange.widgets.utils.filedialogs import RecentPath
@@ -44,7 +46,6 @@ except ImportError:
 from Orange.widgets.utils.signals import Output
 
 from orangecontrib.imageanalytics.import_images import ImportImages
-
 
 def prettyfypath(path):
     home = os.path.expanduser("~/")
@@ -307,11 +308,11 @@ class OWImportImages(widget.OWWidget):
             ncategories = self._n_image_categories
             n_skipped = self._n_skipped
             if ncategories < 2:
-                text = "{} image{}".format(nvalid, "s" if nvalid != 1 else "")
+                text = f'{nvalid} {pl(nvalid, "image")}'
             else:
-                text = "{} images / {} categories".format(nvalid, ncategories)
+                text = f'{nvalid} {pl(nvalid, "image")} / {ncategories} {pl(ncategories, "category")}'
             if n_skipped > 0:
-                text = text + ", {} skipped".format(n_skipped)
+                text = text + f', {n_skipped} skipped'
         elif self.__state == State.Cancelled:
             text = "Cancelled"
         elif self.__state == State.Error:

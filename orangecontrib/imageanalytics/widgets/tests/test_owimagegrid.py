@@ -1,6 +1,8 @@
 import unittest
 
 from AnyQt.QtTest import QSignalSpy
+from AnyQt.QtCore import Qt
+
 from Orange.data import Table, ContinuousVariable, Domain
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
@@ -90,7 +92,8 @@ class TestOWImageGrid(WidgetTest):
         w.rowSpinner.setValue(2)
 
         w.on_selection_changed(
-            [w.items[0].widget, w.items[3].widget, w.items[2].widget], True)
+            [w.items[0].widget, w.items[3].widget, w.items[2].widget],
+            Qt.NoModifier)
 
         im_out = self.get_output("Images")
         self.assertEqual(sum(im_out.Y), 3)  # 3 selected elements

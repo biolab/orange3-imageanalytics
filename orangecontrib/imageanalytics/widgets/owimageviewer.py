@@ -466,8 +466,7 @@ def column_data_as_qurl(
 def column_data_as_str(
         table: Orange.data.Table, var: Orange.data.Variable
 ) -> Sequence[str]:
-    var = table.domain[var]
-    data, _ = table.get_column_view(var)
+    data = table.get_column(var)
     return list(map(var.str_val, data))
 
 

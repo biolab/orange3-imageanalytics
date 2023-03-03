@@ -37,10 +37,7 @@ from Orange.widgets.utils.concurrent import (
 )
 from Orange.widgets.utils.localization import pl
 
-try:
-    from orangecanvas.preview.previewbrowser import TextLabel
-except ImportError:
-    from Orange.canvas.preview.previewbrowser import TextLabel
+from orangecanvas.preview.previewbrowser import TextLabel
 
 from Orange.widgets.utils.signals import Output
 

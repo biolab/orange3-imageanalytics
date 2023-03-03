@@ -523,7 +523,10 @@ def loader_qnam(
             QNetworkRequest.CacheLoadControlAttribute,
             QNetworkRequest.PreferCache
         )
-        request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
+        request.setAttribute(
+            QNetworkRequest.RedirectPolicyAttribute,
+            QNetworkRequest.NoLessSafeRedirectPolicy
+        )
         request.setMaximumRedirectsAllowed(5)
         if hasattr(QNetworkRequest, "setTransferTimeout"):
             request.setTransferTimeout()

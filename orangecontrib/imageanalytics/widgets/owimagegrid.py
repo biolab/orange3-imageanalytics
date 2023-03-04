@@ -90,7 +90,10 @@ class OWImageGrid(widget.OWWidget):
     auto_commit = settings.Setting(True)
 
     class Warning(OWWidget.Warning):
-        incompatible_subset = Msg("Some Data Subset elements are not present in the Data")
+        incompatible_subset = Msg(
+            "No Data Subset elements appear in the Data.")
+        extras_in_subset = Msg(
+            "Some Data Subset elements do not appear in the Data.")
         no_valid_data = Msg("No valid data")
 
     def __init__(self):
@@ -100,7 +103,7 @@ class OWImageGrid(widget.OWWidget):
 
         self.data = None
         self.data_subset = None
-        self.data_is_subset = []
+        self.data_is_subset = None
         self.nonempty = []
 
         self.allAttrs = []
@@ -328,37 +331,35 @@ class OWImageGrid(widget.OWWidget):
                 self.update_selection()
 
     def handleNewSignals(self):
-        self.Warning.incompatible_subset.clear()
-        self.data_is_subset = []
-
-        if self.data and self.data_subset:
-
-            if len(np.setdiff1d(self.data_subset.ids, self.data.ids)) > 0:
-                self.Warning.incompatible_subset()
-
-            ids_from_names = []
-            if len(self.stringAttrs) > 0:
-                attr = self.stringAttrs[self.imageAttr]
-                data_names_col = self.data.get_column(attr)
-                try:
-                    subset_names = set(self.data_subset.get_column(attr))
-                except ValueError:
-                    # feature can not be found; checking if the domain includes it
-                    # could be insufficient if it was a computed feature
-                    subset_names = set()
-
-                if len(subset_names - set(data_names_col)):
-                    self.Warning.incompatible_subset()
-                for ex, dn in zip(self.data, data_names_col):
-                    if dn in subset_names:
-                        ids_from_names.append(ex.id)
-
-            subset_indices = list(self.data_subset.ids) + ids_from_names
-            indices = set(np.intersect1d(subset_indices, self.data.ids))
-
-            self.data_is_subset = [ex.id in indices for ex in self.data]
-
+        self.data_is_subset = self._update_data_is_subset()
         self.apply_subset()
+
+    def _update_data_is_subset(self):
+        self.Warning.incompatible_subset.clear()
+        self.Warning.extras_in_subset.clear()
+        if not (self.data and self.data_subset):
+            return None
+
+        subset_ids = set(self.data_subset.ids)
+        data_is_subset = np.array([id_ in subset_ids for id_ in self.data.ids])
+
+        if len(self.stringAttrs) > 0:
+            attr = self.stringAttrs[self.imageAttr]
+            data_names_col = self.data.get_column(attr)
+            try:
+                subset_names = set(self.data_subset.get_column(attr))
+            except ValueError:
+                # feature can not be found; checking if the domain includes it
+                # could be insufficient if it was a computed feature
+                pass
+            else:
+                data_is_subset |= [dn in subset_names for dn in data_names_col]
+
+        nsub = np.sum(data_is_subset)
+        if nsub < len(self.data_subset):
+            self.Warning.incompatible_subset(shown=nsub == 0)
+            self.Warning.extras_in_subset(shown=nsub != 0)
+        return data_is_subset
 
     def cancel_all_futures(self):
         for item in self.items:
@@ -414,8 +415,8 @@ class OWImageGrid(widget.OWWidget):
 
     def apply_subset(self):
         if self.image_grid:
-            is_subset = (self.data_is_subset if self.data_is_subset
-                else [True] * len(self.items))
+            is_subset = (self.data_is_subset if self.data_is_subset is not None
+                         else np.ones(len(self.items), dtype=bool))
             ordered_subset_indices = self.image_grid.order_to_grid(
                 is_subset)
 

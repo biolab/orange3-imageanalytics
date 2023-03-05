@@ -127,42 +127,42 @@ class TestOWImageGrid(WidgetTest):
         """
         w = self.widget
         self.send_signal(w.Inputs.data, self.fake_embeddings)
-        self.assertEqual(0, len(w.subset_indices))
+        self.assertIsNone(w.data_is_subset)
 
         # send regular subset
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[:2])
-        self.assertListEqual([True, True, False, False], w.subset_indices)
+        np.testing.assert_equal([True, True, False, False], w.data_is_subset)
 
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[::2])
-        self.assertListEqual([True, False, True, False], w.subset_indices)
+        np.testing.assert_equal([True, False, True, False], w.data_is_subset)
 
         # send mixed subset
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 2]])
-        self.assertListEqual([False, False, True, True], w.subset_indices)
+        np.testing.assert_equal([False, False, True, True], w.data_is_subset)
 
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 0, 2]])
-        self.assertListEqual([True, False, True, True], w.subset_indices)
+        np.testing.assert_equal([True, False, True, True], w.data_is_subset)
 
         # try with mixed data (data has mixed indices - at [0] there is no
         # row with index 0
         mixed_fake_emb = self.fake_embeddings[[1, 3, 2, 0]]
         self.send_signal(w.Inputs.data_subset, None)
         self.send_signal(w.Inputs.data, mixed_fake_emb)
-        self.assertEqual(0, len(w.subset_indices))
+        self.assertIsNone(w.data_is_subset)
 
         # send regular subset
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[:2])
-        self.assertListEqual([True, False, False, True], w.subset_indices)
+        np.testing.assert_equal([True, False, False, True], w.data_is_subset)
 
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[::2])
-        self.assertListEqual([False, False, True, True], w.subset_indices)
+        np.testing.assert_equal([False, False, True, True], w.data_is_subset)
 
         # send mixed subset
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 2]])
-        self.assertListEqual([False, True, True, False], w.subset_indices)
+        np.testing.assert_equal([False, True, True, False], w.data_is_subset)
 
         self.send_signal(w.Inputs.data_subset, self.fake_embeddings[[3, 0, 2]])
-        self.assertListEqual([False, True, True, True], w.subset_indices)
+        np.testing.assert_equal([False, True, True, True], w.data_is_subset)
 
     def tests_subset_conditions(self):
         """
@@ -172,26 +172,58 @@ class TestOWImageGrid(WidgetTest):
         """
         w = self.widget
         self.send_signal(w.Inputs.data, self.fake_embeddings)
-        self.assertEqual(0, len(w.subset_indices))
+        self.assertIsNone(w.data_is_subset)
 
         # test with different indices in the subset
         fake_embedding_copy = self.fake_embeddings.copy()
         fake_embedding_copy.ids[0] = 10000
+        fake_embedding_copy[:, "Images"] = "tralala"  # destroy
         self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
-        self.assertListEqual([], w.subset_indices)
+        np.testing.assert_equal([False, True, True, True], w.data_is_subset)
+        self.assertTrue(self.widget.Warning.extras_in_subset.is_shown())
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy[:1])
+        np.testing.assert_equal([False, False, False, False], w.data_is_subset)
         self.assertTrue(self.widget.Warning.incompatible_subset.is_shown())
+        self.assertFalse(self.widget.Warning.extras_in_subset.is_shown())
 
         # reset
         self.send_signal(w.Inputs.data_subset, None)
-        self.assertListEqual([], w.subset_indices)
+        self.assertIsNone(w.data_is_subset)
         self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+        self.assertFalse(self.widget.Warning.extras_in_subset.is_shown())
 
-        # test with different image under the same index
+        # test with different image under the same ids;
+        # show all because ids match
         fake_embedding_copy = self.fake_embeddings.copy()
         fake_embedding_copy[0, "Images"] = "tralala"
         self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
-        self.assertListEqual([], w.subset_indices)
-        self.assertTrue(self.widget.Warning.incompatible_subset.is_shown())
+        np.testing.assert_equal([True, True, True, True], w.data_is_subset)
+        self.assertFalse(self.widget.Warning.extras_in_subset.is_shown())
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+
+        # test with different ids, but some images still match
+        fake_embedding_copy = self.fake_embeddings.copy()
+        fake_embedding_copy.ids = np.arange(len(fake_embedding_copy.ids)*-1)  # destroy
+        fake_embedding_copy[0, "Images"] = "tralala"
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
+        np.testing.assert_equal([False, True, True, True], w.data_is_subset)
+        self.assertTrue(self.widget.Warning.extras_in_subset.is_shown())
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+
+        # only keep some ids, no data, and some should still match
+        fake_embedding_copy = self.fake_embeddings.transform(Domain([])).copy()
+        fake_embedding_copy.ids[0] = 10000
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy)
+        np.testing.assert_equal([False, True, True, True], w.data_is_subset)
+        self.assertTrue(self.widget.Warning.extras_in_subset.is_shown())
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
+
+        self.send_signal(w.Inputs.data_subset, fake_embedding_copy[1:])
+        np.testing.assert_equal([False, True, True, True], w.data_is_subset)
+        self.assertFalse(self.widget.Warning.extras_in_subset.is_shown())
+        self.assertFalse(self.widget.Warning.incompatible_subset.is_shown())
 
 
 if __name__ == "__main__":

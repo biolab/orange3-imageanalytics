@@ -158,7 +158,7 @@ class TestOWImageEmbedding(WidgetTest):
     @mock.patch(
         "orangecontrib.imageanalytics.server_embedder.ServerEmbedder."
         "embedd_data",
-        side_effect=OSError,
+        side_effect=OSError("Connection failed"),
     )
     def test_unexpected_error(self, _):
         """
@@ -175,6 +175,10 @@ class TestOWImageEmbedding(WidgetTest):
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertIsNone(output)
         self.widget.Error.unexpected_error.is_shown()
+        self.assertEqual(
+            "Embedding error: Connection failed",
+            str(self.widget.Error.unexpected_error),
+        )
 
     @patch(HTTPX_POST_METHOD, regular_dummy_sr)
     def test_rerun_on_new_data(self):

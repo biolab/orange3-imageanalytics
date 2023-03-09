@@ -2,7 +2,6 @@ import logging
 from types import SimpleNamespace
 from typing import Optional
 
-import numpy as np
 from AnyQt.QtCore import Qt
 from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
 
@@ -285,9 +284,8 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         log = logging.getLogger(__name__)
         log.debug(ex, exc_info=ex)
         self.cancel_button.setDisabled(True)
-        self.Error.unexpected_error(type(ex).__name__)
+        self.Error.unexpected_error(str(ex))
         self.clear_outputs()
-        logging.debug("Exception", exc_info=ex)
 
     def cancel(self):
         self.cancel_button.setDisabled(True)

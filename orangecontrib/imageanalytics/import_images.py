@@ -24,6 +24,7 @@ from AnyQt.QtGui import QImageReader
 
 log = logging.getLogger(__name__)
 
+IMG_ATTR_NAME = "image"
 
 class ImportImages:
     """
@@ -171,7 +172,7 @@ def create_table(image_meta, categories=None, start_dir=None):
         # Image name (file basename without the extension)
         imagename_var = Orange.data.StringVariable.make("image name")
         # Full fs path
-        image_var = Orange.data.StringVariable.make("image")
+        image_var = Orange.data.StringVariable(IMG_ATTR_NAME)
         image_var.attributes["type"] = "image"
         if start_dir:
             image_var.attributes["origin"] = start_dir

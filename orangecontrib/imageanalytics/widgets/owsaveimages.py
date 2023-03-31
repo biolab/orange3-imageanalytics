@@ -3,6 +3,7 @@ import shutil
 from collections import deque
 from os.path import join, isdir
 from types import SimpleNamespace as namespace
+from urllib.parse import urlparse
 
 from AnyQt.QtWidgets import QFileDialog, QGridLayout, QMessageBox
 from AnyQt.QtCore import Qt, QSize
@@ -22,8 +23,7 @@ from orangecontrib.imageanalytics.utils.image_utils import (
     filter_image_attributes,
 )
 
-SUPPORTED_FILE_FORMATS = ["png", "jpeg", "gif", "tiff", "pdf", "bmp", "eps",
-                          "ico"]
+SUPPORTED_FILE_FORMATS = ["png", "jpg", "gif", "tiff", "pdf", "bmp", "eps", "ico"]
 
 
 class Result(namespace):
@@ -56,14 +56,26 @@ def _create_dir(path):
         os.makedirs(dir_path)
 
 
+def _is_url(url):
+    return urlparse(url).scheme != ""
+
+
 def _save_an_image(loader, origin, save_path, target_size):
     """
     This function loads and saves a separate image.
     """
     _create_dir(save_path)
-    image = loader.load_image_or_none(origin, target_size)
-    if image is not None:
-        image.save(save_path)
+    _, orig_ext = os.path.splitext(origin)
+    _, save_ext = os.path.splitext(save_path)
+    if not _is_url(origin) and target_size is None and orig_ext == save_ext:
+        # if path not url and extension of original and target the same and no
+        # resizing required, copy instead of saving with Pillow
+        if os.path.exists(origin):
+            shutil.copyfile(origin, save_path)
+    else:
+        image = loader.load_image_or_none(origin, target_size)
+        if image is not None:
+            image.save(save_path)
 
 
 def _prepare_dir_and_save_images(
@@ -110,8 +122,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     class Error(widget.OWWidget.Error):
         no_file_name = widget.Msg("Directory name is not set.")
         general_error = widget.Msg("{}")
-        no_image_attribute = widget.Msg(
-            "Data does not have any image attribute.")
+        no_image_attribute = widget.Msg("Data does not have any image attribute.")
 
     want_main_area = False
     resizing_enabled = False
@@ -303,7 +314,6 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
         """
         self.Error.clear()
         self.data = data
-        self._update_status()
         self._update_messages()
         self.image_attributes = (
             filter_image_attributes(data) if data is not None else []
@@ -327,18 +337,6 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
         """
         self.Error.no_file_name(
             shown=not self.dirname and self.auto_save)
-
-    def _update_status(self):
-        """
-        Update input summary.
-        """
-        if self.data is None:
-            self.info.set_input_summary(self.info.NoInput)
-        else:
-            self.info.set_input_summary(
-                str(len(self.data)),
-                f"Data set {self.data.name or '(no name)'} "
-                f"with {len(self.data)} images.")
 
     def _initial_start_dir(self):
         """

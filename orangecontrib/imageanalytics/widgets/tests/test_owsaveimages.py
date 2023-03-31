@@ -5,20 +5,20 @@ import unittest
 from unittest.mock import patch, Mock
 import os
 
-import scipy.sparse as sp
+import numpy as np
 from AnyQt.QtWidgets import QFileDialog
 from PIL import Image
 
 from Orange.data import Table, Domain
 from Orange.widgets.tests.base import WidgetTest
 from Orange.widgets.tests.utils import simulate
+from orangecontrib.imageanalytics.import_images import ImportImages
 
 from orangecontrib.imageanalytics.widgets.owsaveimages import OWSaveImages, \
     SUPPORTED_FILE_FORMATS
 
 
-def _raise_error(*args):
-    raise IOError
+LOCAL_IMAGES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_images")
 
 
 class TestOWSaveImages(WidgetTest):
@@ -40,30 +40,24 @@ class TestOWSaveImages(WidgetTest):
 
     def test_dataset(self):
         self.widget.auto_save = True
-        insum = self.widget.info.set_input_summary = Mock()
         savefile = self.widget.save_file = Mock()
 
         datasig = self.widget.Inputs.data
         self.send_signal(datasig, self.data)
         self.wait_until_finished()
-        self.assertEqual(insum.call_args[0][0], "6")
-        insum.reset_mock()
         savefile.reset_mock()
 
         self.widget.dirname = os.path.join(self.test_dir, "foo")
         self.widget.auto_save = False
         self.send_signal(datasig, self.data)
-        self.assertEqual(insum.call_args[0][0], "6")
         savefile.assert_not_called()
 
         self.widget.auto_save = True
         self.send_signal(datasig, self.data)
         self.wait_until_finished()
-        self.assertEqual(insum.call_args[0][0], "6")
         savefile.assert_called()
 
         self.send_signal(datasig, None)
-        insum.assert_called_with(self.widget.info.NoInput)
 
     def test_initial_start_dir(self):
         self.widget.dirname = os.path.join(self.test_dir, "foo")
@@ -137,7 +131,7 @@ class TestOWSaveImages(WidgetTest):
         widget.save_file_as.assert_called()
         widget.save_file_as.reset_mock()
 
-        widget.dirname = "bar"
+        widget.dirname = os.path.join(self.test_dir, "bar")
         widget.save_file()
         widget.save_file_as.assert_not_called()
 
@@ -173,8 +167,11 @@ class TestOWSaveImages(WidgetTest):
         widget.save_file()
         widget.save_images.assert_called()
 
-    @patch("orangecontrib.imageanalytics.widgets.owsaveimages."
-           "_prepare_dir_and_save_images", Mock(side_effect=_raise_error))
+    @patch(
+        "orangecontrib.imageanalytics.widgets.owsaveimages."
+        "_prepare_dir_and_save_images",
+        Mock(side_effect=IOError),
+    )
     def test_save_file_write_errors(self):
         widget = self.widget
         datasig = widget.Inputs.data
@@ -315,8 +312,49 @@ class TestOWSaveImages(WidgetTest):
                 "D7-0503-12-2-bone-inj-d7-3-0020-m1.{}".format(f))
             self.assertTrue(os.path.isfile(image_path))
 
-    def test_minimum_size(self):
-        pass
+    @staticmethod
+    def local_images_table():
+        table, _ = ImportImages()(LOCAL_IMAGES)
+        # non-existing image, saving should not fail
+        table2 = Table.from_numpy(
+            table.domain, np.empty((1, 0)),
+            metas=[["im1", "im1.jpg", "71036", "640", "412"]]
+        )
+        return Table.concatenate((table, table2), axis=0)
+
+    def test_local_images(self):
+        """Test saving images with loading - change in format from jpg to png"""
+        table = self.local_images_table()
+
+        save_dir = os.path.join(self.test_dir, "saved")
+        self.widget.dirname = save_dir
+        self.widget.auto_save = True
+        self.send_signal(self.widget.Inputs.data, table)
+        self.wait_until_finished()
+
+        for row in table[:-1]:
+            # by default widget saves in PNG format
+            name = os.path.splitext(str(row["image"]))[0] + ".png"
+            self.assertTrue(os.path.exists(os.path.join(save_dir, name)))
+        self.assertFalse(self.widget.Error.general_error.is_shown())
+
+    def test_copy_locally(self):
+        """
+        When saving local images without resize in the same file format widget
+        copies images without opening them
+        """
+        table = self.local_images_table()
+
+        save_dir = os.path.join(self.test_dir, "saved")
+        self.widget.dirname = save_dir
+        self.widget.auto_save = True
+        self.widget.file_format_index = 1  # jpg
+        self.send_signal(self.widget.Inputs.data, table)
+        self.wait_until_finished()
+
+        for row in table[:-1]:
+            self.assertTrue(os.path.exists(os.path.join(save_dir, str(row["image"]))))
+        self.assertFalse(self.widget.Error.general_error.is_shown())
 
 
 @unittest.skipUnless(sys.platform in ("darwin", "win32"),

@@ -63,7 +63,7 @@ class OWImageGrid(widget.OWWidget):
     description = "Visualize images in a similarity grid"
     icon = "icons/ImageGrid.svg"
     priority = 160
-    keywords = ["image", "grid", "similarity"]
+    keywords = "image grid, image, grid, similarity"
     graph_name = "scene"
 
     class Inputs:

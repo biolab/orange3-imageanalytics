@@ -112,7 +112,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     name = "Save Images"
     description = "Save images in the directory structure."
     icon = "icons/SaveImages.svg"
-    keywords = ["save", "saveimages", "save images", "images"]
+    keywords = "save images, save, images"
 
     userhome = os.path.expanduser(f"~{os.sep}")
 

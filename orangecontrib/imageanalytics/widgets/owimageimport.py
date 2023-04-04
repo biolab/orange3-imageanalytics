@@ -98,7 +98,7 @@ class State(enum.IntEnum):
 class OWImportImages(widget.OWWidget):
     name = "Import Images"
     description = "Import images from a directory(s)"
-    keywords = ["import", "image", "import image", "read", "load"]
+    keywords = "import images, import, image, read, load"
     icon = "icons/ImportImages.svg"
     priority = 110
 

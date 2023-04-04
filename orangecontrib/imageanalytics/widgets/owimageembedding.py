@@ -69,7 +69,7 @@ def run_embedding(
 class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
-    keywords = ["embedding", "image", "image embedding"]
+    keywords = "image embedding, embedding, image"
     icon = "icons/ImageEmbedding.svg"
     priority = 150
 

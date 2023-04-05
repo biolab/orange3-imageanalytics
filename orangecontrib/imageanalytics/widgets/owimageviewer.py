@@ -224,7 +224,7 @@ class OWImageViewer(widget.OWWidget):
 
     imageSize = settings.Setting(100)  # type: int
     autoCommit = settings.Setting(True)
-    graph_name = "thumbnailView"
+    graph_name = "thumbnailView"  # QWidget (QListView -> IconView)
 
     UserAdviceMessages = [
         widget.Message(

@@ -64,7 +64,7 @@ class OWImageGrid(widget.OWWidget):
     icon = "icons/ImageGrid.svg"
     priority = 160
     keywords = "image grid, image, grid, similarity"
-    graph_name = "scene"
+    graph_name = "scene"  # QGraphicsScene
 
     class Inputs:
         data = Input("Embeddings", Orange.data.Table, default=True)

@@ -3,57 +3,62 @@ Image Viewer Widget
 -------------------
 
 """
-import os
-import weakref
-import logging
 import io
+import logging
+import os
+import typing
+import weakref
 from collections import namedtuple
-from functools import partial
 from concurrent.futures import Future
 from contextlib import closing
-
-import typing
-from typing import List, Optional, Callable, Tuple, Sequence
-
-from AnyQt.QtCore import (
-    Qt,
-    QObject,
-    QEvent,
-    QThread,
-    QSize,
-    QUrl,
-    QSettings,
-    QModelIndex,
-    QRect,
-    QPoint,
-)
-from AnyQt.QtGui import QPixmap, QImageReader, QImage, QPaintEvent
-from AnyQt.QtWidgets import QApplication, QShortcut
-from AnyQt.QtCore import pyqtSlot as Slot
-from AnyQt.QtNetwork import (
-    QNetworkAccessManager, QNetworkDiskCache, QNetworkRequest, QNetworkReply,
-    QNetworkProxyFactory, QNetworkProxy, QNetworkProxyQuery
-)
-
-from orangewidget.utils.itemmodels import PyListModel
-from orangewidget.utils.concurrent import FutureSetWatcher
+from functools import partial
+from typing import Callable, List, Optional, Sequence, Set, Tuple
 
 import Orange.data
-from Orange.data import StringVariable, DiscreteVariable, Table
-from Orange.widgets import widget, gui, settings
-from Orange.widgets.utils.itemmodels import VariableListModel
-from Orange.widgets.widget import Input, Output
-from Orange.widgets.utils.annotated_data import create_annotated_table
-from orangecontrib.imageanalytics.utils.image_utils import (
-    filter_image_attributes,
-    extract_paths,
+from AnyQt.QtCore import (
+    QEvent,
+    QItemSelection,
+    QItemSelectionModel,
+    QModelIndex,
+    QObject,
+    QPoint,
+    QRect,
+    QSettings,
+    QSize,
+    Qt,
+    QThread,
+    QUrl,
 )
+from AnyQt.QtCore import pyqtSlot as Slot
+from AnyQt.QtGui import QImage, QImageReader, QPaintEvent, QPixmap
+from AnyQt.QtNetwork import (
+    QNetworkAccessManager,
+    QNetworkDiskCache,
+    QNetworkProxy,
+    QNetworkProxyFactory,
+    QNetworkProxyQuery,
+    QNetworkReply,
+    QNetworkRequest,
+)
+from AnyQt.QtWidgets import QApplication, QShortcut
+from Orange.data import DiscreteVariable, Domain, StringVariable, Table, Variable
+from Orange.widgets import gui, settings
+from Orange.widgets.utils.annotated_data import create_annotated_table
+from Orange.widgets.utils.itemmodels import DomainModel
+from Orange.widgets.widget import Input, Output, OWWidget
+from orangewidget.utils.concurrent import FutureSetWatcher
+from orangewidget.utils.itemmodels import PyListModel
+from orangewidget.widget import Message, Msg
 
+from orangecontrib.imageanalytics.utils.image_utils import (
+    extract_paths,
+    filter_image_attributes,
+)
 from orangecontrib.imageanalytics.widgets.utils.imagepreview import Preview
 from orangecontrib.imageanalytics.widgets.utils.thumbnailview import (
-    IconView as _IconView, IconViewDelegate
+    IconView as _IconView,
 )
-
+from orangecontrib.imageanalytics.widgets.utils.thumbnailview import IconViewDelegate
 
 _log = logging.getLogger(__name__)
 
@@ -63,6 +68,7 @@ _ImageItem = typing.NamedTuple(
         ("index", int),   # Row index in the input data table
         ("url", QUrl),      # Composed final image url.
         ("future", 'Future[QImage]'),   # Future instance yielding an QImage
+        ("attr_value", str),  # image attribute string value
     ]
 )
 
@@ -200,9 +206,12 @@ class IconView(_IconView):
         return indices
 
 
-# TODO: Remove remote image loading. Should only allow viewing local files.
+class MetaDomainModel(DomainModel):
+    def set_domain(self, domain: Domain):
+        super().set_domain(None if domain is None else Domain([], metas=domain.metas))
 
-class OWImageViewer(widget.OWWidget):
+
+class OWImageViewer(OWWidget):
     name = "Image Viewer"
     description = "View images referred to in the data."
     keywords = "image viewer, viewer, image"
@@ -217,17 +226,24 @@ class OWImageViewer(widget.OWWidget):
         selected_data = Output("Selected Images", Orange.data.Table)
         data = Output("Data", Orange.data.Table)
 
+    class Error(OWWidget.Error):
+        no_images_shown = Msg(
+            "Unable to display images! Please ensure that the chosen "
+            "Image Filename Attribute store the correct paths to the images."
+        )
+
     settingsHandler = settings.DomainContextHandler()
 
-    imageAttr = settings.ContextSetting(0)
-    titleAttr = settings.ContextSetting(0)
+    image_attr: Optional[Variable] = settings.ContextSetting(None)
+    title_attr: Optional[Variable] = settings.ContextSetting(None)
 
-    imageSize = settings.Setting(100)  # type: int
-    autoCommit = settings.Setting(True)
-    graph_name = "thumbnailView"  # QWidget (QListView -> IconView)
+    imageSize: int = settings.Setting(100)
+    selected_items: Set[str] = settings.ContextSetting(set(), schema_only=True)
+    autoCommit: bool = settings.Setting(True)
+    graph_name = "thumbnailView"
 
     UserAdviceMessages = [
-        widget.Message(
+        Message(
             "Pressing the 'Space' key while the thumbnail view has focus and "
             "a selected item will open a window with a full image",
             persistent_id="preview-introduction")
@@ -236,30 +252,38 @@ class OWImageViewer(widget.OWWidget):
     def __init__(self):
         super().__init__()
         self.data = None
-        self.allAttrs = []
-        self.stringAttrs = []
-        self.selectedIndices = []
         self.items = []  # type: List[_ImageItem]
         self.__watcher = None  # type: Optional[FutureSetWatcher]
         self._errcount = 0
         self._successcount = 0
 
-        self.imageAttrCB = gui.comboBox(
-            self.controlArea, self, "imageAttr",
+        self.image_model = MetaDomainModel(
+            valid_types=(StringVariable, DiscreteVariable)
+        )
+        gui.comboBox(
+            self.controlArea,
+            self,
+            "image_attr",
             box="Image Filename Attribute",
             tooltip="Attribute with image filenames",
             callback=[self.clearModel, self.setupModel],
             contentsLength=12,
+            searchable=True,
+            model=self.image_model,
         )
 
-        self.titleAttrCB = gui.comboBox(
-            self.controlArea, self, "titleAttr",
+        self.title_model = DomainModel()
+        gui.comboBox(
+            self.controlArea,
+            self,
+            "title_attr",
             box="Title Attribute",
             tooltip="Attribute with image title",
             callback=self.updateTitles,
             contentsLength=12,
+            searchable=True,
+            model=self.title_model,
         )
-        self.titleAttrCB.setStyleSheet("combobox-popup: 0;")
 
         gui.hSlider(
             self.controlArea, self, "imageSize",
@@ -292,52 +316,52 @@ class OWImageViewer(widget.OWWidget):
         self.data = data
 
         if data is not None:
-            domain = data.domain
-            self.allAttrs = (domain.class_vars + domain.metas +
-                             domain.attributes)
-            self.stringAttrs = filter_image_attributes(data)
-
-            self.imageAttrCB.setModel(VariableListModel(self.stringAttrs))
-            self.titleAttrCB.setModel(VariableListModel(self.allAttrs))
-            if self.stringAttrs:
-                self.imageAttr = 0
+            self.image_model.set_domain(data.domain)
+            self.title_model.set_domain(data.domain)
+            im_attr = filter_image_attributes(self.data)
+            self.image_attr = im_attr[0] if im_attr else None
+            self.title_attr = self.title_model[0] if self.title_model else None
 
             self.openContext(data)
 
-            self.imageAttr = max(min(self.imageAttr, len(self.stringAttrs) - 1), 0)
-            self.titleAttr = max(min(self.titleAttr, len(self.allAttrs) - 1), 0)
-
-            if self.stringAttrs:
+            if self.image_model:
                 self.setupModel()
         self.commit.now()
 
+    def __select_image_attr(self):
+        for attr in self.image_model:
+            if attr.attributes.get("type").lower() == "image":
+                return attr
+        # check if function already exist
+        return self.image_model[0] if self.image_model else None
+
     def clear(self):
         self.data = None
-        self.error()
-        self.imageAttrCB.clear()
-        self.titleAttrCB.clear()
+        self.Error.no_images_shown.clear()
         if self.__watcher is not None:
             self.__watcher.finishedAt.disconnect(self.__on_load_finished)
             self.__watcher = None
         self._cancelAllTasks()
         self.clearModel()
+        self.image_model.set_domain(None)
+        self.title_model.set_domain(None)
+        self.selected_items = set()
 
     def setupModel(self):
-        self.error()
+        self.Error.no_images_shown.clear()
         if self.data is not None:
-            attr = self.stringAttrs[self.imageAttr]
-            titleAttr = self.allAttrs[self.titleAttr]
-            urls = column_data_as_qurl(self.data, attr)
-            titles = column_data_as_str(self.data, titleAttr)
+            urls = column_data_as_qurl(self.data, self.image_attr)
+            titles = column_data_as_str(self.data, self.title_attr)
+            im_attr_vals = column_data_as_str(self.data, self.image_attr)
             assert self.thumbnailView.count() == 0
             assert len(self.data) == len(urls)
             qnam = ImageLoader.networkAccessManagerInstance()
             items = []
-            for i, (url, title) in enumerate(zip(urls, titles)):
+            for i, (url, title, attr_val) in enumerate(zip(urls, titles, im_attr_vals)):
                 if url.isEmpty():  # skip missing
                     continue
                 future, deferrable = image_loader(url, qnam)
-                self.items.append(_ImageItem(i, url, future))
+                self.items.append(_ImageItem(i, url, future, attr_val))
                 items.append({
                     Qt.DisplayRole: title,
                     Qt.EditRole: title,
@@ -356,7 +380,21 @@ class OWImageViewer(widget.OWWidget):
         self.__watcher = FutureSetWatcher()
         self.__watcher.setFutures([it.future for it in self.items])
         self.__watcher.finishedAt.connect(self.__on_load_finished)
+        self.__set_selected_items()
         self._updateStatus()
+
+    def __set_selected_items(self):
+        model = self.thumbnailView.model()
+        selection = QItemSelection()
+        for i in range(model.rowCount()):
+            index = model.index(i)
+            name = self.items[index.row()].attr_value
+            if name in self.selected_items:
+                sel = QItemSelection(index, index)
+                selection.merge(sel, QItemSelectionModel.Select)
+        self.thumbnailView.selectionModel().select(
+            selection, QItemSelectionModel.ClearAndSelect
+        )
 
     @Slot(int, Future)
     def __on_load_finished(self, index: int, future: 'Future[QImage]'):
@@ -392,53 +430,40 @@ class OWImageViewer(widget.OWWidget):
         self.thumbnailView.setIconSize(QSize(self.imageSize, self.imageSize))
 
     def updateTitles(self):
-        titleAttr = self.allAttrs[self.titleAttr]
-        titles = column_data_as_str(self.data, titleAttr)
+        titles = column_data_as_str(self.data, self.title_attr)
         model = self.thumbnailView.model()
         for i, item in enumerate(self.items):
             model.setData(model.index(i, 0), titles[item.index], Qt.EditRole)
 
     @Slot()
     def onSelectionChanged(self):
-        items = self.items
         smodel = self.thumbnailView.selectionModel()
-        indices = [idx.row() for idx in smodel.selectedRows()]
-        self.selectedIndices = [items[i].index for i in indices]
+        self.selected_items = {
+            self.items[idx.row()].attr_value for idx in smodel.selectedRows()
+        }
         self.commit.deferred()
+
+    def __selected_indexes(self):
+        sel_model = self.thumbnailView.selectionModel()
+        # view indexes does reflect table indexes - invalid paths are skipped
+        # map to table's indexes
+        return [self.items[idx.row()].index for idx in sel_model.selectedRows()]
 
     @gui.deferred
     def commit(self):
         if self.data:
-            if self.selectedIndices:
-                selected = self.data[self.selectedIndices]
-            else:
-                selected = None
+            selected_idx = self.__selected_indexes()
+            selected = self.data[selected_idx] if selected_idx else None
             self.Outputs.selected_data.send(selected)
-            self.Outputs.data.send(create_annotated_table(
-                self.data, self.selectedIndices))
+            self.Outputs.data.send(create_annotated_table(self.data, selected_idx))
         else:
             self.Outputs.selected_data.send(None)
             self.Outputs.data.send(None)
 
-    def _noteCompleted(self, future):
-        # Note the completed future's state
-        if future.cancelled():
-            return
-
-        if future.exception():
-            self._errcount += 1
-            _log.debug("Error: %r", future.exception())
-        else:
-            self._successcount += 1
-
-        self._updateStatus()
-
     def _updateStatus(self):
         count = len([item for item in self.items if item.future is not None])
-        attr = self.stringAttrs[self.imageAttr]
-        if self._errcount == count and "type" not in attr.attributes:
-            self.error("No images could be ! Make sure the '%s' attribute "
-                       "is tagged with 'type=image'" % attr.name)
+        if self._errcount == count:
+            self.Error.no_images_shown()
 
     def onDeleteWidget(self):
         self.clear()
@@ -448,6 +473,8 @@ class OWImageViewer(widget.OWWidget):
 def column_data_as_qurl(
     table: Table, var: [StringVariable, DiscreteVariable]
 ) -> Sequence[QUrl]:
+    if var is None:
+        return []
     file_paths = extract_paths(table, var)
 
     res = [QUrl()] * len(file_paths)
@@ -466,8 +493,11 @@ def column_data_as_qurl(
 def column_data_as_str(
         table: Orange.data.Table, var: Orange.data.Variable
 ) -> Sequence[str]:
-    data = table.get_column(var)
-    return list(map(var.str_val, data))
+    if var is not None:
+        data = table.get_column(var)
+        return list(map(var.str_val, data))
+    else:
+        return []
 
 
 T = typing.TypeVar("T")

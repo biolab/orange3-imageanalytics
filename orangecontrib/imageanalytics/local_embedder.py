@@ -2,7 +2,6 @@ from os.path import join
 
 import cachecontrol.caches
 import requests
-from ndf.example_models import squeezenet
 
 from Orange.canvas.config import cache_dir
 from Orange.misc.utils.embedder_utils import EmbedderCache
@@ -15,8 +14,7 @@ class LocalEmbedder:
     embedder = None
 
     def __init__(self, model, model_settings):
-        self.model = model
-        self._load_model()
+        self.embedder = model_settings["model"]()
 
         self._target_image_size = model_settings["target_image_size"]
 
@@ -29,9 +27,6 @@ class LocalEmbedder:
 
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)
-
-    def _load_model(self):
-        self.embedder = squeezenet(include_softmax=False)
 
     def embedd_data(self, file_paths, callback=dummy_callback):
         all_embeddings = []
@@ -52,15 +47,14 @@ class LocalEmbedder:
         )
         if image is None:
             return None
-        image = self._image_loader.preprocess_squeezenet(image)
+        image = self.embedder.preprocess(image)
 
         cache_key = self._cache.md5_hash(image)
         cached_im = self._cache.get_cached_result_or_none(cache_key)
         if cached_im is not None:
             return cached_im
 
-        embedded_image = self.embedder.predict([image])
-        embedded_image = embedded_image[0][0]
+        embedded_image = self.embedder.predict(image)
 
         self._cache.add(cache_key, embedded_image)
         return embedded_image

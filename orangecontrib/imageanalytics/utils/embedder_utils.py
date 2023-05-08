@@ -83,15 +83,3 @@ class ImageLoader:
         except (IOError, ValueError):
             log.warning("Image skipped", exc_info=True)
             return None
-
-    @staticmethod
-    def preprocess_squeezenet(image):
-        mean_pixel = [104.006, 116.669, 122.679]  # imagenet centering
-        image = np.array(image, dtype=float)
-        if len(image.shape) < 4:
-            image = image[None, ...]
-        swap_img = np.array(image)
-        img_out = np.array(swap_img)
-        img_out[:, :, 0] = swap_img[:, :, 2]  # from rgb to bgr - caffe mode
-        img_out[:, :, 2] = swap_img[:, :, 0]
-        return img_out - mean_pixel

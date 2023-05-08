@@ -7,6 +7,7 @@ from Orange.util import dummy_callback
 
 from orangecontrib.imageanalytics.local_embedder import LocalEmbedder
 from orangecontrib.imageanalytics.server_embedder import ServerEmbedder
+from orangecontrib.imageanalytics.squeezenet_model import SqueezenetModel
 from orangecontrib.imageanalytics.utils.image_utils import extract_paths
 
 MODELS = {
@@ -73,6 +74,7 @@ MODELS = {
         "order": 1,
         "is_local": True,
         "batch_size": 16,
+        "model": SqueezenetModel,
     },
 }
 

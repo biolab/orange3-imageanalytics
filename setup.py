@@ -101,6 +101,8 @@ if __name__ == '__main__':
             "orange-widget-base >=4.20.0",
             "pillow >=6.2.0",
             "requests",
+            # temporary fixes https://github.com/ionrock/cachecontrol/pull/294
+            "urllib3<2",
             "scipy",
         ],
         extras_require={

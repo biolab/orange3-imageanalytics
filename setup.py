@@ -12,7 +12,7 @@ with io.open('README.pypi', 'r', encoding='utf-8') as f:
 NAME = 'Orange3-ImageAnalytics'
 
 MAJOR = 0
-MINOR = 10
+MINOR = 11
 MICRO = 0
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 

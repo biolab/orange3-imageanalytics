@@ -100,6 +100,9 @@ if __name__ == '__main__':
             "orange-canvas-core >=0.1.28",
             "orange-widget-base >=4.20.0",
             "pillow >=6.2.0",
+            # Orange3 <3.35 does not work with Pandas 2.1, remove this
+            # constraint when requiring Orange> 3.35
+            "pandas <2.1",
             "requests",
             "scipy",
         ],

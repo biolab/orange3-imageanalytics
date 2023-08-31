@@ -42,7 +42,7 @@ PACKAGES = find_packages()
 PACKAGE_DATA = {
     'orangecontrib.imageanalytics.widgets': ['icons/*.svg'],
     'orangecontrib.imageanalytics.widgets.tests': ['test_images/*'],
-    'orangecontrib.imageanalytics.tests': ['test_images/*']
+    'orangecontrib.imageanalytics.tests': ['test_images/*', 'test_images/img/*', 'test_images/img/inner/*'],
 }
 
 ENTRY_POINTS = {
@@ -105,6 +105,7 @@ if __name__ == '__main__':
             "pandas <2.1",
             "requests",
             "scipy",
+            "pandas<2.1",
         ],
         extras_require={
             'test': ['coverage', ],

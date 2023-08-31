@@ -2,8 +2,6 @@ import logging
 import unittest
 from os.path import dirname, join
 
-from pkg_resources import get_distribution
-
 from orangecontrib.imageanalytics.import_images import ImportImages
 
 
@@ -31,8 +29,19 @@ class ImportImagesTest(unittest.TestCase):
         includes all currently supported formats by QImageReader
         """
         table, n_skipped = self.import_images(join(dirname(__file__), "test_images"))
-        self.assertEqual(16, len(table))
+        self.assertEqual(18, len(table))
         self.assertEqual(0, n_skipped)
+
+    def test_import_subfolder(self):
+        """
+        Check if paths are valid for all operating systems.
+        """
+        table, n_skipped = \
+            self.import_images(join(dirname(__file__), "test_images"))
+        self.assertEqual(18, len(table))
+        self.assertEqual(0, n_skipped)
+        self.assertEqual(table.metas[-2, 1], "img/example_image_a.jpg")
+        self.assertEqual(table.metas[-1, 1], "img/inner/example_image_b.jpg")
 
 
 if __name__ == "__main__":

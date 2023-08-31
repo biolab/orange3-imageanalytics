@@ -200,10 +200,10 @@ def create_table(image_meta, categories=None, start_dir=None):
                 basename = os.path.basename(imgmeta.path)
                 imgname, _ = os.path.splitext(basename)
 
+                path = imgmeta.path[len(start_dir)+1:] if start_dir else imgmeta.path
+                path = path.replace(os.path.sep, "/")
                 meta_data.append(
-                    [imgname,
-                     imgmeta.path[len(start_dir)+1:] if start_dir else imgmeta.path,
-                     imgmeta.size, imgmeta.width, imgmeta.height]
+                    [imgname, path, imgmeta.size, imgmeta.width, imgmeta.height]
                 )
             else:
                 n_skipped += 1

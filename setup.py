@@ -93,7 +93,7 @@ if __name__ == '__main__':
         classifiers=CLASSIFIERS,
         install_requires=[
             "AnyQt",
-            "cachecontrol",
+            "cachecontrol[filecache]",
             "ndf >=0.1.4",
             "numpy >=1.16",
             "Orange3 >=3.34.0",

@@ -93,7 +93,6 @@ if __name__ == '__main__':
         classifiers=CLASSIFIERS,
         install_requires=[
             "AnyQt",
-            "cachecontrol[filecache]",
             "ndf >=0.1.4",
             "numpy >=1.16",
             "Orange3 >=3.34.0",
@@ -104,6 +103,7 @@ if __name__ == '__main__':
             # constraint when requiring Orange> 3.35
             "pandas <2.1",
             "requests",
+            "requests_cache",
             "scipy",
         ],
         extras_require={

@@ -1,9 +1,3 @@
-from os.path import join
-
-import cachecontrol.caches
-import requests
-
-from Orange.canvas.config import cache_dir
 from Orange.misc.utils.embedder_utils import EmbedderCache
 from Orange.util import dummy_callback
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
@@ -17,13 +11,6 @@ class LocalEmbedder:
         self.embedder = model_settings["model"]()
 
         self._target_image_size = model_settings["target_image_size"]
-
-        self._session = cachecontrol.CacheControl(
-            requests.session(),
-            cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache")
-            ),
-        )
 
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)

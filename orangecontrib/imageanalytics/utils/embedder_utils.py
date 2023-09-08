@@ -1,20 +1,18 @@
 import ftplib
 import logging
+from datetime import timedelta
 from io import BytesIO
 from os.path import join
 from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
-import cachecontrol.caches
-import numpy as np
-import requests
+from AnyQt.QtCore import QStandardPaths
 from PIL import ImageFile
 from PIL.Image import LANCZOS
 from PIL.Image import open as open_image
 from requests.exceptions import RequestException
-
-from Orange.misc.environ import cache_dir
+from requests_cache import CachedSession
 
 log = logging.getLogger(__name__)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -22,11 +20,14 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class ImageLoader:
     def __init__(self):
-        self._session = cachecontrol.CacheControl(
-            requests.session(),
-            cache=cachecontrol.caches.FileCache(
-                join(cache_dir(), __name__ + ".ImageEmbedder.httpcache")
-            ),
+        cache_dir = QStandardPaths.writableLocation(QStandardPaths.CacheLocation)
+        cache_path = join(cache_dir, "networkcache", "image_loader.sqlite")
+        self._session = CachedSession(
+            cache_path,
+            backend="sqlite",
+            cache_control=True,
+            expire_after=timedelta(days=1),
+            stale_if_error=True,
         )
 
     def load_image_or_none(self, file_path, target_size=None):
@@ -65,7 +66,7 @@ class ImageLoader:
         urlparts = urlparse(file_path)
         if urlparts.scheme in ("http", "https"):
             try:
-                file = self._session.get(file_path, stream=True).raw
+                file = BytesIO(self._session.get(file_path).content)
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

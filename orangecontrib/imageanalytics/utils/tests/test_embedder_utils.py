@@ -3,7 +3,9 @@ import unittest
 from unittest.mock import patch
 from urllib.error import URLError
 
+import numpy as np
 from PIL.Image import Image
+from numpy.testing import assert_array_equal
 from requests import RequestException
 
 from orangecontrib.imageanalytics.utils.embedder_utils import ImageLoader
@@ -49,6 +51,10 @@ class TestImageLoader(unittest.TestCase):
         """
         image = self.image_loader.load_image_or_none(self.im_url)
         self.assertTrue(isinstance(image, Image))
+        image_array = np.array(image)
+        # manually checked values
+        assert_array_equal(image_array[147, 181], [103, 10, 0])
+        assert_array_equal(image_array[305, 331], [21, 1, 2])
 
         image = self.image_loader.load_image_or_none(self.im_paths[0],
                                                      target_size=(255, 255))
@@ -59,7 +65,7 @@ class TestImageLoader(unittest.TestCase):
         image = self.image_loader.load_image_or_none(self.im_url + "a")
         self.assertIsNone(image)
 
-    @patch("requests.sessions.Session.get", side_effect=RequestException)
+    @patch("requests_cache.CachedSession.get", side_effect=RequestException)
     def test_load_images_url_request_exception(self, _) -> None:
         """
         Handle loading images from http, https type urls

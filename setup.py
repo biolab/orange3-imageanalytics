@@ -105,7 +105,6 @@ if __name__ == '__main__':
             "pandas <2.1",
             "requests",
             "scipy",
-            "pandas<2.1",
         ],
         extras_require={
             'test': ['coverage', ],

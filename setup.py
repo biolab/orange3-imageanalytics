@@ -42,7 +42,7 @@ PACKAGES = find_packages()
 PACKAGE_DATA = {
     'orangecontrib.imageanalytics.widgets': ['icons/*.svg'],
     'orangecontrib.imageanalytics.widgets.tests': ['test_images/*'],
-    'orangecontrib.imageanalytics.tests': ['test_images/*']
+    'orangecontrib.imageanalytics.tests': ['test_images/*', 'test_images/img/*', 'test_images/img/inner/*'],
 }
 
 ENTRY_POINTS = {

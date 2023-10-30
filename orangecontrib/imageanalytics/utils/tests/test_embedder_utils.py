@@ -1,6 +1,7 @@
 import os
 import unittest
-from unittest.mock import patch
+from sqlite3 import OperationalError
+from unittest.mock import patch, MagicMock
 from urllib.error import URLError
 
 import numpy as np
@@ -114,6 +115,24 @@ class TestImageLoader(unittest.TestCase):
     def test_unsuccessful_convert_to_RGB(self, _) -> None:
         image = self.image_loader.load_image_or_none(self.im_paths[2])
         self.assertIsNone(image)
+
+    @patch("requests_cache.CachedSession.get")
+    def test_load_images_url_with_http_cache(self, mock) -> None:
+        with open(self.im_paths[0], "rb") as f:
+            mock.return_value = MagicMock(content=f.read())
+        self.assertIsNotNone(self.image_loader.load_image_or_none(self.im_url))
+        mock.assert_called_once()
+
+    @patch(
+        "orangecontrib.imageanalytics.utils.embedder_utils.CachedSession",
+        side_effect=OperationalError("test")
+    )
+    @patch("requests.Session.get")
+    def test_load_images_url_without_http_cache(self, mock, _) -> None:
+        with open(self.im_paths[0], "rb") as f:
+            mock.return_value = MagicMock(content=f.read())
+        self.assertIsNotNone(self.image_loader.load_image_or_none(self.im_url))
+        mock.assert_called_once()
 
 
 if __name__ == "__main__":

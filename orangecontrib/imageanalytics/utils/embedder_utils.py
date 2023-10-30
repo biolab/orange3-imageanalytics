@@ -3,10 +3,12 @@ import logging
 from datetime import timedelta
 from io import BytesIO
 from os.path import join
+from sqlite3 import OperationalError
 from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
+import requests
 from AnyQt.QtCore import QStandardPaths
 from PIL import ImageFile
 from PIL.Image import LANCZOS
@@ -19,16 +21,31 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class ImageLoader:
-    def __init__(self):
+    _session = None
+
+    @property
+    def session(self):
+        if self._session is not None:
+            return self._session
+
         cache_dir = QStandardPaths.writableLocation(QStandardPaths.CacheLocation)
         cache_path = join(cache_dir, "networkcache", "image_loader.sqlite")
-        self._session = CachedSession(
-            cache_path,
-            backend="sqlite",
-            cache_control=True,
-            expire_after=timedelta(days=1),
-            stale_if_error=True,
-        )
+        try:
+            self._session = CachedSession(
+                cache_path,
+                backend="sqlite",
+                cache_control=True,
+                expire_after=timedelta(days=1),
+                stale_if_error=True,
+            )
+        except OperationalError as ex:
+            # if no permission to write in dir or read cache file return regular session
+            log.info(
+                f"Cache file creation/opening failed with: '{str(ex)}'. "
+                "Using requests.Session instead of cached session."
+            )
+            self._session = requests.Session()
+        return self._session
 
     def load_image_or_none(self, file_path, target_size=None):
         if file_path is None:
@@ -66,7 +83,7 @@ class ImageLoader:
         urlparts = urlparse(file_path)
         if urlparts.scheme in ("http", "https"):
             try:
-                file = BytesIO(self._session.get(file_path).content)
+                file = BytesIO(self.session.get(file_path).content)
             except RequestException:
                 log.warning("Image skipped", exc_info=True)
                 return None

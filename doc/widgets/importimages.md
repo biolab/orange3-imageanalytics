@@ -33,3 +33,8 @@ Now we can proceed with standard machine learning methods. We will send images t
 Then we will use **Test & Score** and **Logistic Regression**, to build a model for predicting the author of a painting. We get a perfect score? How come? It turns out, these were the images the *Painters* embedder was trained on, so a high accuracy is expected.
 
 ![](images/ImportImages-Example.png)
+
+Note
+----
+
+If you have a list of images in a tabular format, add *type=image* to the third header row of the column containing the path to images.

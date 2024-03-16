@@ -95,13 +95,10 @@ if __name__ == '__main__':
             "AnyQt",
             "ndf >=0.1.4",
             "numpy >=1.16",
-            "Orange3 >=3.34.0",
+            "Orange3 >=3.35.0",
             "orange-canvas-core >=0.1.28",
             "orange-widget-base >=4.20.0",
             "pillow >=6.2.0",
-            # Orange3 <3.35 does not work with Pandas 2.1, remove this
-            # constraint when requiring Orange> 3.35
-            "pandas <2.1",
             "requests",
             "requests_cache",
             "scipy",

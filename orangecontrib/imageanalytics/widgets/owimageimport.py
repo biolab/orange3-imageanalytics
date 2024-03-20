@@ -306,7 +306,8 @@ class OWImportImages(widget.OWWidget):
             if ncategories < 2:
                 text = f'{nvalid} {pl(nvalid, "image")}'
             else:
-                text = f'{nvalid} {pl(nvalid, "image")} / {ncategories} {pl(ncategories, "category")}'
+                text = (f'{nvalid} {pl(nvalid, "image")} / {ncategories} '
+                        f'{pl(ncategories, "category|categories")}')
             if n_skipped > 0:
                 text = text + f', {n_skipped} skipped'
         elif self.__state == State.Cancelled:

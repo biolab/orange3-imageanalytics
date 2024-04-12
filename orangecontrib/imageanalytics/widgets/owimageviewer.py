@@ -41,7 +41,7 @@ from AnyQt.QtNetwork import (
     QNetworkRequest,
 )
 from AnyQt.QtWidgets import QApplication, QShortcut
-from Orange.data import DiscreteVariable, Domain, StringVariable, Table, Variable
+from Orange.data import DiscreteVariable, StringVariable, Table, Variable
 from Orange.widgets import gui, settings
 from Orange.widgets.utils.annotated_data import create_annotated_table
 from Orange.widgets.utils.itemmodels import DomainModel
@@ -50,10 +50,7 @@ from orangewidget.utils.concurrent import FutureSetWatcher
 from orangewidget.utils.itemmodels import PyListModel
 from orangewidget.widget import Message, Msg
 
-from orangecontrib.imageanalytics.utils.image_utils import (
-    extract_paths,
-    filter_image_attributes,
-)
+from orangecontrib.imageanalytics.utils.image_utils import extract_paths
 from orangecontrib.imageanalytics.widgets.utils.imagepreview import Preview
 from orangecontrib.imageanalytics.widgets.utils.thumbnailview import (
     IconView as _IconView,
@@ -206,11 +203,6 @@ class IconView(_IconView):
         return indices
 
 
-class MetaDomainModel(DomainModel):
-    def set_domain(self, domain: Domain):
-        super().set_domain(None if domain is None else Domain([], metas=domain.metas))
-
-
 class OWImageViewer(OWWidget):
     name = "Image Viewer"
     description = "View images referred to in the data."
@@ -231,8 +223,13 @@ class OWImageViewer(OWWidget):
             "Unable to display images! Please ensure that the chosen "
             "Image Filename Attribute store the correct paths to the images."
         )
+        no_image_attr = Msg(
+            "Data does not contain any variables with image names.\n"
+            "Numeric variables cannot store image names."
+        )
 
     settingsHandler = settings.DomainContextHandler()
+    settings_version = 2
 
     image_attr: Optional[Variable] = settings.ContextSetting(None)
     title_attr: Optional[Variable] = settings.ContextSetting(None)
@@ -257,9 +254,7 @@ class OWImageViewer(OWWidget):
         self._errcount = 0
         self._successcount = 0
 
-        self.image_model = MetaDomainModel(
-            valid_types=(StringVariable, DiscreteVariable)
-        )
+        self.image_model = DomainModel(valid_types=StringVariable)
         gui.comboBox(
             self.controlArea,
             self,
@@ -311,38 +306,59 @@ class OWImageViewer(OWWidget):
 
     @Inputs.data
     def setData(self, data):
-        self.closeContext()
+        if self.image_attr is not None:
+            # Don't store invalid contexts because they will match anything
+            # and crash the widget when they're used.
+            self.closeContext()
         self.clear()
+        if data is None:
+            self.commit.now()
+            return
+
+        self.image_model.set_domain(data.domain)
+        self.title_model.set_domain(data.domain)
+        if not self.image_model:
+            self.Error.no_image_attr()
+            self.commit.now()
+            return
+
         self.data = data
-
-        if data is not None:
-            self.image_model.set_domain(data.domain)
-            self.title_model.set_domain(data.domain)
-            im_attr = filter_image_attributes(self.data)
-            self.image_attr = im_attr[0] if im_attr else None
-            self.title_attr = self.title_model[0] if self.title_model else None
-
-            self.openContext(data)
-
-            if self.image_model:
-                self.setupModel()
+        self._propose_image_and_title_attr()
+        self.openContext(data)
+        self.setupModel()
         self.commit.now()
 
-    def __select_image_attr(self):
-        for attr in self.image_model:
-            if attr.attributes.get("type").lower() == "image":
-                return attr
-        # check if function already exist
-        return self.image_model[0] if self.image_model else None
+    def _propose_image_and_title_attr(self):
+        self.image_attr = max(
+            self.image_model,
+            key=lambda attr: attr.attributes.get("type", "").lower() == "image"
+        )
+        # Use class variable if it exists. Otherwise,
+        # prefer string variables (there will be at least one, otherwise
+        # image_model is empty and widget reports an error,
+        # but avoid those marked as "image" and in particular the one used
+        # for image_attr
+        self.title_attr = self.data.domain.class_var or max(
+            # exclude separators
+            (attr for attr in self.title_model if isinstance(attr, Variable)),
+            key=lambda attr:
+                isinstance(attr, StringVariable)
+                and (3
+                     - (attr.attributes.get("type", "").lower() == "image")
+                     - (attr is self.image_attr))
+        )
 
     def clear(self):
         self.data = None
         self.Error.no_images_shown.clear()
+        self.Error.no_image_attr.clear()
         if self.__watcher is not None:
             self.__watcher.finishedAt.disconnect(self.__on_load_finished)
             self.__watcher = None
         self._cancelAllTasks()
         self.clearModel()
+        self.image_attr = None
+        self.title_attr = None
         self.image_model.set_domain(None)
         self.title_model.set_domain(None)
         self.selected_items = set()
@@ -377,11 +393,11 @@ class OWImageViewer(OWWidget):
             self.thumbnailView.selectionModel().selectionChanged.connect(
                 self.onSelectionChanged
             )
-        self.__watcher = FutureSetWatcher()
-        self.__watcher.setFutures([it.future for it in self.items])
-        self.__watcher.finishedAt.connect(self.__on_load_finished)
-        self.__set_selected_items()
-        self._updateStatus()
+            self.__watcher = FutureSetWatcher()
+            self.__watcher.setFutures([it.future for it in self.items])
+            self.__watcher.finishedAt.connect(self.__on_load_finished)
+            self.__set_selected_items()
+            self._updateStatus()
 
     def __set_selected_items(self):
         model = self.thumbnailView.model()
@@ -468,6 +484,17 @@ class OWImageViewer(OWWidget):
     def onDeleteWidget(self):
         self.clear()
         super().onDeleteWidget()
+
+    @classmethod
+    def migrate_context(cls, context, version):
+        if version < 2:
+            # Remove contexts in which image_attr is None because they match
+            # anything and crash the widget.
+            # Also remove context in which image_attr is not a string variable
+            # because widget now requires a string variable.
+            image_attr = context.values.get("image_attr")
+            if image_attr is None or image_attr[1] != 103:
+                raise settings.IncompatibleContext
 
 
 def column_data_as_qurl(

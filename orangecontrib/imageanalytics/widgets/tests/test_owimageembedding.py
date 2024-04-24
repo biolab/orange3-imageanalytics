@@ -199,6 +199,25 @@ class TestOWImageEmbedding(WidgetTest):
             1, len(self.get_output(self.widget.Outputs.embeddings))
         )
 
+    def test_url_changed(self):
+        """
+        This test set if the urls are changed correctly
+        The test may fail if default url will be changed
+        """
+        w = self.widget
+
+        w.use_custom_server_cb.setChecked(False)
+        self.assertEqual(w._image_embedder._server_url, w.SERVER_URL_DEFAULT)
+
+        w.use_custom_server_cb.setChecked(True)
+        w.server_url_box.setText("")
+        w.changed_server_url()
+
+        w.use_custom_server_cb.setChecked(True)
+        w.server_url_box.setText(w.SERVER_URL_DEFAULT)
+        w.changed_server_url()
+        self.assertEqual(w._image_embedder._server_url, w.SERVER_URL_DEFAULT)
+
 
 if __name__ == "__main__":
     unittest.main()

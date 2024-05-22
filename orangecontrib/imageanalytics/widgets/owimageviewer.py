@@ -218,14 +218,16 @@ class OWImageViewer(OWWidget):
         selected_data = Output("Selected Images", Orange.data.Table)
         data = Output("Data", Orange.data.Table)
 
-    class Error(OWWidget.Error):
+    class Warning(OWWidget.Warning):
         no_images_shown = Msg(
-            "Unable to display images! Please ensure that the chosen "
-            "Image Filename Attribute store the correct paths to the images."
+            "Unable to display images. Check that the chosen "
+            "Image Filename Attribute stores correct paths to images."
         )
-        no_image_attr = Msg(
-            "Data does not contain any variables with image names.\n"
-            "Numeric variables cannot store image names."
+
+    class Error(OWWidget.Error):
+            no_image_attr = Msg(
+            "Data does not contain any variables with image file names or URLs.\n"
+            "Data contains no text variables."
         )
 
     settingsHandler = settings.DomainContextHandler()
@@ -350,7 +352,7 @@ class OWImageViewer(OWWidget):
 
     def clear(self):
         self.data = None
-        self.Error.no_images_shown.clear()
+        self.Warning.no_images_shown.clear()
         self.Error.no_image_attr.clear()
         if self.__watcher is not None:
             self.__watcher.finishedAt.disconnect(self.__on_load_finished)
@@ -364,7 +366,7 @@ class OWImageViewer(OWWidget):
         self.selected_items = set()
 
     def setupModel(self):
-        self.Error.no_images_shown.clear()
+        self.Warning.no_images_shown.clear()
         if self.data is not None:
             urls = column_data_as_qurl(self.data, self.image_attr)
             titles = column_data_as_str(self.data, self.title_attr)
@@ -479,7 +481,7 @@ class OWImageViewer(OWWidget):
     def _updateStatus(self):
         count = len([item for item in self.items if item.future is not None])
         if self._errcount == count:
-            self.Error.no_images_shown()
+            self.Warning.no_images_shown()
 
     def onDeleteWidget(self):
         self.clear()

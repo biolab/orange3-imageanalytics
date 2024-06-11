@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-
 import io
 import os
+import contextlib
+import importlib.metadata
+import subprocess
+import warnings
+import stat
 from os import path, walk
 
 from setuptools import setup, find_packages
+from setuptools.command.install import install
 
 with io.open('README.pypi', 'r', encoding='utf-8') as f:
     ABOUT = f.read()
@@ -74,6 +79,22 @@ def include_documentation(local_dir, install_dir):
     DATA_FILES.extend(doc_files)
 
 
+class InstallMultilingualCommand(install):
+    def run(self):
+        install.run(self)
+        self.compile_to_multilingual()
+
+    @staticmethod
+    def compile_to_multilingual():
+        from trubar import translate
+
+        package_dir = os.path.dirname(os.path.abspath(__file__))
+        translate(
+            "msgs.jaml",
+            source_dir=os.path.join(package_dir, "orangecontrib", "imageanalytics"),
+            config_file=os.path.join(package_dir, "i18n", "trubar-config.yaml"))
+
+
 if __name__ == '__main__':
     include_documentation('doc/_build/html', 'help/orange3-imageanalytics')
     setup(
@@ -91,6 +112,7 @@ if __name__ == '__main__':
         package_data=PACKAGE_DATA,
         keywords=KEYWORDS,
         classifiers=CLASSIFIERS,
+        setup_requires=["trubar>=0.3.1"],
         install_requires=[
             "AnyQt",
             "ndf >=0.1.4",
@@ -103,6 +125,9 @@ if __name__ == '__main__':
             "requests_cache",
             "scipy",
         ],
+        cmdclass={
+            'install': InstallMultilingualCommand,
+        },
         extras_require={
             'test': ['coverage', ],
             'doc': ['sphinx', 'recommonmark', 'sphinx_rtd_theme', ],

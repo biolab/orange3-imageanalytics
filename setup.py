@@ -84,14 +84,13 @@ class InstallMultilingualCommand(install):
         install.run(self)
         self.compile_to_multilingual()
 
-    @staticmethod
-    def compile_to_multilingual():
+    def compile_to_multilingual(self):
         from trubar import translate
 
         package_dir = os.path.dirname(os.path.abspath(__file__))
         translate(
             "msgs.jaml",
-            source_dir=os.path.join(package_dir, "orangecontrib", "imageanalytics"),
+            source_dir=os.path.join(self.install_lib, "orangecontrib", "imageanalytics"),
             config_file=os.path.join(package_dir, "i18n", "trubar-config.yaml"))
 
 

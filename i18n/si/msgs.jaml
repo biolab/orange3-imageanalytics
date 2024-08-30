@@ -1,0 +1,488 @@
+image_embedder.py:
+    inception-v3: false
+    name: false
+    Inception v3: true
+    description: false
+    Google's Inception v3 model trained on ImageNet.: Googlov model Inception v3, naučen na podatkovni bazi ImageNet.
+    target_image_size: false
+    layers: false
+    penultimate: false
+    order: false
+    batch_size: false
+    painters: false
+    Painters: true
+    A model trained to predict painters from artwork\nimages.: Model, naučen za napovedovanje slikarjev iz umetniških del.
+    deeploc: false
+    DeepLoc: true
+    A model trained to analyze yeast cell images.: Model, naučen za analizo slik celic kvasovk.
+    vgg16: false
+    VGG-16: true
+    16-layer image recognition model trained on\nImageNet.: 16-slojni model za prepoznavanje slik,\nnaučen na podatkovni bazi ImageNet.
+    vgg19: false
+    VGG-19: true
+    19-layer image recognition model trained on\nImageNet.: 19-slojni model za prepoznavanje slik,\nnaučen na podatkovni bazi ImageNet.
+    openface: false
+    Face recognition model trained on FaceScrub and\n: Model za prepoznavanje obrazov, ki je bil naučen na zbirki podatkov FaceScrub in\n
+    CASIA-WebFace datasets.: CASIA-WebFace.
+    squeezenet: false
+    SqueezeNet: true
+    Deep model for image recognition that achieves \n: Globok model za prepoznavanje slik, ki v podatkovni bazi ImageNet \n
+    AlexNet-level accuracy on ImageNet with \n: s 50-krat manj parametri dosega natančnost \n
+    50x fewer parameters.: na ravni AlexNeta.
+    is_local: false
+    model: false
+    class `ImageEmbedder`:
+        def `__init__`:
+            inception-v3: false
+            https://api.garaza.io/: false
+        def `is_local_embedder`:
+            is_local: false
+        def `_get_model_settings_confidently`:
+            "'{:s}' is not a valid model, should be one of: {:s}": "'{:s}' ni veljaven model, moral bi biti eden izmed: {:s}"
+            ', ': false
+        def `_init_embedder`:
+            batch_size: false
+            image: false
+            target_image_size: false
+        def `__call__`:
+            Please provide a column for image path: Prosimo, navedite stolpec za pot do slike
+        def `from_table`:
+            image: false
+        def `__enter__`:
+            ImageEmbedder: false
+        def `construct_output_data_table`:
+            n{:d}: false
+            hidden: false
+        def `prepare_output_data`:
+            Skipped images: Izpuščene slike
+            Embedded images: Vložene slike
+    __main__: false
+    tests/test_images/example_image_0.jpg: false
+image_grid.py:
+    class `ImageGrid`:
+        def `_reduce_dimensions`:
+            MDS: false
+            precomputed: false
+            PCA: false
+            TSNE: false
+            pca: false
+        def `_get_assignments`:
+            sqeuclidean: false
+            lap: false
+import_images.py:
+    image: slika
+    class `ImportImages`:
+        ImgData: false
+        path: false
+        format: false
+        height: false
+        width: false
+        size: false
+        ImgDataError: false
+        error: false
+        error_str: false
+        def `image_meta`:
+            *: false
+    def `scan`:
+        *: false
+        .*: false
+    def `image_meta_data`:
+        ascii: false
+        nan: false
+    def `create_table`:
+        category: kategorija
+        image name: ime slike
+        type: false
+        image: false
+        origin: false
+        size: velikost
+        width: širina
+        height: višina
+        /: false
+local_embedder.py:
+    class `LocalEmbedder`:
+        def `__init__`:
+            model: false
+            target_image_size: false
+server_embedder.py:
+    class `ServerEmbedder`:
+        def `__init__`:
+            image/jpeg: false
+utils/embedder_utils.py:
+    class `ImageLoader`:
+        def `session`:
+            networkcache: false
+            image_loader.sqlite: false
+            sqlite: false
+            "Cache file creation/opening failed with: '{str(ex)}'. ": false
+            Using requests.Session instead of cached session.: false
+        def `load_image_or_none`:
+            RGB: false
+        def `load_image_bytes`:
+            JPEG: false
+        def `_load_image_from_url_or_local_path`:
+            http: false
+            https: false
+            Image skipped: Izpuščena slika
+            ftp: false
+            data: false
+utils/image_utils.py:
+    def `filter_image_attributes`:
+        type: false
+        image: false
+    def `extract_image_path`:
+        origin: false
+        http: false
+        https: false
+        ftp: false
+        data: false
+        /: false
+widgets/__init__.py:
+    Image Analytics: Analiza slik
+    Management and embedding of image data.: Upravljanje in vložitve slikovnih podatkov.
+    icons/Category-ImageAnalytics.svg: false
+    '#F7F5A8': false
+    {DEVELOP_ROOT}/doc/_build/html/index.html: false
+    {}/help/orange3-imageanalytics/index.html: false
+    data: false
+    http://orange3-imageanalytics.readthedocs.io/en/latest/: false
+widgets/owimageembedding.py:
+    def `run_embedding`:
+        squeezenet: false
+    class `OWImageEmbedding`:
+        Image Embedding: Vložitev slik
+        Image embedding through deep neural networks.: Vložitev slik z globokimi nevronskimi mrežami.
+        image embedding, embedding, image: image embedding, embedding, vložitev slike, slika
+        icons/ImageEmbedding.svg: false
+        class `Inputs`:
+            Images: Slike
+        class `Outputs`:
+            Embeddings: Vložitev
+            Skipped Images: Izpuščene slike
+        class `Warning`:
+            'No internet connection: switched to local embedder': Ni internetne povezave: preklopite na lokalni vgrajevalnik
+            Please provide data with an image attribute.: Prosimo, navedite podatke z atributom slike.
+            {} images are skipped.: Število izpuščenih slik: {}
+        class `Error`:
+            'Embedding error: {}': Napaka pri vložitvi: {}
+        No data on input.: Ni podatkov o vnosu.
+        def `__init__`:
+            order: false
+        def `_setup_layout`:
+            Settings: Nastavitve
+            cb_image_attr_current_id: false
+            Image attribute:: Atribut slike
+            cb_embedder_current_id: false
+            Embedder:: Vlagalnik:
+            name: false
+            ' (local)': ' (lokalno)'
+            is_local: false
+            description: false
+            _auto_apply: false
+            Apply: Uveljavi
+            Cancel: Prekliči
+        def `set_input_data_summary`:
+            Data have {len(data)} instances: Podatki imajo {len(data)} {plsi(len(data), 'primer')}
+        def `set_output_data_summary`:
+            {success}: false
+            {success} images successfully embedded ,\n: {success} {plsi(success, 'slika je uspešno vložena|sliki sta uspešno vloženi|slike so uspešno vložene|slik je uspešno vloženih')},\n
+            {skip} images skipped.: {skip} {plsi(skip, 'slika je izpuščena|sliki sta izpuščeni|slike so izpuščene|slik je izpuščenih')}.
+        def `_cb_embedder_changed`:
+            description: false
+        def `_switch_to_local_embedder`:
+            squeezenet: false
+    __main__: false
+    https://datasets.biolab.si/core/bone-healing.xlsx: false
+widgets/owimagegrid.py:
+    _ImageItem: false
+    index: false
+    widget: false
+    url: false
+    future: false
+    class `OWImageGrid`:
+        Image Grid: Mreža slik
+        Visualize images in a similarity grid: Vizualizacija slik v mreži podobnosti.
+        icons/ImageGrid.svg: false
+        image grid, image, grid, similarity: image grid, grid, similarity, slika, mreža, podobnost
+        scene: false
+        class `Inputs`:
+            Embeddings: Vložitve
+            Data Subset: Podskupina podatkov
+        class `Outputs`:
+            Selected Images: Izbrane slike
+            Images: Slike
+        Resize: Spremeni velikost
+        class `Warning`:
+            No Data Subset elements appear in the Data.: V podatkih ni elementov podskupine podatkov.
+            Some Data Subset elements do not appear in the Data.: Nekateri elementi podskupine podatkov niso prikazani v podatkih.
+            No valid data: Ni veljavnih podatkov
+        def `__init__`:
+            (No labels): (Brez oznak)
+            imageAttr: false
+            Image Filename Attribute: Stolpec z imenom datoteke s sliko
+            Attribute with image filenames: Stolpec z imeni datotek s slikami
+            cell_fit: false
+            Resize: Spremeni velikost
+            Crop: Obreži
+            Image cell fit: Prileganje slikovne celice
+            Grid size: Velikost mreže
+            columns: false
+            Columns: Stolpci
+            rows: false
+            Rows: Vrstice
+            Set size automatically: Samodejno nastavi velikost
+            Labels: Oznake
+            label_attr: false
+            Show labels: Prikaži oznake
+            auto_commit: false
+            Apply: Uveljavi
+        def `setup_scene`:
+            ?: false
+            \n: false
+            def `set_pixmap`:
+                \n: false
+        def `commit`:
+            Group: Skupina
+        def `send_report`:
+            Number of images: Število slik
+            Grid: Mreža
+        def `_note_completed`:
+            'Error: %r': Napaka: %r
+        def `_update_status`:
+            "No images found for column '{attr.name}'! ": "Ni najdenih slik za stolpec '{attr.name}'! "
+            'Make sure to usa a column with valid image path ': 'Prepričajte se, da uporabljate stolpec z veljavno potjo '
+            name or urls.: do slike ali URL-ji.
+    class `GraphicsThumbnailWidget`:
+        def `__init__`:
+            'background-color: rgba(255, 255, 255, 10);': false
+    class `GraphicsThumbnailGrid`:
+        def `insertThumbnail`:
+            {!r} is already inserted: {!r} je že vstavljena
+    __main__: false
+    squeezenet: false
+    https://datasets.biolab.si/core/bone-healing.xlsx: false
+    Image: false
+widgets/owimageimport.py:
+    def `prettyfypath`:
+        ~/: false
+        ~: false
+    class `OWImportImages`:
+        Import Images: Uvoz slik
+        Import images from a directory(s): Uvoz slik iz imenika (imenikov).
+        import images, import, image, read, load: import images, image, read, load, uvoz slike, slika, preberi, naloži
+        icons/ImportImages.svg: false
+        class `Outputs`:
+            Data: Podatki
+        def `__init__`:
+            Open/Load Images: Odpri/naloži slike
+            \N{HORIZONTAL ELLIPSIS}: false
+            Select a directory from which to load the images: Izberite imenik, iz katerega želite naložiti slike
+            Reload: Ponovno naloži
+            Reload current image set: Ponovno naloži trenutni nabor slik
+            Info: false
+            No image set selected: Nabor slik ni izbran
+            Cancel: Prekliči
+        def `__runOpenDialog`:
+            ~/: false
+            Select Top Level Directory: Izberite imenik na najvišji ravni
+        def `__updateInfo`:
+            No image set selected: Nabor slik ni izbran
+            Processing: Obdelava
+            {nvalid} {pl(nvalid, "image")}: {nvalid} {plsi(nvalid, "slika")}
+            {nvalid} {pl(nvalid, "image")} / {ncategories} {pl(ncategories, "category")}: {nvalid} {plsi(nvalid, "slika")} / {ncategories} {plsi(ncategories, "kategorija")}
+            , {n_skipped} skipped: , {n_skipped} {plsi(n_skipped, "izpuščena|izpuščeni|izpuščene|izpuščenih")}
+            Cancelled: Preklicano
+            Error state: Stanje napake
+        def `setCurrentPath`:
+            "'{}' does not exist": "'{}' ne obstaja"
+            "'{}' is not a directory": "'{}' ni imenik"
+        def `_search_paths`:
+            basedir: false
+        def `__setRuntimeState`:
+            Processing: Obdelava
+            Cancelled: Preklicano
+            Error during processing: Napaka med obdelavo
+        def `start`:
+            'Starting a new task while one is in progress. ': false
+            Cancel the existing task (dir:'{}'): false
+            __onReportProgress: false
+            def `cancel`:
+                The task did not stop in in a timely manner: false
+        def `eventFilter`:
+            def `dirpath`:
+                /: false
+    __main__: false
+widgets/owimageviewer.py:
+    _ImageItem: false
+    index: false
+    url: false
+    future: false
+    Future[QImage]: false
+    attr_value: false
+    class `DeferredIconViewDelegate`:
+        def `renderThumbnail`:
+            Future[QImage]: false
+    class `OWImageViewer`:
+        Image Viewer: Pregledovalnik slik
+        View images referred to in the data.: Ogled slik, navedenih v podatkih.
+        image viewer, viewer, image: image viewer, viewer, pregledovalnik slik, pregled, slika
+        icons/ImageViewer.svg: false
+        Orange.widgets.data.owimageviewer.OWImageViewer: false
+        class `Inputs`:
+            Data: Podatki
+        class `Outputs`:
+            Selected Images: Izbrane slike
+            Data: Podatki
+        class `Error`:
+            'Unable to display images! Please ensure that the chosen ': 'Ni mogoče prikazati slik! Prepričajte se, da je izbrani '
+            Image Filename Attribute store the correct paths to the images.: stolpec z imenom datoteke s sliko shranil pravilne poti do slik.
+        thumbnailView: false
+        "Pressing the 'Space' key while the thumbnail view has focus and ": Pritisnite preslednico (space) za ogled slike
+        a selected item will open a window with a full image: ""
+        preview-introduction: false
+        def `__init__`:
+            image_attr: false
+            Image Filename Attribute: Stolpec z imenom datoteke s sliko
+            Attribute with image filenames: Stolpec z imeni datotek s slikami
+            title_attr: false
+            Title Attribute: Stolpec z naslovom
+            Attribute with image title: Stolpec z naslovom slike
+            imageSize: false
+            Image Size: Velikost slike
+            autoCommit: false
+            Send: Uveljavi
+        def `__select_image_attr`:
+            type: false
+            image: false
+        def `__on_load_finished`:
+            Future[QImage]: false
+    T: false
+    Some: false
+    val: false
+    def `execute`:
+        Future[T]: false
+    def `loader_local`:
+        Future[QImage]: false
+        def `load_local_file`:
+            'Read local: %s': Preberi lokalno: %s
+    def `loader_qnam`:
+        Future[QImage]: false
+        def `load_qnam`:
+            Future[QImage]: false
+            setTransferTimeout: false
+            'Fetch: %s': Pridobi: %s
+            def `abort_on_cancel`:
+                'Abort: %s': Prekinitev: %s
+            def `on_reply_finished`:
+                \n: false
+                '  (served from cache)': '  (servirano iz predpomnilnika)'
+                latin-1: false
+                :: false
+    def `image_loader`:
+        Future[QImage]: false
+        "'{url.toString()}' is not a valid url": "'{url.toString()}' ni veljaven url naslov"
+    class `ProxyFactory`:
+        def `queryProxy`:
+            network: false
+            -proxy: false
+            http: false
+            https: false
+            socks: false
+            socks5: false
+            "Proxy for '%s': '%s'": true
+            Proxy for '%s' - ignored: true
+    class `ImageLoader`:
+        def `networkAccessManagerInstance`:
+            .ImageLoader.Cache: false
+        def `get`:
+            User-Agent: false
+            OWImageViewer/1.0: false
+            def `on_reply_ready`:
+                \n: false
+                '  (served from cache)': '  (pridobljeno iz pomnilnika)'
+                latin-1: false
+                :: false
+    __main__: false
+    https://datasets.biolab.si/core/bone-healing.xlsx: false
+widgets/owsaveimages.py:
+    png: false
+    jpg: false
+    gif: false
+    tiff: false
+    pdf: false
+    bmp: false
+    eps: false
+    ico: false
+    class `OWSaveImages`:
+        Save Images: Shrani slike
+        Save images in the directory structure.: Shrani slike v strukturo imenika.
+        icons/SaveImages.svg: false
+        save images, save, images: save images, images, shrani slike, slike, slika
+        ~{os.sep}: false
+        class `Inputs`:
+            Data: Podatki
+        class `Error`:
+            Directory name is not set.: Ime imenika ni nastavljeno.
+            {}: false
+            Data does not have any image attribute.: Podatki nimajo nobenega atributa slike.
+        def `__init__`:
+            order: false
+            image_attr_current_index: false
+            Image attribute: Atribut slike
+            use_scale: false
+            'Scale images to ': 'Pomanjšajte slike na '
+            scale_index: false
+            {} ({}×{}): false
+            name: false
+            target_image_size: false
+            file_format_index: false
+            File format: Format datoteke
+            auto_save: false
+            Autosave when receiving new data or settings change: Samodejno shranjevanje ob prejemu novih podatkov ali spremembi nastavitev
+            Save: Shrani
+            Save as ...: Shrani kot ...
+        def `gather_paths`:
+            .: false
+            {}.{}: false
+        def `save_images`:
+            target_image_size: false
+            Stop: true
+        def `on_done`:
+            Save: Shrani
+        def `on_exception`:
+            Save: Shrani
+        def `save_file`:
+            Resume save: Nadaljuj shranjevanje
+        def `save_file_as`:
+            Save as {os.path.basename(dirname)}: Shrani kot {os.path.basename(dirname)}
+        def `get_save_filename`:
+            Select directory to save: Izberite imenik za shranjevanje
+            Overwrite file?: Nadomesti datoteke?
+            Folder {os.path.split(filename)[1]} already exists.\n: Mapa {os.path.split(filename)[1]} že obstaja.\n
+            Overwrite?: Nadomesti mapo na cilju?
+    __main__: false
+    https://datasets.biolab.si/core/bone-healing.xlsx: false
+widgets/tests/utils.py:
+    def `load_images`:
+        test_images: false
+        Images: false
+        type: false
+        image: false
+        origin: false
+widgets/utils/thumbnailview.py:
+    class `IconViewDelegate`:
+        class `_Item`:
+            _Scaled: false
+        def `__init__`:
+            Future[QImage]: false
+        def `renderThumbnail`:
+            Future[QImage]: false
+        def `__getIcon`:
+            \N{Empty Set}: false
+        def `__on_future_done`:
+            Future[QImage]: false
+        def `__spin_icon`:
+            \N{Vertical Ellipsis}: false
+            \N{Up Right Diagonal Ellipsis}: false
+            \N{Midline Horizontal Ellipsis}: false
+            \N{Down Right Diagonal Ellipsis}: false

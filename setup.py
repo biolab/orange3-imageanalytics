@@ -111,7 +111,7 @@ if __name__ == '__main__':
         package_data=PACKAGE_DATA,
         keywords=KEYWORDS,
         classifiers=CLASSIFIERS,
-        setup_requires=["trubar>=0.3.2"],
+        setup_requires=["trubar>=0.3.3"],
         install_requires=[
             "AnyQt",
             "ndf >=0.1.4",

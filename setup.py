@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 import io
 import os
-import contextlib
-import importlib.metadata
-import subprocess
-import warnings
-import stat
 from os import path, walk
 
 from setuptools import setup, find_packages
@@ -115,7 +110,7 @@ if __name__ == '__main__':
             "AnyQt",
             "ndf >=0.1.4",
             "numpy >=1.16",
-            "Orange3 >=3.35.0",
+            "Orange3 >=3.37.0",
             "orange-canvas-core >=0.2.2",
             "orange-widget-base >=4.23.0",
             "pillow >=6.2.0",

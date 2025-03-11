@@ -103,7 +103,7 @@ class OWImportImages(widget.OWWidget):
     priority = 110
 
     class Outputs:
-        data = Output('Data', Table, default=True)
+        data = Output('Data', Table, default=True, dynamic=False)
 
     #: list of recent paths
     recent_paths = settings.Setting([])  # type: List[RecentPath]

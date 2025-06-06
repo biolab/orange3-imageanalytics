@@ -49,8 +49,22 @@ def run_embedding(
     The object that holds embedded images, skipped images, and number
     of skipped images.
     """
-    embedder = ImageEmbedder(model=embedder_name)
 
+    embedder = ImageEmbedder(model=embedder_name)
+    if embedder.is_local_embedder():
+        model_cls = embedder._model_settings["model"]
+        if not model_cls.is_cached():
+            def callback(count, total):
+                if state.is_interruption_requested():
+                    raise Exception()
+                if total > 0:
+                    state.set_progress_value(count / total * 100)
+            state.set_status("Downloading model. Please hold.")
+            try:
+                model_cls.download_from_hf(progress_callback=callback)
+            finally:
+                state.set_status("")
+                state.set_progress_value(0)
     def callback(s):
         if state.is_interruption_requested():
             raise Exception()
@@ -140,7 +154,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         )
         names = [
             EMBEDDERS_INFO[e]["name"]
-            + (" (local)" if EMBEDDERS_INFO[e].get("is_local") else "")
+            + (" (Remote)" if not EMBEDDERS_INFO[e].get("is_local") else "")
             for e in self.embedders
         ]
         self.cb_embedder.setModel(VariableListModel(names))

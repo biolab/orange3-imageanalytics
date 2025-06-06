@@ -4,6 +4,9 @@ import numpy as np
 from Orange.data import ContinuousVariable, Domain, Table, Variable
 from Orange.misc.utils.embedder_utils import EmbedderCache
 from Orange.util import dummy_callback
+from orangecontrib.imageanalytics.timm_model import InceptionV3, \
+    InceptionV4, ResNet18, ResNet50, ConvNeXt_Small, ConvNeXt_Tiny, ConvNeXt_Atto, \
+    Inception_Next_Atto, Inception_Next_Tiny
 
 from orangecontrib.imageanalytics.local_embedder import LocalEmbedder
 from orangecontrib.imageanalytics.server_embedder import ServerEmbedder
@@ -11,17 +14,98 @@ from orangecontrib.imageanalytics.squeezenet_model import SqueezenetModel
 from orangecontrib.imageanalytics.utils.image_utils import extract_paths
 
 MODELS = {
-    "inception-v3": {
+    "inceptionnext_atto-local": {
+        "name": "InceptionNeXt Atto",
+        "description": "InceptionNeXt image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 0,
+        "is_local": True,
+        "model": Inception_Next_Atto,
+    },
+    "inceptionnext_tiny-local": {
+        "name": "InceptionNeXt Tiny",
+        "description": "InceptionNeXt image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 0,
+        "is_local": True,
+        "model": Inception_Next_Tiny,
+    },
+    "inception-v3-local": {
         "name": "Inception v3",
         "description": "Google's Inception v3 model trained on ImageNet.",
         "target_image_size": (299, 299),
         "layers": ["penultimate"],
         "order": 0,
+        "is_local": True,
+        "model": InceptionV3,
+    },
+    "inception-v3": {
+        "name": "Inception v3",
+        "description": "Google's Inception v3 model trained on ImageNet.",
+        "target_image_size": (299, 299),
+        "layers": ["penultimate"],
+        "order": 1,
         # batch size tell how many images we send in parallel, this number is
         # high for inception since it has many workers, but other embedders
         # send less images since bottleneck are workers, this way we avoid
         # ReadTimeout because of images waiting in a queue at the server
         "batch_size": 500,
+    },
+    "inception-v4-local": {
+        "name": "Inception v4",
+        "description": "Google's Inception v4 model trained on ImageNet.",
+        "target_image_size": (299, 299),
+        "layers": ["penultimate"],
+        "order": 1,
+        "is_local": True,
+        "model": InceptionV4,
+    },
+    "resnet18-local": {
+        "name": "ResNet-B (18)",
+        "description": "18-layer image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 2,
+        "is_local": True,
+        "model": ResNet18,
+    },
+    "resnet50-local": {
+        "name": "ResNet-B (50)",
+        "description": "50-layer image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 2,
+        "is_local": True,
+        "model": ResNet50,
+    },
+    "convnext_small-local": {
+        "name": "ConvNeXt Small",
+        "description": "ConvNeXt image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 2,
+        "is_local": True,
+        "model": ConvNeXt_Small,
+    },
+    "convnext_tiny-local": {
+        "name": "ConvNeXt Tiny",
+        "description": "ConvNeXt image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 2,
+        "is_local": True,
+        "model": ConvNeXt_Tiny,
+    },
+    "convnext_atto-local": {
+        "name": "ConvNeXt Atto",
+        "description": "ConvNeXt image recognition model trained on\nImageNet.",
+        "target_image_size": (224, 224),
+        "layers": ["penultimate"],
+        "order": 2,
+        "is_local": True,
+        "model": ConvNeXt_Atto,
     },
     "painters": {
         "name": "Painters",

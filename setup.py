@@ -117,6 +117,10 @@ if __name__ == '__main__':
             "requests",
             "requests_cache",
             "scipy",
+            "onnxruntime",
+            "more_itertools",
+            "filelock",
+            "huggingface_hub",
         ],
         cmdclass={
             'install': InstallMultilingualCommand,

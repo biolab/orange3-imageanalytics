@@ -298,7 +298,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         log = logging.getLogger(__name__)
         log.debug(ex, exc_info=ex)
         self.cancel_button.setDisabled(True)
-        self.Error.unexpected_error(str(ex))
+        self.Error.unexpected_error(str(ex), exc_info=ex)
         self.clear_outputs()
 
     def cancel(self):

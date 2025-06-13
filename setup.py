@@ -113,7 +113,7 @@ if __name__ == '__main__':
             "Orange3 >=3.37.0",
             "orange-canvas-core >=0.2.2",
             "orange-widget-base >=4.23.0",
-            "pillow >=6.2.0",
+            "pillow >=10.2.0",
             "requests",
             "requests_cache",
             "scipy",

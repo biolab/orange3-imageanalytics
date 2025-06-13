@@ -226,7 +226,8 @@ class ImageEmbedder:
         Init local or server embedder.
         """
         if self.is_local_embedder():
-            self._embedder = LocalEmbedder(self.model, self._model_settings)
+            bsize = self._model_settings.get("batch_size", LocalEmbedder.DEFAULT_BATCH_SIZE)
+            self._embedder = LocalEmbedder(self.model, self._model_settings, batch_size=bsize)
         else:
             self._embedder = ServerEmbedder(
                 self.model,

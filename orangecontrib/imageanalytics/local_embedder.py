@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from concurrent import futures
 from typing import TypeVar, Sequence
+from threading import local
 
 import PIL.Image
 import numpy as np
@@ -21,15 +22,14 @@ class LocalEmbedder:
 
     def __init__(self, model, model_settings, batch_size=DEFAULT_BATCH_SIZE):
         self.embedder = model_settings["model"]()
-
         self._target_image_size = model_settings["target_image_size"]
-
         self._image_loader = ImageLoader()
         self._cache = EmbedderCache(model)
         self._executor = futures.ThreadPoolExecutor(
             thread_name_prefix="local-image-embeder-pool"
         )
         self.batch_size = batch_size
+        self._tlocal = local()
 
     def embedd_data(self, file_paths, callback=dummy_callback):
         all_embeddings = []
@@ -43,11 +43,20 @@ class LocalEmbedder:
         self._cache.persist_cache()
         return all_embeddings
 
+    def _load_image(self, path: str) -> PIL.Image.Image | None:
+        # Use a thread local image loader, due to requests-cache/issues/845
+        # (really a cpython sqlite bug)
+        try:
+            self._tlocal.image_loader
+        except AttributeError:
+            self._tlocal.image_loader = ImageLoader()
+        return self._tlocal.image_loader.load_image_or_none(path)
+
     def _embed_batch(
             self, paths: Sequence[str | None]
     ) -> Sequence[np.ndarray | None]:
         preprocess = self.embedder.preprocess
-        load_image = self._image_loader.load_image_or_none
+        load_image = self._load_image
         def image(path: str | None) -> np.ndarray | None:
             if not path:
                 return None

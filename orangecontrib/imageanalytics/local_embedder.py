@@ -102,23 +102,3 @@ class LocalEmbedder:
                     r.embedding = next(embeddings_iter)
                     self._cache.add(r.cache_key, r.embedding)
         return [r.embedding for r in results]
-
-    def _embed(self, file_path):
-        """ Load images and compute cache keys and send requests to
-        an http2 server for valid ones.
-        """
-
-        image = self._image_loader.load_image_or_none(file_path)
-        if image is None:
-            return None
-        image = self.embedder.preprocess(image)
-
-        cache_key = self._cache.md5_hash(image)
-        cached_im = self._cache.get_cached_result_or_none(cache_key)
-        if cached_im is not None:
-            return cached_im
-
-        embedded_image = self.embedder.predict(image)
-
-        self._cache.add(cache_key, embedded_image)
-        return embedded_image

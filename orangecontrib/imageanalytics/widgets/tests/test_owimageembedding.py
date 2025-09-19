@@ -3,6 +3,7 @@ from unittest import mock
 from unittest.mock import patch
 
 import numpy as np
+from AnyQt.QtCore import Qt
 
 from Orange.data import Table
 from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
@@ -14,6 +15,7 @@ from orangecontrib.imageanalytics.widgets.owimageembedding import \
     OWImageEmbedding
 from orangecontrib.imageanalytics.widgets.tests.utils import load_images
 
+DEFAULT_EMBEDDER = "InceptionNeXt Atto"
 
 class DummyCorpus(Table):
     pass
@@ -99,10 +101,11 @@ class TestOWImageEmbedding(WidgetTest):
         w = self.widget
 
         table = load_images()
-        self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
+        w.set_current_embedder("inception-v3")
+        self.assertEqual(w.cb_embedder.currentText(), "Inception v3 (Remote)")
         self.send_signal(w.Inputs.images, table)
         self.wait_until_finished()
-        self.assertEqual(w.cb_embedder.currentText(), "SqueezeNet (local)")
+        self.assertEqual(w.cb_embedder.currentText(), "SqueezeNet")
 
         output = self.get_output(self.widget.Outputs.embeddings)
         self.assertIsInstance(output, Table)
@@ -117,12 +120,14 @@ class TestOWImageEmbedding(WidgetTest):
         w = self.widget
         table = load_images()
 
-        self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
+        self.assertEqual(w.cb_embedder.currentText(), DEFAULT_EMBEDDER)
         self.send_signal(w.Inputs.images, table)
 
-        simulate.combobox_activate_index(self.widget.controls.cb_embedder_current_id, 3)
-        self.assertEqual("VGG-19", w.cb_embedder.currentText())
-        self.assertEqual("vgg19", w.embedders[w.cb_embedder_current_id])
+        simulate.combobox_activate_item(
+            self.widget.cb_embedder, "squeezenet", Qt.UserRole
+        )
+        self.assertEqual("SqueezeNet", w.cb_embedder.currentText())
+        self.assertEqual("squeezenet", w.current_embedder)
 
     def test_not_image_data_attributes(self):
         """
@@ -132,10 +137,8 @@ class TestOWImageEmbedding(WidgetTest):
         table = Table("iris")
         self.send_signal(w.Inputs.images, table)
         self.wait_until_finished()
-
-        # it should jut not chrash
-        cbox = self.widget.controls.cb_embedder_current_id
-        simulate.combobox_activate_index(cbox, 3)
+        # it should not crash
+        simulate.combobox_activate_index(self.widget.cb_embedder, 3)
 
     def test_cancel_embedding(self):
         table = load_images()
@@ -168,7 +171,8 @@ class TestOWImageEmbedding(WidgetTest):
         w = self.widget
 
         table = load_images()
-        self.assertEqual(w.cb_embedder.currentText(), "Inception v3")
+        w.set_current_embedder("inception-v3")
+        self.assertEqual(w.cb_embedder.currentText(), "Inception v3 (Remote)")
         self.send_signal(w.Inputs.images, table)
         self.wait_until_finished()
 
@@ -199,6 +203,12 @@ class TestOWImageEmbedding(WidgetTest):
             1, len(self.get_output(self.widget.Outputs.embeddings))
         )
 
+    def test_migration_v2(self):
+        w = self.create_widget(OWImageEmbedding, stored_settings={
+            "__version__": 1,
+            "cb_embedder_current_id": 1,
+        })
+        self.assertEqual(w.current_embedder, "squeezenet")
 
 if __name__ == "__main__":
     unittest.main()

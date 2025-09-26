@@ -7,6 +7,8 @@ import os
 
 import numpy as np
 from AnyQt.QtWidgets import QFileDialog
+from AnyQt.QtCore import Qt
+
 from PIL import Image
 
 from Orange.data import Table, Domain
@@ -253,11 +255,13 @@ class TestOWSaveImages(WidgetTest):
         self.assertFalse((512, 512) == size)
 
         # change scale
-        simulate.combobox_activate_index(self.widget.controls.scale_index, 1)
+        simulate.combobox_activate_item(
+            self.widget.scale_combo, "squeezenet", role=Qt.ItemDataRole.UserRole
+        )
         self.wait_until_finished()
         with Image.open(image_path) as im:
             size = im.size
-        # second option is squeezenet with scale 227x227
+        # squeezenet with scale 227x227
         self.assertTupleEqual((227, 227), size)
 
     def test_save_one_class_only(self):

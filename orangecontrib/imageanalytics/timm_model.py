@@ -8,11 +8,10 @@ from __future__ import annotations
 import ast
 import os
 import tempfile
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
 
 import numpy as np
 import PIL.Image
-import onnxruntime as ort
 import huggingface_hub
 
 from orangecanvas.utils import findf
@@ -24,6 +23,9 @@ from orangecontrib.imageanalytics.utils import (
 from orangecontrib.imageanalytics.transforms import (
     Module, Resize, CenterCrop, MaybeToTensor, Normalize, Compose
 )
+
+if TYPE_CHECKING:
+    import onnxruntime as ort
 
 HF_REPO_ID = "ales-erjavec/embedders-onnx"  # test
 
@@ -50,6 +52,7 @@ class LocalEmbedderModel:
 class ORTModel(LocalEmbedderModel):
     """Embedder model using ONNXRuntime for inference."""
     def __init__(self, model: str|ort.InferenceSession, name=None):
+        import onnxruntime as ort
         if not isinstance(model, ort.InferenceSession):
             model = ort.InferenceSession(model)
         self.model = model
@@ -92,6 +95,7 @@ class TimmModel(ORTModel):
     ModelName: ClassVar[str]
 
     def __init__(self):
+        import onnxruntime as ort
         super().__init__(ort.InferenceSession(self.cached_model_path), self.ModelName)
 
     @classproperty

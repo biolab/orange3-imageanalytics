@@ -23,7 +23,19 @@ class DummyCorpus(Table):
 
 class TestOWImageEmbedding(WidgetTest):
     def setUp(self):
+        super().setUp()
         self.widget = self.create_widget(OWImageEmbedding)
+
+    def get_output(self, output=None, widget=None, wait=5000, check_error=True):
+        w = widget or self.widget
+        res = super().get_output(output, widget, wait)
+        if check_error and w.Error.unexpected_error.is_shown():
+            message = str(w.Error.unexpected_error)
+            if w.Error.unexpected_error.tb:
+                message += f"\n{w.Error.unexpected_error.tb}"
+            raise Exception(message)
+        else:
+            return res
 
     def test_not_image_data(self):
         """
@@ -176,7 +188,7 @@ class TestOWImageEmbedding(WidgetTest):
         self.send_signal(w.Inputs.images, table)
         self.wait_until_finished()
 
-        output = self.get_output(self.widget.Outputs.embeddings)
+        output = self.get_output(self.widget.Outputs.embeddings, check_error=False)
         self.assertIsNone(output)
         self.widget.Error.unexpected_error.is_shown()
         self.assertEqual(

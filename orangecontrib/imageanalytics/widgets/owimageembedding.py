@@ -214,6 +214,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     def set_data(self, data):
         self.Warning.clear()
         self.set_input_data_summary(data)
+        self.cancel()
         self.clear_outputs()
 
         if not data:

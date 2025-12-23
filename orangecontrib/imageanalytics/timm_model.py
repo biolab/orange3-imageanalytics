@@ -120,7 +120,8 @@ class TimmModel(ORTModel):
                 torch.onnx.export(
                     model,
                     (torch.rand((1, *input_size)).to(dtype),),
-                    f,
+                    f.name,
+                    dynamo=False,
                     input_names=["input"],
                     output_names=["output"],
                     dynamic_axes={"input": [0]},
@@ -130,15 +131,18 @@ class TimmModel(ORTModel):
         # add penultimate layer output to model output
         classifier = model.pretrained_cfg.get("classifier", None)
         nodes = list(onnx_model.graph.node)
+        node = None
         if classifier:
             classifier = "/" + classifier.replace(".", "/") # onnx node naming convention
             # find the classifier node
             node = findf(nodes, lambda n: n.name.startswith(classifier))
-            if node is None:
-                raise ValueError("Could not map classifier node too onnx")
-        else:
+        if node is None:
+            # try matching by output name
+            node = findf(nodes, lambda n: "output" in n.output)
+        if node is None:
             # Just assume last node
             node = list(onnx_model.graph.node)[-1]
+
         inputs = [inp for inp in node.input if inp.startswith("/")]
         if len(inputs) != 1:
             raise ValueError(f"Expected one non constant input got: {inputs}")

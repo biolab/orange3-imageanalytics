@@ -14,7 +14,7 @@ class classproperty(property):
 
 
 @contextmanager
-def atomic_update(path: str, mode="wb"):
+def atomic_update(path: str, mode="wb", **kwargs):
     """
     A context manager implementing an 'atomic' file update (replace).
 
@@ -27,11 +27,16 @@ def atomic_update(path: str, mode="wb"):
     ----
     The executing user must have the permissions to create files in
     the target directory.
+
+    Example
+    -------
+    >>> with atomic_update(path) as f:
+    ...    f.write("hello world")
     """
     dirname, basename = os.path.dirname(path), os.path.basename(path)
     fd, fn = tempfile.mkstemp(dir=dirname, suffix=f"{basename}-")
     try:
-        with open(fd, mode) as f:
+        with open(fd, mode, **kwargs) as f:
             yield f
             os.chmod(fn, 0o644)
     except BaseException:

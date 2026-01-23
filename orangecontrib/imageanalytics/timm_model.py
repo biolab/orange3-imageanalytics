@@ -5,9 +5,9 @@ Models are converted from timm torch models to float16 ONNX models.
 """
 from __future__ import annotations
 
-import ast
 import os
 import tempfile
+import json
 from typing import Any, ClassVar, TYPE_CHECKING
 
 import numpy as np
@@ -51,16 +51,16 @@ class LocalEmbedderModel:
 
 class ORTModel(LocalEmbedderModel):
     """Embedder model using ONNXRuntime for inference."""
+
+    #: The input data type
+    dtype: np.float16
+
     def __init__(self, model: str|ort.InferenceSession, name=None):
         import onnxruntime as ort
         if not isinstance(model, ort.InferenceSession):
             model = ort.InferenceSession(model)
         self.model = model
         self.name = name
-        meta = self.model.get_modelmeta().custom_metadata_map
-        cfg_s: str = meta["cfg"]
-        cfg = ast.literal_eval(cfg_s)
-        self.transform = self._create_transform(cfg)
 
     @classmethod
     def _create_transform(cls, cfg: dict[str, Any]) -> Module:
@@ -82,9 +82,12 @@ class ORTModel(LocalEmbedderModel):
         ])
 
     def predict(self, image: np.ndarray) -> np.ndarray:
+        """
+        Predict the image embeddings using the model.
+        """
         if image.ndim == 3:
             image = image[None, :]
-        image = image.astype(np.float16)
+        image = image.astype(self.dtype)
         _, embeddings, = self.model.run(None, {"input": image})
         return embeddings
 
@@ -97,6 +100,13 @@ class TimmModel(ORTModel):
     def __init__(self):
         import onnxruntime as ort
         super().__init__(ort.InferenceSession(self.cached_model_path), self.ModelName)
+        self._load_config()
+
+    def _load_config(self):
+        config_path = self.cached_config_path
+        with open(config_path, "r", encoding="utf-8") as f:
+            self.cfg = json.load(f)
+        self.transform = self._create_transform(self.cfg)
 
     @classproperty
     def model_filename(self):
@@ -105,6 +115,14 @@ class TimmModel(ORTModel):
     @classproperty
     def cached_model_path(self):
         return cached_path(self.model_filename)
+
+    @classproperty
+    def config_filename(self):
+        return f"{self.ModelName}-f16.config.json"
+
+    @classproperty
+    def cached_config_path(self):
+        return cached_path(self.config_filename)
 
     @classmethod
     def convert_from_hf(cls, path=None):
@@ -164,30 +182,42 @@ class TimmModel(ORTModel):
         assert cfg["interpolation"] in [e.value for e in Resize.InterpolationMode]
         assert cfg["crop_mode"] in ("center", "squash")
         assert model.pretrained_cfg.get("normalize", True)
-        # Add image transform metadata to onnx model
+         # Add image transform metadata to onnx model
         cfg_value = onnx_model.metadata_props.add()
         cfg_value.key = "cfg"
         cfg_value.value = str(cfg)
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
+
         with atomic_update(path, "wb") as f:
             f.write(onnx_model.SerializeToString())
+        # Save image transform metadata to a separate config.json file
+        config_path = os.path.splitext(path)[0] + ".config.json"
+        with atomic_update(config_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
 
     @classmethod
     def download_from_hf(cls, *, force=False, progress_callback=None):
+        """Download model and config from HuggingFace Hub"""
         # hf_hub_download lacks progress report hook so we go long way
         url = huggingface_hub.hf_hub_url(HF_REPO_ID, cls.model_filename)
         download_url_to_file(url, cls.cached_model_path, progress_callback=progress_callback, force=force)
+        url = huggingface_hub.hf_hub_url(HF_REPO_ID, cls.config_filename)
+        download_url_to_file(url, cls.cached_config_path, progress_callback=progress_callback, force=force)
 
     @classmethod
     def upload_to_hf(cls):
+        """Upload model and config to HuggingFace Hub"""
         huggingface_hub.upload_file(
             cls.cached_model_path, cls.model_filename, HF_REPO_ID, repo_type="model"
+        )
+        huggingface_hub.upload_file(
+            cls.cached_config_path, cls.config_filename, HF_REPO_ID, repo_type="model"
         )
 
     @classmethod
     def is_cached(cls):
-        return os.path.isfile(cls.cached_model_path)
+        return os.path.isfile(cls.cached_model_path) and os.path.isfile(cls.cached_config_path)
 
 
 class InceptionV3(TimmModel):

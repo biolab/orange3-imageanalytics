@@ -117,10 +117,7 @@ if __name__ == '__main__':
             "requests",
             "requests_cache",
             "scipy",
-            # limited on windows due to bundled msvc runtime incompatibility
-            # with PyQt https://www.riverbankcomputing.com/pipermail/pyqt/2025-November/046378.html
-            "onnxruntime < 1.21; sys_platform=='win32'",
-            "onnxruntime; sys_platform!='win32'",
+            "onnxruntime",
             "more_itertools",
             "filelock",
             "huggingface_hub",

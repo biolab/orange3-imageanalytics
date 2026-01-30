@@ -5,10 +5,11 @@ Models are converted from timm torch models to float16 ONNX models.
 """
 from __future__ import annotations
 
+import multiprocessing
 import os
 import tempfile
 import json
-from typing import Any, ClassVar, TYPE_CHECKING
+from typing import Any, ClassVar
 
 import numpy as np
 import PIL.Image
@@ -16,6 +17,7 @@ import huggingface_hub
 
 from orangecanvas.utils import findf
 from Orange.misc.environ import data_dir
+from orangecontrib.imageanalytics import onnxrunner
 
 from orangecontrib.imageanalytics.utils import (
     classproperty, atomic_update, download_url_to_file
@@ -23,9 +25,6 @@ from orangecontrib.imageanalytics.utils import (
 from orangecontrib.imageanalytics.transforms import (
     Module, Resize, CenterCrop, MaybeToTensor, Normalize, Compose
 )
-
-if TYPE_CHECKING:
-    import onnxruntime as ort
 
 HF_REPO_ID = "ales-erjavec/embedders-onnx"  # test
 
@@ -50,17 +49,49 @@ class LocalEmbedderModel:
 
 
 class ORTModel(LocalEmbedderModel):
-    """Embedder model using ONNXRuntime for inference."""
+    """
+    Embedder model using ONNXRuntime for inference.
+
+    Parameters:
+        model_path (str): Path to the ONNX model file.
+        name (str): Name of the model.
+
+    Note:
+        This class uses the `multiprocessing` module to run inference in a
+        subprocess with minimal dll environment to avoid conflicts with
+        other python packages. This is a workaround for the issue described in
+        https://www.riverbankcomputing.com/pipermail/pyqt/2025-November/046378.html
+
+    Example:
+        >>> with ORTModel("path/to/model.onnx") as model:
+        ...     image = PIL.Image.open("image.jpg")
+        ...     features = model.predict(model.preprocess(image))
+
+    """
 
     #: The input data type
     dtype: np.float16
 
-    def __init__(self, model: str|ort.InferenceSession, name=None):
-        import onnxruntime as ort
-        if not isinstance(model, ort.InferenceSession):
-            model = ort.InferenceSession(model)
-        self.model = model
+    def __init__(self, model_path: str, name=None):
+        self.model_path = model_path
         self.name = name
+        self._pool: multiprocessing.Pool | None = None
+
+    def __enter__(self):
+        if self._pool is None:
+            context = multiprocessing.get_context("spawn")
+            self._pool = context.Pool(
+                processes=1,
+                initializer=onnxrunner.Session.set_global_session,
+                initargs=(self.model_path,)
+            )
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._pool is not None:
+            self._pool.close()
+            self._pool.join()
+            self._pool = None
 
     @classmethod
     def _create_transform(cls, cfg: dict[str, Any]) -> Module:
@@ -88,7 +119,9 @@ class ORTModel(LocalEmbedderModel):
         if image.ndim == 3:
             image = image[None, :]
         image = image.astype(self.dtype)
-        _, embeddings, = self.model.run(None, {"input": image})
+        _, embeddings = self._pool.apply(
+            onnxrunner.Session.global_session_run, (None, {"input": image})
+        )
         return embeddings
 
 
@@ -98,8 +131,7 @@ class TimmModel(ORTModel):
     ModelName: ClassVar[str]
 
     def __init__(self):
-        import onnxruntime as ort
-        super().__init__(ort.InferenceSession(self.cached_model_path), self.ModelName)
+        super().__init__(self.cached_model_path, self.ModelName)
         self._load_config()
 
     def _load_config(self):

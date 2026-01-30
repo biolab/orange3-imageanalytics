@@ -35,11 +35,12 @@ class LocalEmbedder:
         all_embeddings = []
         i = 0
         callback(0)
-        for chunk in batched(file_paths, self.batch_size):
-            embs = self._embed_batch(chunk)
-            all_embeddings.extend(embs)
-            i += len(embs)
-            callback(i / len(file_paths))
+        with self.embedder:
+            for chunk in batched(file_paths, self.batch_size):
+                embs = self._embed_batch(chunk)
+                all_embeddings.extend(embs)
+                i += len(embs)
+                callback(i / len(file_paths))
         self._cache.persist_cache()
         return all_embeddings
 
@@ -95,7 +96,8 @@ class LocalEmbedder:
         imgs = [r.image for r, masked in zip(results, mask) if masked]
         if imgs:
             assert len({img.shape for img in imgs}) == 1
-            embeddings = self.embedder.predict(np.stack(imgs))
+            imgs = np.stack(imgs, dtype=self.embedder.dtype)
+            embeddings = self.embedder.predict(imgs)
             embeddings_iter = iter(embeddings)
             for r, masked in zip(results, mask):
                 if masked:

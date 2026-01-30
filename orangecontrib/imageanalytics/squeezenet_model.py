@@ -11,6 +11,10 @@ class SqueezenetModel:
     """
     Squeezenet model wrapper.
     """
+    # These are defined for compatibility with LocalEmbederModel
+    dtype = np.float64
+    def __enter__(self): pass
+    def __exit__(self, *args): pass
 
     def __init__(self):
         self.__model = squeezenet(include_softmax=False)

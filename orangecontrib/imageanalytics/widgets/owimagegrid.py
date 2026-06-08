@@ -61,7 +61,7 @@ DEFAULT_SELECTION_PEN = QPen(QColor(125, 162, 206, 192))
 class OWImageGrid(widget.OWWidget):
     name = "Image Grid"
     description = "Visualize images in a similarity grid"
-    icon = "icons/ImageGrid.svg"
+    icon = "icons/ImageGrid-symbolic.svg"
     priority = 160
     keywords = "image grid, image, grid, similarity"
     graph_name = "scene"  # QGraphicsScene

@@ -70,7 +70,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     name = "Image Embedding"
     description = "Image embedding through deep neural networks."
     keywords = "image embedding, embedding, image"
-    icon = "icons/ImageEmbedding.svg"
+    icon = "icons/ImageEmbedding-symbolic.svg"
     priority = 150
 
     want_main_area = False

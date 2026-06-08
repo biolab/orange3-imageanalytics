@@ -99,7 +99,7 @@ class OWImportImages(widget.OWWidget):
     name = "Import Images"
     description = "Import images from a directory(s)"
     keywords = "import images, import, image, read, load"
-    icon = "icons/ImportImages.svg"
+    icon = "icons/ImportImages-symbolic.svg"
     priority = 110
 
     class Outputs:

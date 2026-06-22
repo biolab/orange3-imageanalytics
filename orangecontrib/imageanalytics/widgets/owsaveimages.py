@@ -111,7 +111,7 @@ def _prepare_dir_and_save_images(
 class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
     name = "Save Images"
     description = "Save images in the directory structure."
-    icon = "icons/SaveImages.svg"
+    icon = "icons/SaveImages-symbolic.svg"
     keywords = "save images, save, images"
 
     userhome = os.path.expanduser(f"~{os.sep}")

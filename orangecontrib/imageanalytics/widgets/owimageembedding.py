@@ -3,7 +3,10 @@ from types import SimpleNamespace
 from typing import Optional
 
 from AnyQt.QtCore import Qt
-from AnyQt.QtWidgets import QLayout, QPushButton, QStyle
+from AnyQt.QtWidgets import QPushButton, QStyle
+from AnyQt.QtWidgets import QFormLayout
+
+from orangewidget.utils.combobox import ComboBox
 
 from Orange.data import Table, Variable
 from Orange.misc.utils.embedder_utils import EmbeddingConnectionError
@@ -49,8 +52,22 @@ def run_embedding(
     The object that holds embedded images, skipped images, and number
     of skipped images.
     """
-    embedder = ImageEmbedder(model=embedder_name)
 
+    embedder = ImageEmbedder(model=embedder_name)
+    if embedder.is_local_embedder():
+        model_cls = embedder._model_settings["model"]
+        if not model_cls.is_cached():
+            def callback(count, total):
+                if state.is_interruption_requested():
+                    raise Exception()
+                if total > 0:
+                    state.set_progress_value(count / total * 100)
+            state.set_status("Downloading model. Please hold.")
+            try:
+                model_cls.download_from_hf(progress_callback=callback)
+            finally:
+                state.set_status("")
+                state.set_progress_value(0)
     def callback(s):
         if state.is_interruption_requested():
             raise Exception()
@@ -75,6 +92,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
     want_main_area = False
     buttons_area_orientation = Qt.Vertical
+    resizing_enabled = False
     _auto_apply = Setting(default=True)
 
     class Inputs:
@@ -96,8 +114,10 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     class Error(OWWidget.Error):
         unexpected_error = Msg("Embedding error: {}")
 
+    settings_version = 2
     cb_image_attr_current_id = Setting(default=0)
-    cb_embedder_current_id = Setting(default=0)
+
+    current_embedder: str = Setting("inceptionnext_atto-local")
     _previous_attr_id = None
     _previous_embedder_id = None
 
@@ -117,41 +137,43 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self._setup_layout()
 
     def _setup_layout(self):
-        self.controlArea.setMinimumWidth(self.controlArea.sizeHint().width())
-        self.layout().setSizeConstraint(QLayout.SetFixedSize)
+        form = QFormLayout(
+            spacing=8,
+            labelAlignment=Qt.AlignLeft,
+            formAlignment=Qt.AlignLeft,
+            fieldGrowthPolicy=QFormLayout.AllNonFixedFieldsGrow
+        )
+        gui.widgetBox(self.controlArea, "Settings", orientation=form)
 
-        widget_box = gui.widgetBox(self.controlArea, "Settings")
         self.cb_image_attr = gui.comboBox(
-            widget=widget_box,
+            widget=None,
             master=self,
             value="cb_image_attr_current_id",
             label="Image attribute:",
             orientation=Qt.Horizontal,
             callback=self._cb_image_attr_changed,
         )
-
-        self.cb_embedder = gui.comboBox(
-            widget=widget_box,
-            master=self,
-            value="cb_embedder_current_id",
-            label="Embedder:",
-            orientation=Qt.Horizontal,
-            callback=self._cb_embedder_changed,
-        )
+        self.cb_embedder = ComboBox()
         names = [
-            EMBEDDERS_INFO[e]["name"]
-            + (" (local)" if EMBEDDERS_INFO[e].get("is_local") else "")
+            (e, EMBEDDERS_INFO[e]["name"]
+            + (" (Remote)" if not EMBEDDERS_INFO[e].get("is_local") else ""))
             for e in self.embedders
         ]
-        self.cb_embedder.setModel(VariableListModel(names))
-        if not self.cb_embedder_current_id < len(self.embedders):
-            self.cb_embedder_current_id = 0
-        self.cb_embedder.setCurrentIndex(self.cb_embedder_current_id)
+        for key, name in names:
+            self.cb_embedder.addItem(name, userData=key)
 
-        current_embedder = self.embedders[self.cb_embedder_current_id]
+        index = self.cb_embedder.findData(self.current_embedder)
+        if index == -1:
+            index = 0
+        self.cb_embedder.setCurrentIndex(index)
+        current_embedder = self.cb_embedder.currentData()
+        self.cb_embedder.currentIndexChanged.connect(self._cb_embedder_changed)
         self.embedder_info = gui.widgetLabel(
-            widget_box, EMBEDDERS_INFO[current_embedder]["description"]
+            None, EMBEDDERS_INFO[current_embedder]["description"]
         )
+        form.addRow("Image attribute:", self.cb_image_attr)
+        form.addRow("Embedder:", self.cb_embedder)
+        form.setWidget(2, QFormLayout.ItemRole.SpanningRole, self.embedder_info)
 
         self.auto_commit_widget = gui.auto_commit(
             widget=self.buttonsArea,
@@ -192,6 +214,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     def set_data(self, data):
         self.Warning.clear()
         self.set_input_data_summary(data)
+        self.cancel()
         self.clear_outputs()
 
         if not data:
@@ -213,31 +236,35 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
         self._input_data = data
         self._previous_attr_id = self.cb_image_attr_current_id
-        self._previous_embedder_id = self.cb_embedder_current_id
-
         self.commit.now()
 
     def _cb_image_attr_changed(self):
-        self._cb_changed()
-
-    def _cb_embedder_changed(self):
-        self.Warning.switched_local_embedder.clear()
-        current_embedder = self.embedders[self.cb_embedder_current_id]
-        self.embedder_info.setText(
-            EMBEDDERS_INFO[current_embedder]["description"]
-        )
-        self._cb_changed()
-
-    def _cb_changed(self):
-        if (
-            self._previous_embedder_id != self.cb_embedder_current_id
-            or self._previous_attr_id != self.cb_image_attr_current_id
-        ):
+        if self._previous_attr_id != self.cb_image_attr_current_id:
             # recompute embeddings only when selected value in dropdown changes
-            self._previous_embedder_id = self.cb_embedder_current_id
             self._previous_attr_id = self.cb_image_attr_current_id
             self.cancel()
             self.commit.deferred()
+
+    def _cb_embedder_changed(self):
+        key = self.cb_embedder.currentData()
+        self.set_current_embedder(key)
+
+    def set_current_embedder(self, key):
+        """Set current selected embedder
+
+        `key` must key into EMBEDDERS_INFO
+        """
+        index = self.cb_embedder.findData(key)
+        assert index != -1
+        if self.current_embedder != key:
+            self.cb_embedder.setCurrentIndex(index)
+            self.current_embedder = key
+            self.embedder_info.setText(
+                EMBEDDERS_INFO[key]["description"]
+            )
+            self.cancel()
+            self.commit.deferred()
+            self.Warning.switched_local_embedder.clear()
 
     @gui.deferred
     def commit(self):
@@ -247,7 +274,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
         self.cancel_button.setDisabled(False)
 
-        embedder_name = self.embedders[self.cb_embedder_current_id]
+        embedder_name = self.current_embedder
         image_attribute = self._image_attributes[self.cb_image_attr_current_id]
         self.start(
             run_embedding, self._input_data, image_attribute, embedder_name
@@ -284,7 +311,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         log = logging.getLogger(__name__)
         log.debug(ex, exc_info=ex)
         self.cancel_button.setDisabled(True)
-        self.Error.unexpected_error(str(ex))
+        self.Error.unexpected_error(str(ex), exc_info=ex)
         self.clear_outputs()
 
     def cancel(self):
@@ -293,7 +320,7 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
     def _switch_to_local_embedder(self):
         self.Warning.switched_local_embedder()
-        self.cb_embedder_current_id = self.embedders.index("squeezenet")
+        self.set_current_embedder("squeezenet")
 
     def _send_output_signals(self, result: Result) -> None:
         self.Warning.images_skipped.clear()
@@ -311,6 +338,21 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
     def onDeleteWidget(self):
         self.cancel()
         super().onDeleteWidget()
+
+    @classmethod
+    def migrate_settings(cls, settings, version):
+        if version is None or version < 2:
+            cb_embedder_current_id = settings.pop("cb_embedder_current_id", 0)
+            current_embedder = [
+                "inception-v3",
+                "squeezenet",
+                "vgg16",
+                "vgg19",
+                "painters",
+                "deeploc",
+                "openface",
+            ][cb_embedder_current_id]
+            settings["current_embedder"] = current_embedder
 
 
 if __name__ == "__main__":

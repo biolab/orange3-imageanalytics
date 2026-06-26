@@ -11,6 +11,10 @@ class SqueezenetModel:
     """
     Squeezenet model wrapper.
     """
+    # These are defined for compatibility with LocalEmbederModel
+    dtype = np.float64
+    def __enter__(self): pass
+    def __exit__(self, *args): pass
 
     def __init__(self):
         self.__model = squeezenet(include_softmax=False)
@@ -28,12 +32,11 @@ class SqueezenetModel:
         Returns
         -------
         image : np.ndarray
-            An array of size (1, 227, 227, 3).
+            An array of size (227, 227, 3).
         """
+        image = image.resize((227, 227), PIL.Image.LANCZOS)
         mean_pixel = [104.006, 116.669, 122.679]  # imagenet centering
         image = np.array(image, dtype=float)
-        if len(image.shape) < 4:
-            image = image[None, ...]
         swap_img = np.array(image)
         img_out = np.array(swap_img)
         img_out[:, :, 0] = swap_img[:, :, 2]  # from rgb to bgr - caffe mode
@@ -47,11 +50,20 @@ class SqueezenetModel:
         Parameters
         ----------
         image : np.ndarray
-            An array of size (1, 227, 227, 3).
+            An array of size (N, 227, 227, 3).
 
         Returns
         -------
         embedding : np.ndarray
-            An array of size (1000,).
+            An array of size (N, 1000,).
         """
-        return self.__model.predict([image])[0][0]
+        res = []
+        for img in image:
+            if img.ndim < 4:
+                img = img[None, :]
+            res.append(self.__model.predict([img])[0][0])
+        return np.stack(res)
+
+    @classmethod
+    def is_cached(cls):
+        return True

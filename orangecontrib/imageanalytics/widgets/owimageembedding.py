@@ -98,6 +98,9 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
     cb_image_attr_current_id = Setting(default=0)
     cb_embedder_current_id = Setting(default=0)
+    custom_server = Setting(default=False)
+    server_url = Setting(default="")
+
     _previous_attr_id = None
     _previous_embedder_id = None
 
@@ -153,6 +156,15 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
             widget_box, EMBEDDERS_INFO[current_embedder]["description"]
         )
 
+        advanced_box = gui.widgetBox(self.controlArea, 'Custom server')
+        self.use_custom_server_cb = gui.checkBox(
+            advanced_box, self, 'custom_server', "Use private server",
+            callback=self.changed_server_url)
+        self.server_url_box = gui.lineEdit(
+            advanced_box, self, 'server_url', label="Server URL: ",
+            tooltip='The url of the server for calculating image embeddings',
+            orientation=Qt.Horizontal, callback=self.changed_server_url)
+
         self.auto_commit_widget = gui.auto_commit(
             widget=self.buttonsArea,
             master=self,
@@ -167,26 +179,6 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
         self.cancel_button.clicked.connect(self.cancel)
         self.buttonsArea.layout().addWidget(self.cancel_button)
         self.cancel_button.setDisabled(True)
-
-    def set_input_data_summary(self, data):
-        if data is None:
-            self.info.set_input_summary(self.info.NoInput)
-        else:
-            self.info.set_input_summary(
-                str(len(data)), f"Data have {len(data)} instances"
-            )
-
-    def set_output_data_summary(self, data_emb, data_skip):
-        if data_emb is None and data_skip is None:
-            self.info.set_output_summary(self.info.NoOutput)
-        else:
-            success = 0 if data_emb is None else len(data_emb)
-            skip = 0 if data_skip is None else len(data_skip)
-            self.info.set_output_summary(
-                f"{success}",
-                f"{success} images successfully embedded ,\n"
-                f"{skip} images skipped.",
-            )
 
     @Inputs.images
     def set_data(self, data):
@@ -219,6 +211,10 @@ class OWImageEmbedding(OWWidget, ConcurrentWidgetMixin):
 
     def _cb_image_attr_changed(self):
         self._cb_changed()
+
+    def changed_server_url(self):
+        self._init_server_connection()
+        self.server_url_box.setDisabled(not self.custom_server)
 
     def _cb_embedder_changed(self):
         self.Warning.switched_local_embedder.clear()

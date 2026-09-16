@@ -7,6 +7,8 @@ import os
 
 import numpy as np
 from AnyQt.QtWidgets import QFileDialog
+from AnyQt.QtCore import Qt
+
 from PIL import Image
 
 from Orange.data import Table, Domain
@@ -23,20 +25,24 @@ LOCAL_IMAGES = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_i
 
 class TestOWSaveImages(WidgetTest):
 
+    @classmethod
+    def setUpClass(cls):
+        cls.data = Table("https://datasets.biolab.si//core/bone-healing.xlsx")
+        # reduce the dataset - take data of both classes
+        cls.data = cls.data[16:22]
+        super().setUpClass()
+
     def setUp(self):
         self.widget = self.create_widget(OWSaveImages)
-        self.data = Table("https://datasets.biolab.si//core/bone-healing.xlsx")
-        # reduce the dataset - take data of both classes
-        self.data = self.data[16:22]
-
         # Create a temporary directory
         self.test_dir = tempfile.mkdtemp()
+        super().setUp()
 
     def tearDown(self):
-        # Close the file, the directory will be removed after the test
         self.widget.cancel()
-        self.widgets.remove(self.widget)
-        self.wait_until_finished()
+        self.widget.onDeleteWidget()
+        super().tearDown()
+        shutil.rmtree(self.test_dir)
 
     def test_dataset(self):
         self.widget.auto_save = True
@@ -249,11 +255,13 @@ class TestOWSaveImages(WidgetTest):
         self.assertFalse((512, 512) == size)
 
         # change scale
-        simulate.combobox_activate_index(self.widget.controls.scale_index, 1)
+        simulate.combobox_activate_item(
+            self.widget.scale_combo, "squeezenet", role=Qt.ItemDataRole.UserRole
+        )
         self.wait_until_finished()
         with Image.open(image_path) as im:
             size = im.size
-        # second option is squeezenet with scale 227x227
+        # squeezenet with scale 227x227
         self.assertTupleEqual((227, 227), size)
 
     def test_save_one_class_only(self):

@@ -14,12 +14,12 @@ class TestSqueezenetModel(unittest.TestCase):
 
     def test_preprocess(self):
         image = self.embedder.preprocess(self.image)
-        self.assertEqual(image.shape, (1, 227, 227, 3))
+        self.assertEqual(image.shape, (227, 227, 3))
 
     def test_predict(self):
         image = self.embedder.preprocess(self.image)
-        embedding = self.embedder.predict(image)
-        self.assertEqual(embedding.shape, (1000,))
+        embedding = self.embedder.predict(image[None, :])
+        self.assertEqual(embedding.shape, (1, 1000,))
 
 
 if __name__ == "__main__":

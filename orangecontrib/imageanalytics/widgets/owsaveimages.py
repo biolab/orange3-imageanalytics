@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 from AnyQt.QtWidgets import QFileDialog, QGridLayout, QMessageBox
 from AnyQt.QtCore import Qt, QSize
 
+from orangewidget.utils.combobox import ComboBox
+
 from Orange.data.table import Table
 from Orange.widgets import gui, widget
 from Orange.widgets.utils.concurrent import TaskState, ConcurrentWidgetMixin
@@ -126,12 +128,12 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
 
     want_main_area = False
     resizing_enabled = False
-
+    settings_version = 2
     last_dir: str = Setting("")
     dirname: str = Setting("", schema_only=True)
     auto_save: bool = Setting(False)
     use_scale: bool = Setting(False)
-    scale_index: int = Setting(0)
+    scale_key: str = Setting("inception-v3")
     file_format_index: int = Setting(0)
     image_attr_current_index: int = Setting(0)
 
@@ -174,14 +176,19 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
             label="Scale images to ",
             callback=self.setting_changed
         )
-        self.scale_combo = gui.comboBox(
-            widget=hbox_scale,
-            master=self,
-            value="scale_index",
-            items=["{} ({}×{})".format(v["name"], *v["target_image_size"])
-                   for v in self.available_scales],
-            callback=self.setting_changed
-        )
+        self.scale_combo = ComboBox()
+        for key, v in sorted(MODELS.items(), key=lambda kv: kv[1]["order"]):
+            self.scale_combo.addItem(
+                "{} ({}×{})".format(v["name"], *v["target_image_size"]),
+                key,
+            )
+        idx = self.scale_combo.findData(self.scale_key, Qt.ItemDataRole.UserRole)
+        if idx < 0:
+            idx = 0
+        self.scale_combo.setCurrentIndex(idx)
+        self.scale_combo.currentIndexChanged.connect(self._cb_scale_changed)
+        hbox_scale.layout().addWidget(self.scale_combo)
+
         grid.addWidget(hbox_scale, 1, 0, 1, 2)
 
         # file format
@@ -224,6 +231,20 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
         if self.auto_save:
             self.save_file()
 
+    def _cb_scale_changed(self, idx):
+        self.set_scale_key(
+            self.scale_combo.itemData(idx, Qt.ItemDataRole.UserRole)
+        )
+
+    def set_scale_key(self, key):
+        if self.scale_key != key:
+            idx = self.scale_combo.findData(key, Qt.ItemDataRole.UserRole)
+            if idx < 0:
+                raise ValueError
+            self.scale_combo.setCurrentIndex(idx)
+            self.scale_key = key
+            self.setting_changed()
+
     def gather_paths(self):
         classes = _get_classes(self.data)
         file_paths_attr = self.image_attributes[self.image_attr_current_index]
@@ -247,7 +268,7 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
             from_path, to_path = self.gather_paths()
             self.paths_queue = deque(list(zip(from_path, to_path)))
         image_size = \
-            self.available_scales[self.scale_index]["target_image_size"]\
+            MODELS[self.scale_key]["target_image_size"]\
             if self.use_scale else None
         self.bt_save.setText("Stop")
         self.start(_prepare_dir_and_save_images, self.paths_queue,
@@ -378,6 +399,21 @@ class OWSaveImages(OWWidget, ConcurrentWidgetMixin):
 
     def sizeHint(self):
         return QSize(500, 450)
+
+    @classmethod
+    def migrate_settings(cls, settings, version):
+        if version is None or version < 2:
+            scale_index = settings.pop("scale_index", 0)
+            scale_key = [
+                "inception-v3",
+                "squeezenet",
+                "vgg16",
+                "vgg19",
+                "painters",
+                "deeploc",
+                "openface",
+            ][scale_index]
+            settings["scale_key"] = scale_key
 
 
 if __name__ == "__main__":  # pragma: no cover
